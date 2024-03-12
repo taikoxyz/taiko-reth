@@ -1,14 +1,11 @@
 //! Test runners for `BlockchainTests` in <https://github.com/ethereum/tests>
 
-use crate::{
-    models::{BlockchainTest, ForkSpec},
-    Case, Error, Suite,
-};
+use crate::models::BlockchainTest;
 use alloy_rlp::Decodable;
 use rayon::iter::{ParallelBridge, ParallelIterator};
 use reth_db::test_utils::{create_test_rw_db, create_test_static_files_dir};
 use reth_node_ethereum::EthEvmConfig;
-use reth_primitives::{BlockBody, SealedBlock, StaticFileSegment};
+use reth_primitives::{BlockBody, ForkSpec, SealedBlock, StaticFileSegment};
 use reth_provider::{providers::StaticFileWriter, HashingWriter, ProviderFactory};
 use reth_stages::{stages::ExecutionStage, ExecInput, Stage};
 use std::{collections::BTreeMap, fs, path::Path, sync::Arc};

@@ -55,7 +55,7 @@ pub use block::{
 };
 pub use chain::{
     AllGenesisFormats, BaseFeeParams, BaseFeeParamsKind, Chain, ChainInfo, ChainSpec,
-    ChainSpecBuilder, DisplayHardforks, ForkBaseFeeParams, ForkCondition, ForkTimestamps,
+    ChainSpecBuilder, DisplayHardforks, ForkBaseFeeParams, ForkCondition, ForkSpec, ForkTimestamps,
     NamedChain, DEV, GOERLI, HOLESKY, MAINNET, SEPOLIA,
 };
 pub use compression::*;

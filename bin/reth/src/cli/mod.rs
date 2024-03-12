@@ -7,7 +7,7 @@ use crate::{
     },
     commands::{
         config_cmd, db, debug_cmd, dump_genesis, import, init_cmd, node, node::NoArgs, p2p,
-        recover, stage, test_vectors,
+        recover, stage, t8n, test_vectors,
     },
     core::cli::runner::CliRunner,
     version::{LONG_VERSION, SHORT_VERSION},
@@ -150,6 +150,7 @@ impl<Ext: clap::Args + fmt::Debug> Cli<Ext> {
             Commands::Db(command) => runner.run_blocking_until_ctrl_c(command.execute()),
             Commands::Stage(command) => runner.run_blocking_until_ctrl_c(command.execute()),
             Commands::P2P(command) => runner.run_until_ctrl_c(command.execute()),
+            Commands::T8n(command) => runner.run_until_ctrl_c(command.execute()),
             Commands::TestVectors(command) => runner.run_until_ctrl_c(command.execute()),
             Commands::Config(command) => runner.run_until_ctrl_c(command.execute()),
             Commands::Debug(command) => runner.run_command_until_exit(|ctx| command.execute(ctx)),
@@ -190,6 +191,12 @@ pub enum Commands<Ext: clap::Args + fmt::Debug = NoArgs> {
     /// P2P Debugging utilities
     #[command(name = "p2p")]
     P2P(p2p::Command),
+    /// Runs an EVM state transition using the provided JSON pre-state files.
+    ///
+    /// Equivalent of Geth's `./evm t8n` utility, and should be used to confirm
+    /// equivalence of behavior between Geth and Reth executors.
+    #[command(name = "t8n")]
+    T8n(t8n::Command),
     /// Generate Test Vectors
     #[command(name = "test-vectors")]
     TestVectors(test_vectors::Command),

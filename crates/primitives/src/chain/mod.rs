@@ -2,8 +2,8 @@ pub use alloy_chains::{Chain, NamedChain};
 pub use info::ChainInfo;
 pub use spec::{
     AllGenesisFormats, BaseFeeParams, BaseFeeParamsKind, ChainSpec, ChainSpecBuilder,
-    DisplayHardforks, ForkBaseFeeParams, ForkCondition, ForkTimestamps, DEV, GOERLI, HOLESKY,
-    MAINNET, SEPOLIA,
+    DisplayHardforks, ForkBaseFeeParams, ForkCondition, ForkSpec, ForkTimestamps, DEV, GOERLI,
+    HOLESKY, MAINNET, SEPOLIA,
 };
 #[cfg(feature = "optimism")]
 pub use spec::{BASE_MAINNET, BASE_SEPOLIA};
