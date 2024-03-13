@@ -1,19 +1,24 @@
 #![allow(unreachable_pub)]
 use itertools::Itertools;
 use rayon::vec;
+use reth_beacon_consensus::BeaconConsensus;
+use reth_interfaces::consensus::Consensus;
+use reth_node_ethereum::EthEvmConfig;
+use reth_provider::test_utils::{ExtendedAccount, MockEthProvider};
 // TODO: Remove.
 use secp256k1::SecretKey;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
     fs::{self, File},
+    sync::Arc,
 };
 
 use super::try_into_primitive_transaction_and_sign;
 use alloy_rlp::Decodable;
 use reth_primitives::{
-    hex, keccak256, sign_message, Address, Bytes, TransactionSigned, TransactionSignedNoHash,
-    Withdrawal, B256, H256, U256, U64,
+    hex, keccak256, sign_message, Address, Bytes, ChainSpec, TransactionSigned,
+    TransactionSignedNoHash, Withdrawal, B256, H256, U256, U64,
 };
 use reth_revm::{
     primitives::{AccountInfo, Bytecode},
@@ -85,19 +90,13 @@ pub(crate) struct Ommer {
 pub(crate) type PrestateAlloc = HashMap<Address, PrestateAccount>;
 
 // Input data from stdin
-#[derive(Serialize, Deserialize)]
+#[derive(Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct Input {
     pub alloc: Option<PrestateAlloc>,
     pub env: Option<PrestateEnv>,
     pub txs: Option<Vec<TxWithKey>>,
     pub tx_rlp: Option<String>,
-}
-
-pub(crate) struct Prestate {
-    pub alloc: PrestateAlloc,
-    pub env: PrestateEnv,
-    pub txs: Vec<TransactionSigned>,
 }
 
 impl Input {
@@ -148,12 +147,6 @@ impl Input {
     }
 }
 
-impl Default for Input {
-    fn default() -> Self {
-        Self { alloc: None, env: None, txs: None, tx_rlp: None }
-    }
-}
-
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct TxWithKey {
@@ -161,4 +154,32 @@ pub(crate) struct TxWithKey {
     #[serde(flatten)]
     pub tx: rpc::Transaction,
     pub protected: bool,
+}
+
+pub(crate) struct Prestate {
+    pub alloc: PrestateAlloc,
+    pub env: PrestateEnv,
+    pub txs: Vec<TransactionSigned>,
+}
+
+impl Prestate {
+    pub(crate) fn apply(self, chain: Arc<ChainSpec>) -> eyre::Result<()> {
+        let Prestate { alloc, env, txs } = self;
+        // set pre state with an in-memory state provider
+        let provider = MockEthProvider::default();
+        for (address, account) in alloc {
+            let mut reth_account = ExtendedAccount::new(account.nonce, account.balance)
+                .extend_storage(account.storage);
+            if let Some(code) = account.code {
+                reth_account = reth_account.with_bytecode(code);
+            }
+            provider.add_account(address, reth_account);
+        }
+
+        let consensus: Arc<dyn Consensus> = Arc::new(BeaconConsensus::new(Arc::clone(&chain)));
+
+        let factory = reth_revm::EvmProcessorFactory::new(chain, EthEvmConfig::default());
+
+        Ok(())
+    }
 }
