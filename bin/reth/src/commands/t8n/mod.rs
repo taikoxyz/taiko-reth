@@ -9,15 +9,6 @@ mod utils;
 use provider::*;
 use utils::*;
 
-use crate::{
-    args::{
-        utils::{chain_help, genesis_value_parser, parse_socket_address, SUPPORTED_CHAINS},
-        DatabaseArgs, DebugArgs, DevArgs, NetworkArgs, PayloadBuilderArgs, PruningArgs,
-        RpcServerArgs, TxPoolArgs,
-    },
-    core::cli::runner::CliContext,
-    dirs::{DataDirPath, MaybePlatformPath},
-};
 use reth_beacon_consensus::BeaconConsensus;
 use reth_interfaces::{
     consensus::Consensus,
@@ -25,7 +16,8 @@ use reth_interfaces::{
 };
 use reth_node_ethereum::EthEvmConfig;
 use reth_primitives::{
-    keccak256, Block, ChainSpec, ChainSpecBuilder, ForkCondition, ForkSpec, Header, U256,
+    keccak256, Block, BlockWithSenders, ChainSpec, ChainSpecBuilder, ForkCondition, ForkSpec,
+    Header, U256,
 };
 use reth_provider::{
     test_utils::{ExtendedAccount, MockEthProvider},
@@ -38,7 +30,6 @@ use reth_revm::{
 use reth_rpc_types as rpc;
 
 use clap::Parser;
-use serde_with::serde_as;
 
 use std::{
     collections::BTreeMap,
@@ -50,12 +41,12 @@ use std::{
 /// `reth t8n` command
 #[derive(Debug, Parser)]
 pub struct Command {
-    #[arg(long = "input.alloc", value_parser = input_source_value_parser)]
-    input_alloc: InputSource,
-    #[arg(long = "input.env", value_parser = input_source_value_parser)]
-    input_env: InputSource,
-    #[arg(long = "input.txs", value_parser = input_source_value_parser)]
-    input_txs: InputSource,
+    #[arg(long = "input.alloc")]
+    input_alloc: String,
+    #[arg(long = "input.env")]
+    input_env: String,
+    #[arg(long = "input.txs")]
+    input_txs: String,
     #[arg(long = "output.basedir")]
     output_basedir: PathBuf,
     #[arg(long = "output.alloc", value_parser = output_source_value_parser)]
@@ -87,13 +78,12 @@ pub struct Command {
 impl Command {
     /// Execute `stage` command
     pub async fn execute(&self) -> eyre::Result<()> {
-        let prestate = self.input_alloc.from_json::<Input, PrestateAlloc>()?;
-        let env = self.input_env.from_json::<Input, PrestateEnv>()?;
-        let txs = self.input_txs.from_json::<Input, Vec<TxWithKey>>()?;
+        let Prestate { alloc, env, txs } =
+            Input::parse(&self.input_alloc, &self.input_env, &self.input_txs)?;
 
         // set pre state with an in-memory state provider
         let provider = MockEthProvider::default();
-        for (address, account) in prestate {
+        for (address, account) in alloc {
             let mut reth_account = ExtendedAccount::new(account.nonce, account.balance)
                 .extend_storage(account.storage);
             if let Some(code) = account.code {
@@ -111,6 +101,7 @@ impl Command {
         let factory = reth_revm::EvmProcessorFactory::new(chain, EthEvmConfig::default());
 
         let executor = factory.with_state(provider);
+        executor.execute_transactions(block, total_difficulty)
 
         let block = Block {
             header: Header {
@@ -136,7 +127,7 @@ impl Command {
                 parent_beacon_block_root: todo!(),
                 extra_data: todo!(),
             },
-            body: txs.into_iter().map(|x| x.into_transaction()).collect(),
+            body: txs,
             ..Default::default()
         };
         let mut executor = Executor::new(&spec, &mut provider);

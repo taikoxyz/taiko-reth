@@ -1,14 +1,30 @@
-#![allow(unreachable_pub)] // TODO: Remove.
+#![allow(unreachable_pub)]
+use itertools::Itertools;
+use rayon::vec;
+// TODO: Remove.
 use secp256k1::SecretKey;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::{
+    collections::HashMap,
+    fs::{self, File},
+};
 
-use reth_primitives::{keccak256, Address, Bytes, Withdrawal, H256, U256, U64};
+use super::try_into_primitive_transaction_and_sign;
+use alloy_rlp::Decodable;
+use reth_primitives::{
+    hex, keccak256, sign_message, Address, Bytes, TransactionSigned, TransactionSignedNoHash,
+    Withdrawal, B256, H256, U256, U64,
+};
 use reth_revm::{
     primitives::{AccountInfo, Bytecode},
     InMemoryDB,
 };
 use reth_rpc_types as rpc;
+
+const STDIN_ARG_NAME: &str = "stdin";
+const STDOUT_ARG_NAME: &str = "stdout";
+const STDERR_ARG_NAME: &str = "stderr";
+const RLP_EXT: &str = ".rlp";
 
 #[derive(Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
@@ -18,7 +34,7 @@ pub(crate) struct PrestateAccount {
     #[serde(default)]
     pub nonce: u64,
     #[serde(default, skip_serializing_if = "HashMap::is_empty")]
-    pub storage: HashMap<H256, U256>,
+    pub storage: HashMap<B256, U256>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub code: Option<Bytes>,
 }
@@ -42,21 +58,21 @@ pub(crate) struct PrestateEnv {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub parent_timestamp: Option<U256>,
     #[serde(skip_serializing_if = "HashMap::is_empty")]
-    pub block_hashes: HashMap<u64, H256>,
+    pub block_hashes: HashMap<u64, B256>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub ommers: Vec<Ommer>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub withdrawals: Vec<Withdrawal>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub current_base_fee: Option<U256>,
-    pub parent_uncle_hash: H256,
+    pub parent_uncle_hash: B256,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub current_excess_blob_gas: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub parent_excess_blob_gas: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub parent_blob_gas_used: Option<u64>,
-    pub parent_beacon_block_root: H256,
+    pub parent_beacon_block_root: B256,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -68,6 +84,7 @@ pub(crate) struct Ommer {
 
 pub(crate) type PrestateAlloc = HashMap<Address, PrestateAccount>;
 
+// Input data from stdin
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct Input {
@@ -77,34 +94,70 @@ pub(crate) struct Input {
     pub tx_rlp: Option<String>,
 }
 
+pub(crate) struct Prestate {
+    pub alloc: PrestateAlloc,
+    pub env: PrestateEnv,
+    pub txs: Vec<TransactionSigned>,
+}
+
+impl Input {
+    pub fn parse(input_alloc: &str, input_env: &str, input_txs: &str) -> eyre::Result<Prestate> {
+        let mut input: Input = Default::default();
+        if input_alloc == STDIN_ARG_NAME ||
+            input_env == STDIN_ARG_NAME ||
+            input_txs == STDIN_ARG_NAME
+        {
+            input = serde_json::from_reader(std::io::stdin())?;
+        }
+
+        if input_alloc != STDIN_ARG_NAME {
+            input.alloc = Some(serde_json::from_reader(File::open(input_alloc)?)?);
+        }
+
+        if input_env != STDIN_ARG_NAME {
+            input.env = Some(serde_json::from_reader(File::open(input_env)?)?);
+        }
+        let mut txs = vec![];
+        if input_txs != STDIN_ARG_NAME {
+            if input_txs.ends_with(RLP_EXT) {
+                let buf = fs::read(input_txs)?;
+                let mut rlp = alloy_rlp::Rlp::new(&buf)?;
+                while let Some(tx) = rlp.get_next()? {
+                    txs.push(tx);
+                }
+            } else {
+                let tx_with_keys: Vec<TxWithKey> = serde_json::from_reader(File::open(input_txs)?)?;
+                for tx in tx_with_keys {
+                    let tx = try_into_primitive_transaction_and_sign(tx.tx, &tx.secret_key)?;
+                    txs.push(tx);
+                }
+            }
+        } else if input.tx_rlp.is_some() {
+            let buf = hex::decode(input.tx_rlp.as_ref().unwrap())?;
+            let mut rlp = alloy_rlp::Rlp::new(&buf)?;
+            while let Some(tx) = rlp.get_next()? {
+                txs.push(tx);
+            }
+        } else if input.txs.is_some() {
+            for tx in input.txs.unwrap() {
+                let tx = try_into_primitive_transaction_and_sign(tx.tx, &tx.secret_key)?;
+                txs.push(tx);
+            }
+        }
+        Ok(Prestate { alloc: input.alloc.unwrap(), env: input.env.unwrap(), txs })
+    }
+}
+
 impl Default for Input {
     fn default() -> Self {
         Self { alloc: None, env: None, txs: None, tx_rlp: None }
     }
 }
 
-impl From<PrestateAlloc> for Input {
-    fn from(value: PrestateAlloc) -> Self {
-        Self { alloc: Some(value), ..Default::default() }
-    }
-}
-
-impl From<PrestateEnv> for Input {
-    fn from(value: PrestateEnv) -> Self {
-        Self { env: Some(value), ..Default::default() }
-    }
-}
-
-impl From<Vec<TxWithKey>> for Input {
-    fn from(value: Vec<TxWithKey>) -> Self {
-        Self { txs: Some(value), ..Default::default() }
-    }
-}
-
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct TxWithKey {
-    pub secret_key: SecretKey,
+    pub secret_key: Option<SecretKey>,
     #[serde(flatten)]
     pub tx: rpc::Transaction,
     pub protected: bool,
