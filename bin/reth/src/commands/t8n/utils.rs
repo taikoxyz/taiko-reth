@@ -45,7 +45,7 @@ impl OutputTarget {
 
 /// Clap value parser for [OutputTarget]s that takes either a specify "stdout", "stderr" or the path
 /// to the OutputSource.
-pub fn output_source_value_parser(s: &str) -> eyre::Result<OutputTarget, eyre::Error> {
+pub(crate) fn output_source_value_parser(s: &str) -> eyre::Result<OutputTarget, eyre::Error> {
     Ok(match s {
         "stdout" => OutputTarget::Stdout,
         "stderr" => OutputTarget::Stderr,
@@ -107,7 +107,7 @@ fn try_into_optimism_fields(other: OtherFields) -> eyre::Result<OptimismTransact
 }
 
 /// Convert [Transaction] to [TransactionSigned]
-pub fn try_into_primitive_transaction_and_sign(
+pub(crate) fn try_into_primitive_transaction_and_sign(
     tx: Transaction,
     secret: &Option<SecretKey>,
 ) -> eyre::Result<TransactionSigned> {
