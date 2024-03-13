@@ -108,6 +108,7 @@ mod metrics;
 mod optimism;
 mod payload;
 mod service;
+mod taiko;
 mod traits;
 
 pub mod noop;
@@ -119,4 +120,5 @@ pub use optimism::{OptimismBuiltPayload, OptimismPayloadBuilderAttributes};
 pub use payload::{EthBuiltPayload, EthPayloadBuilderAttributes};
 pub use reth_rpc_types::engine::PayloadId;
 pub use service::{PayloadBuilderHandle, PayloadBuilderService, PayloadStore};
+pub use taiko::{TaikoBuiltPayload, TaikoPayloadBuilderAttributes};
 pub use traits::{KeepPayloadJobAlive, PayloadJob, PayloadJobGenerator};

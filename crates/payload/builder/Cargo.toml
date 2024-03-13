@@ -23,6 +23,7 @@ reth-node-api.workspace = true
 
 # ethereum
 alloy-rlp.workspace = true
+alloy-rpc-types.workspace = true
 revm-primitives.workspace = true
 
 # async
@@ -38,6 +39,7 @@ metrics.workspace = true
 thiserror.workspace = true
 sha2 = { version = "0.10", default-features = false }
 tracing.workspace = true
+serde = { workspace = true, features = ["derive"] }
 
 [dev-dependencies]
 revm.workspace = true
@@ -51,3 +53,4 @@ optimism = [
     "reth-interfaces/optimism",
     "reth-transaction-pool/optimism",
 ]
+taiko = []
