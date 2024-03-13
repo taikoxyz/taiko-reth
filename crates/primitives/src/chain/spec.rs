@@ -451,7 +451,8 @@ impl BaseFeeParams {
 }
 
 /// Fork specification.
-#[derive(Debug, PartialEq, Eq, PartialOrd, Hash, Ord, Clone, Deserialize)]
+#[derive(Debug, PartialEq, Eq, PartialOrd, Hash, Ord, Clone, Deserialize, clap::ValueEnum)]
+#[clap(rename_all = "verbatim")]
 pub enum ForkSpec {
     /// Frontier
     Frontier,
@@ -493,12 +494,15 @@ pub enum ForkSpec {
     Shanghai,
     /// Merge EOF test
     #[serde(alias = "Merge+3540+3670")]
+    #[value(name = "Merge+3540+3670")]
     MergeEOF,
     /// After Merge Init Code test
     #[serde(alias = "Merge+3860")]
+    #[value(name = "Merge+3860")]
     MergeMeterInitCode,
     /// After Merge plus new PUSH0 opcode
     #[serde(alias = "Merge+3855")]
+    #[value(name = "Merge+3855")]
     MergePush0,
     /// Cancun
     Cancun,

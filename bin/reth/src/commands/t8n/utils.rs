@@ -31,24 +31,13 @@ impl InputSource {
     }
 }
 
-/// A util for clap value_parser
-pub struct InputSourceValueParser;
-
-impl TypedValueParser for InputSourceValueParser {
-    type Value = InputSource;
-
-    fn parse_ref(
-        &self,
-        cmd: &Command,
-        arg: Option<&Arg>,
-        value: &std::ffi::OsStr,
-    ) -> Result<Self::Value, Error> {
-        let value = NonEmptyStringValueParser::new().parse_ref(cmd, arg, value)?;
-        Ok(match value.as_str() {
-            "stdin" => InputSource::Stdin,
-            x => InputSource::File(PathBuf::from(x)),
-        })
-    }
+/// Clap value parser for [InputSource]s that takes either a specify "stdin" or the path
+/// to the InputSource.
+pub fn input_source_value_parser(s: &str) -> eyre::Result<InputSource, eyre::Error> {
+    Ok(match s {
+        "stdin" => InputSource::Stdin,
+        x => InputSource::File(PathBuf::from(x)),
+    })
 }
 
 /// OutputTarget represents both stdout, stderr and file output
@@ -74,22 +63,12 @@ impl OutputTarget {
     }
 }
 
-pub struct OutputTargetValueParser;
-
-impl TypedValueParser for OutputTargetValueParser {
-    type Value = OutputTarget;
-
-    fn parse_ref(
-        &self,
-        cmd: &Command,
-        arg: Option<&Arg>,
-        value: &std::ffi::OsStr,
-    ) -> Result<Self::Value, Error> {
-        let value = NonEmptyStringValueParser::new().parse_ref(cmd, arg, value)?;
-        Ok(match value.as_str() {
-            "stdout" => OutputTarget::Stdout,
-            "stderr" => OutputTarget::Stderr,
-            x => OutputTarget::File(PathBuf::from(x)),
-        })
-    }
+/// Clap value parser for [OutputTarget]s that takes either a specify "stdout", "stderr" or the path
+/// to the OutputSource.
+pub fn output_source_value_parser(s: &str) -> eyre::Result<OutputTarget, eyre::Error> {
+    Ok(match s {
+        "stdout" => OutputTarget::Stdout,
+        "stderr" => OutputTarget::Stderr,
+        x => OutputTarget::File(PathBuf::from(x)),
+    })
 }

@@ -68,30 +68,36 @@ pub(crate) struct Ommer {
 
 pub(crate) type PrestateAlloc = HashMap<Address, PrestateAccount>;
 
-#[derive(Debug, Default, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct Input {
-    pub alloc: PrestateAlloc,
-    pub env: PrestateEnv,
-    pub txs: Vec<TxWithKey>,
-    pub tx_rlp: String,
+    pub alloc: Option<PrestateAlloc>,
+    pub env: Option<PrestateEnv>,
+    pub txs: Option<Vec<TxWithKey>>,
+    pub tx_rlp: Option<String>,
+}
+
+impl Default for Input {
+    fn default() -> Self {
+        Self { alloc: None, env: None, txs: None, tx_rlp: None }
+    }
 }
 
 impl From<PrestateAlloc> for Input {
     fn from(value: PrestateAlloc) -> Self {
-        Self { alloc: value, ..Default::default() }
+        Self { alloc: Some(value), ..Default::default() }
     }
 }
 
 impl From<PrestateEnv> for Input {
     fn from(value: PrestateEnv) -> Self {
-        Self { env: value, ..Default::default() }
+        Self { env: Some(value), ..Default::default() }
     }
 }
 
 impl From<Vec<TxWithKey>> for Input {
     fn from(value: Vec<TxWithKey>) -> Self {
-        Self { txs: value, ..Default::default() }
+        Self { txs: Some(value), ..Default::default() }
     }
 }
 

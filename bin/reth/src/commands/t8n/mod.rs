@@ -19,9 +19,9 @@ use crate::{
     dirs::{DataDirPath, MaybePlatformPath},
 };
 use reth_beacon_consensus::BeaconConsensus;
-use reth_executor::{
-    executor::{test_utils::InMemoryStateProvider, Executor},
-    revm_wrap::{State, SubState},
+use reth_interfaces::{
+    consensus::Consensus,
+    p2p::{bodies::client::BodiesClient, headers::client::HeadersClient},
 };
 use reth_node_ethereum::EthEvmConfig;
 use reth_primitives::{
@@ -50,19 +50,19 @@ use std::{
 /// `reth t8n` command
 #[derive(Debug, Parser)]
 pub struct Command {
-    #[arg(long = "input.alloc", value_parser = InputSourceValueParser)]
+    #[arg(long = "input.alloc", value_parser = input_source_value_parser)]
     input_alloc: InputSource,
-    #[arg(long = "input.env", value_parser = InputSourceValueParser)]
+    #[arg(long = "input.env", value_parser = input_source_value_parser)]
     input_env: InputSource,
-    #[arg(long = "input.txs", value_parser = InputSourceValueParser)]
+    #[arg(long = "input.txs", value_parser = input_source_value_parser)]
     input_txs: InputSource,
     #[arg(long = "output.basedir")]
     output_basedir: PathBuf,
-    #[arg(long = "output.alloc", value_parser = OutputTargetValueParser)]
+    #[arg(long = "output.alloc", value_parser = output_source_value_parser)]
     output_alloc: OutputTarget,
-    #[arg(long = "output.body", value_parser = OutputTargetValueParser)]
+    #[arg(long = "output.body", value_parser = output_source_value_parser)]
     output_body: OutputTarget,
-    #[arg(long = "output.result", value_parser = OutputTargetValueParser)]
+    #[arg(long = "output.result", value_parser = output_source_value_parser)]
     output_result: OutputTarget,
     #[arg(long)]
     trace: bool,
@@ -80,8 +80,8 @@ pub struct Command {
     reward: i64,
     #[arg(long = "state.chainid")]
     chain_id: u64,
-    #[arg(long = "state.fork")]
-    chain: ChainSpec,
+    #[arg(long = "state.fork", value_enum)]
+    fork: ForkSpec,
 }
 
 impl Command {
@@ -89,7 +89,7 @@ impl Command {
     pub async fn execute(&self) -> eyre::Result<()> {
         let prestate = self.input_alloc.from_json::<Input, PrestateAlloc>()?;
         let env = self.input_env.from_json::<Input, PrestateEnv>()?;
-        let txs = self.input_txs.from_json::<Input, Vec<rpc::Transaction>>()?;
+        let txs = self.input_txs.from_json::<Input, Vec<TxWithKey>>()?;
 
         // set pre state with an in-memory state provider
         let provider = MockEthProvider::default();
@@ -102,13 +102,13 @@ impl Command {
             provider.add_account(address, reth_account);
         }
 
-        let mut chain = self.chain.clone();
+        let mut chain: ChainSpec = self.fork.clone().into();
         chain.chain = self.chain_id.into();
         let chain = Arc::new(chain);
 
         let consensus: Arc<dyn Consensus> = Arc::new(BeaconConsensus::new(Arc::clone(&chain)));
 
-        let faxctory = reth_revm::EvmProcessorFactory::new(chain, EthEvmConfig::default());
+        let factory = reth_revm::EvmProcessorFactory::new(chain, EthEvmConfig::default());
 
         let executor = factory.with_state(provider);
 
@@ -117,7 +117,7 @@ impl Command {
                 beneficiary: env.current_coinbase,
                 // TODO: Make RANDAO-aware for post-Shanghai blocks
                 difficulty: env.current_difficulty,
-                number: env.current_number.as_u64(),
+                number: env.current_number,
                 timestamp: env.current_timestamp.to::<u64>(),
                 gas_limit: env.current_gas_limit.to::<u64>(),
                 parent_hash: todo!(),
