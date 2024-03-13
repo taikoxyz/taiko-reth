@@ -6285,6 +6285,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "reth-node-taiko"
+version = "0.2.0-beta.1"
+dependencies = [
+ "eyre",
+ "reth-basic-payload-builder",
+ "reth-db",
+ "reth-ethereum-payload-builder",
+ "reth-network",
+ "reth-node-api",
+ "reth-node-builder",
+ "reth-payload-builder",
+ "reth-primitives",
+ "reth-provider",
+ "reth-rpc-types",
+ "reth-tracing",
+ "reth-transaction-pool",
+ "serde",
+]
+
+[[package]]
 name = "reth-optimism-payload-builder"
 version = "0.2.0-beta.1"
 dependencies = [
@@ -6304,6 +6324,7 @@ name = "reth-payload-builder"
 version = "0.2.0-beta.1"
 dependencies = [
  "alloy-rlp",
+ "alloy-rpc-types",
  "futures-util",
  "metrics",
  "reth-interfaces",
@@ -6316,6 +6337,7 @@ dependencies = [
  "reth-transaction-pool",
  "revm",
  "revm-primitives",
+ "serde",
  "sha2",
  "thiserror",
  "tokio",
@@ -6690,6 +6712,21 @@ dependencies = [
  "reth-tokio-util",
  "tempfile",
  "tokio-stream",
+ "tracing",
+]
+
+[[package]]
+name = "reth-taiko-payload-builder"
+version = "0.2.0-beta.1"
+dependencies = [
+ "reth-basic-payload-builder",
+ "reth-payload-builder",
+ "reth-primitives",
+ "reth-provider",
+ "reth-revm",
+ "reth-transaction-pool",
+ "revm",
+ "thiserror",
  "tracing",
 ]
 
