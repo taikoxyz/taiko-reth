@@ -5,9 +5,11 @@
 
 mod mem_db;
 mod provider;
+mod trie;
 mod utils;
 
 use alloy_rlp::Rlp;
+use futures::SinkExt;
 use mem_db::*;
 use proptest::collection::vec;
 use provider::*;
@@ -23,6 +25,7 @@ use reth_revm::{
     DatabaseCommit,
 };
 use tracing::{info, warn};
+use trie::*;
 use utils::*;
 
 use reth_primitives::{
@@ -31,7 +34,8 @@ use reth_primitives::{
     eip4844::calculate_excess_blob_gas,
     hex, keccak256,
     revm::{config::revm_spec, env::fill_tx_env},
-    BaseFeeParams, Bytes, ChainSpec, ForkSpec, Hardfork, Head, Receipt, TxType, U256,
+    BaseFeeParams, Bloom, Bytes, ChainSpec, ForkSpec, Hardfork, Head, Log, Receipt,
+    ReceiptWithBloom, TxType, U256,
 };
 
 use clap::Parser;
@@ -113,6 +117,8 @@ impl Command {
             db.increment_balance(&DAO_HARDFORK_BENEFICIARY, drained_balance);
         }
 
+        let mut init_state_trie = MptNode::default();
+        apply_state_update(&mut init_state_trie, &db)?;
         let spec_id = revm_spec(
             chain,
             Head::new(
@@ -123,6 +129,7 @@ impl Command {
                 env.current_timestamp,
             ),
         );
+        let mut excess_blob_gas = 0;
         let mut evm = Evm::builder()
             .with_db(db)
             .with_spec_id(spec_id)
@@ -135,17 +142,19 @@ impl Command {
                 blk_env.prevrandao = env.current_random.map(Into::into);
                 blk_env.basefee = env.current_base_fee.unwrap_or_default();
                 blk_env.gas_limit = env.current_gas_limit.try_into().unwrap();
-                if env.current_excess_blob_gas.is_some() {
-                    blk_env.blob_excess_gas_and_price =
-                        env.current_excess_blob_gas.map(BlobExcessGasAndPrice::new);
+                excess_blob_gas = if env.current_excess_blob_gas.is_some() {
+                    env.current_excess_blob_gas.unwrap()
                 } else if env.parent_excess_blob_gas.is_some() && env.parent_blob_gas_used.is_some()
                 {
-                    blk_env.blob_excess_gas_and_price =
-                        Some(BlobExcessGasAndPrice::new(calculate_excess_blob_gas(
-                            env.parent_excess_blob_gas.unwrap(),
-                            env.parent_blob_gas_used.unwrap(),
-                        )));
-                }
+                    calculate_excess_blob_gas(
+                        env.parent_excess_blob_gas.unwrap(),
+                        env.parent_blob_gas_used.unwrap(),
+                    )
+                } else {
+                    0
+                };
+                blk_env.blob_excess_gas_and_price =
+                    Some(BlobExcessGasAndPrice::new(excess_blob_gas));
             })
             .modify_cfg_env(|cfg_env| {
                 // set the EVM configuration
@@ -166,7 +175,7 @@ impl Command {
 
         let mut rejected_txs = vec![];
         let mut included_txs = vec![];
-        let mut receipts = vec![];
+        let mut receipts: Vec<ReceiptWithBloom> = vec![];
         let mut blob_gas_used = 0;
         let mut gas_used = 0;
 
@@ -217,15 +226,18 @@ impl Command {
 
             // Push transaction changeset and calculate header bloom filter for receipt.
             #[cfg(not(feature = "optimism"))]
-            receipts.push(Receipt {
-                tx_type: tx.tx_type(),
-                // Success flag was added in `EIP-658: Embedding transaction status code in
-                // receipts`.
-                success: result.is_success(),
-                cumulative_gas_used: gas_used,
-                // convert to reth log
-                logs: result.into_logs().into_iter().map(Into::into).collect(),
-            });
+            receipts.push(
+                Receipt {
+                    tx_type: tx.tx_type(),
+                    // Success flag was added in `EIP-658: Embedding transaction status code in
+                    // receipts`.
+                    success: result.is_success(),
+                    cumulative_gas_used: gas_used,
+                    // convert to reth log
+                    logs: result.into_logs().into_iter().map(Into::into).collect(),
+                }
+                .into(),
+            );
 
             included_txs.push(tx);
         }
@@ -242,26 +254,40 @@ impl Command {
             evm.db_mut().increment_balance(&env.current_coinbase, miner_reward as u128);
         }
         // withdrawals
-        for withdrawal in env.withdrawals {
+        let mut withdrawals_trie = MptNode::default();
+        for (i, withdrawal) in env.withdrawals.iter().enumerate() {
             let amount = withdrawal.amount_wei();
             evm.db_mut().increment_balance(&withdrawal.address, amount);
+            withdrawals_trie.insert_rlp(&alloy_rlp::encode(i), withdrawal)?;
         }
         // take db
         let db = std::mem::take(evm.db_mut());
+        // calcuate roots
+        let mut tx_trie = MptNode::default();
+        let mut receipt_trie = MptNode::default();
+        let mut bloom = Bloom::default();
+        for (idx, (tx, receipt)) in included_txs.iter().zip(receipts.iter()).enumerate() {
+            let trie_key = alloy_rlp::encode(idx);
+            tx_trie.insert_rlp(&trie_key, tx)?;
+            receipt_trie.insert_rlp(&trie_key, receipt)?;
+            bloom.accrue_bloom(&receipt.bloom);
+        }
+        apply_state_update(&mut init_state_trie, &db)?;
+        let logs: Vec<&Log> = receipts.iter().flat_map(|r| r.receipt.logs.iter()).collect();
         let exec_result = ExecutionResult {
-            state_root: todo!(),
-            tx_root: todo!(),
-            receipt_root: todo!(),
-            logs_hash: todo!(),
-            bloom: todo!(),
-            receipts: todo!(),
-            rejected: todo!(),
-            difficulty: todo!(),
-            gas_used: todo!(),
-            base_fee: todo!(),
-            withdrawals_root: todo!(),
-            current_excess_blob_gas: todo!(),
-            current_blob_gas_used: todo!(),
+            state_root: init_state_trie.hash(),
+            tx_root: tx_trie.hash(),
+            receipt_root: receipt_trie.hash(),
+            logs_hash: keccak256(alloy_rlp::encode(logs)),
+            bloom,
+            receipts: receipts.into_iter().map(|v| v.into_receipt()).collect(),
+            rejected: rejected_txs,
+            difficulty: env.current_difficulty,
+            gas_used: gas_used.try_into().unwrap(),
+            base_fee: env.current_base_fee,
+            withdrawals_root: Some(withdrawals_trie.hash()),
+            current_excess_blob_gas: Some(excess_blob_gas),
+            current_blob_gas_used: Some(blob_gas_used),
         };
         let body = alloy_rlp::encode(included_txs);
         Ok((db, exec_result, Bytes::from(body)))
@@ -273,7 +299,7 @@ impl Command {
         result: ExecutionResult,
         body: Bytes,
     ) -> eyre::Result<()> {
-        todo!()
+        Ok(())
     }
 
     fn parse_prestate(&self) -> eyre::Result<Prestate> {
@@ -436,6 +462,34 @@ fn apply_cancun_checks(env: &mut PrestateEnv, chain: &ChainSpec) -> eyre::Result
     }
     if env.parent_beacon_block_root.is_none() {
         return Err(eyre::eyre!("post-cancun env requires parentBeaconBlockRoot to be set"));
+    }
+    Ok(())
+}
+
+fn apply_state_update(state_tire: &mut MptNode, db: &MemDb) -> eyre::Result<()> {
+    for (address, account) in &db.accounts {
+        let storage_root = {
+            let mut storage_trie = MptNode::default();
+            // apply all new storage entries for the current account (address)
+            for (key, value) in &account.storage {
+                let storage_trie_index = keccak256(key.to_be_bytes::<32>());
+                if value == &U256::ZERO {
+                    storage_trie.delete(storage_trie_index.as_slice())?;
+                } else {
+                    storage_trie.insert_rlp(storage_trie_index.as_slice(), *value)?;
+                }
+            }
+
+            storage_trie.hash()
+        };
+        let state_trie_index = keccak256(address);
+        let value = StateAccount {
+            nonce: account.info.nonce,
+            balance: account.info.balance,
+            storage_root,
+            code_hash: account.info.code_hash,
+        };
+        state_tire.insert_rlp(state_trie_index.as_slice(), value)?;
     }
     Ok(())
 }

@@ -49,12 +49,15 @@ reth-trie = { workspace = true, features = ["metrics"] }
 reth-nippy-jar.workspace = true
 reth-node-api.workspace = true
 reth-node-ethereum.workspace = true
-reth-node-optimism = { workspace = true, optional = true, features = ["optimism"] }
+reth-node-optimism = { workspace = true, optional = true, features = [
+    "optimism",
+] }
 reth-node-core.workspace = true
 reth-node-builder.workspace = true
 
 # crypto
 alloy-rlp.workspace = true
+rlp = "0.5"
 alloy-chains.workspace = true
 secp256k1.workspace = true
 
@@ -82,7 +85,12 @@ ratatui = "0.25.0"
 human_bytes = "0.4.1"
 
 # async
-tokio = { workspace = true, features = ["sync", "macros", "time", "rt-multi-thread"] }
+tokio = { workspace = true, features = [
+    "sync",
+    "macros",
+    "time",
+    "rt-multi-thread",
+] }
 futures.workspace = true
 
 # misc
