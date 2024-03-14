@@ -53,6 +53,9 @@ pub struct TxEip1559 {
     /// A gas cost is charged, though at a discount relative to the cost of
     /// accessing outside the list.
     pub access_list: AccessList,
+    /// CHANGE(taiko): Add is_anchor field
+    #[cfg(feature = "taiko")]
+    pub is_anchor: bool,
     /// Input has two uses depending if transaction is Create or Call (if `to` field is None or
     /// Some). pub init: An unlimited size byte array specifying the
     /// EVM-code for the account initialisation procedure CREATE,
@@ -105,20 +108,27 @@ impl TxEip1559 {
             value: Decodable::decode(buf)?,
             input: Decodable::decode(buf)?,
             access_list: Decodable::decode(buf)?,
+            #[cfg(feature = "taiko")]
+            is_anchor: Decodable::decode(buf)?,
         })
     }
 
     /// Encodes only the transaction's fields into the desired buffer, without a RLP header.
     pub(crate) fn fields_len(&self) -> usize {
-        self.chain_id.length() +
-            self.nonce.length() +
-            self.max_priority_fee_per_gas.length() +
-            self.max_fee_per_gas.length() +
-            self.gas_limit.length() +
-            self.to.length() +
-            self.value.length() +
-            self.input.0.length() +
-            self.access_list.length()
+        let anchor_len = 0;
+        #[cfg(feature = "taiko")]
+        let anchor_len = self.is_anchor.length();
+
+        self.chain_id.length()
+            + self.nonce.length()
+            + self.max_priority_fee_per_gas.length()
+            + self.max_fee_per_gas.length()
+            + self.gas_limit.length()
+            + self.to.length()
+            + self.value.length()
+            + self.input.0.length()
+            + self.access_list.length()
+            + anchor_len
     }
 
     /// Encodes only the transaction's fields into the desired buffer, without a RLP header.
@@ -132,6 +142,8 @@ impl TxEip1559 {
         self.value.encode(out);
         self.input.0.encode(out);
         self.access_list.encode(out);
+        #[cfg(feature = "taiko")]
+        self.is_anchor.encode(out);
     }
 
     /// Inner encoding function that is used for both rlp [`Encodable`] trait and for calculating
@@ -249,6 +261,8 @@ mod tests {
             max_fee_per_gas: 0x4a817c800,
             max_priority_fee_per_gas: 0x3b9aca00,
             access_list: AccessList::default(),
+            #[cfg(feature = "taiko")]
+            is_anchor: false,
         });
 
         let sig = Signature {
