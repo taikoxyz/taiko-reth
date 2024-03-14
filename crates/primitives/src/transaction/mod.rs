@@ -458,9 +458,13 @@ impl Transaction {
 
     /// Marks the transaction as an anchor transaction.
     #[cfg(feature = "taiko")]
-    pub fn mark_as_anchor(&mut self) {
-        if let Transaction::Eip1559(tx) = self {
-            tx.is_anchor = true;
+    pub fn mark_as_anchor(&mut self) -> Result<(), InvalidTransactionError> {
+        match self {
+            Transaction::Eip1559(tx) => {
+                tx.is_anchor = true;
+                Ok(())
+            }
+            _ => Err(InvalidTransactionError::TxTypeNotSupported),
         }
     }
 
