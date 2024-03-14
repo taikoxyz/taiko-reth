@@ -21,7 +21,7 @@ use thiserror::Error as ThisError;
 
 /// Error returned by the [MemDb].
 #[derive(Debug, ThisError)]
-pub enum DbError {
+pub(crate) enum DbError {
     /// Returned when an account was accessed but not loaded into the DB.
     #[error("account {0} not loaded")]
     AccountNotFound(Address),
@@ -37,7 +37,7 @@ pub enum DbError {
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub enum AccountState {
+pub(crate) enum AccountState {
     // Account can be cleared/removed from state.
     Deleted,
     /// EVM touched this account.
@@ -50,19 +50,19 @@ pub enum AccountState {
 }
 
 #[derive(Clone, Debug, Default)]
-pub struct DbAccount {
-    pub info: AccountInfo,
-    pub state: AccountState,
-    pub storage: HashMap<U256, U256>,
+pub(crate) struct DbAccount {
+    pub(crate) info: AccountInfo,
+    pub(crate) state: AccountState,
+    pub(crate) storage: HashMap<U256, U256>,
 }
 
 impl DbAccount {
-    pub fn new(info: AccountInfo) -> Self {
+    pub(crate) fn new(info: AccountInfo) -> Self {
         Self { info, ..Default::default() }
     }
 
     /// Return the account info or `None` if the account has been deleted.
-    pub fn info(&self) -> Option<AccountInfo> {
+    pub(crate) fn info(&self) -> Option<AccountInfo> {
         if self.state == AccountState::Deleted {
             None
         } else {
@@ -73,19 +73,19 @@ impl DbAccount {
 
 /// In-memory EVM database.
 #[derive(Clone, Debug, Default)]
-pub struct MemDb {
+pub(crate) struct MemDb {
     /// Account info where None means it is not existing.
-    pub accounts: HashMap<Address, DbAccount>,
+    pub(crate) accounts: HashMap<Address, DbAccount>,
     /// All cached block hashes.
-    pub block_hashes: HashMap<u64, B256>,
+    pub(crate) block_hashes: HashMap<u64, B256>,
 }
 
 impl MemDb {
-    pub fn accounts_len(&self) -> usize {
+    pub(crate) fn accounts_len(&self) -> usize {
         self.accounts.len()
     }
 
-    pub fn storage_keys(&self) -> HashMap<Address, Vec<U256>> {
+    pub(crate) fn storage_keys(&self) -> HashMap<Address, Vec<U256>> {
         let mut out = HashMap::new();
         for (address, account) in &self.accounts {
             out.insert(*address, account.storage.keys().cloned().collect());
@@ -96,7 +96,7 @@ impl MemDb {
 
     /// Insert account info without overriding its storage.
     /// Panics if a different account info exists.
-    pub fn insert_account_info(&mut self, address: Address, info: AccountInfo) {
+    pub(crate) fn insert_account_info(&mut self, address: Address, info: AccountInfo) {
         match self.accounts.entry(address) {
             Entry::Occupied(entry) => assert_eq!(info, entry.get().info),
             Entry::Vacant(entry) => {
@@ -107,13 +107,13 @@ impl MemDb {
 
     /// insert account storage without overriding the account info.
     /// Panics if the account does not exist.
-    pub fn insert_account_storage(&mut self, address: &Address, index: U256, data: U256) {
+    pub(crate) fn insert_account_storage(&mut self, address: &Address, index: U256, data: U256) {
         let account = self.accounts.get_mut(address).expect("account not found");
         account.storage.insert(index, data);
     }
 
     /// Insert the specified block hash. Panics if a different block hash exists.
-    pub fn insert_block_hash(&mut self, block_no: u64, block_hash: B256) {
+    pub(crate) fn insert_block_hash(&mut self, block_no: u64, block_hash: B256) {
         match self.block_hashes.entry(block_no) {
             Entry::Occupied(entry) => assert_eq!(&block_hash, entry.get()),
             Entry::Vacant(entry) => {
@@ -123,7 +123,10 @@ impl MemDb {
     }
 
     /// Increment the balance of the specified account.
-    pub fn drain_balances(&mut self, addresses: impl IntoIterator<Item = Address>) -> Vec<u128> {
+    pub(crate) fn drain_balances(
+        &mut self,
+        addresses: impl IntoIterator<Item = Address>,
+    ) -> Vec<u128> {
         addresses
             .into_iter()
             .map(|address| {
@@ -136,7 +139,7 @@ impl MemDb {
     }
 
     /// Increment the balance of the specified account.
-    pub fn increment_balance(&mut self, address: &Address, balance: u128) {
+    pub(crate) fn increment_balance(&mut self, address: &Address, balance: u128) {
         let balance = U256::from(balance);
         self.accounts.get_mut(address).expect("account not found").info.balance += balance;
     }

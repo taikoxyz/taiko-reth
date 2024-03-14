@@ -33,7 +33,7 @@ use thiserror::Error as ThisError;
 /// return an error. Another distinction of this implementation is that branches cannot
 /// store values, aligning with the construction of MPTs in Ethereum.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Ord, PartialOrd, Serialize, Deserialize)]
-pub struct MptNode {
+pub(crate) struct MptNode {
     /// The type and data of the node.
     data: MptNodeData,
     /// Cache for a previously computed reference of this node. This is skipped during
@@ -48,7 +48,7 @@ pub struct MptNode {
 /// encountering unresolved nodes, finding values in branches where they shouldn't be, and
 /// issues related to RLP (Recursive Length Prefix) encoding and decoding.
 #[derive(Debug, ThisError)]
-pub enum Error {
+pub(crate) enum Error {
     /// Triggered when an operation reaches an unresolved node. The associated `B256`
     /// value provides details about the unresolved node.
     #[error("reached an unresolved node: {0:#}")]
@@ -82,7 +82,7 @@ impl From<B256> for MptNode {
 /// structure. This enum provides a clear and type-safe way to represent the data
 /// associated with each node type.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Ord, PartialOrd, Serialize, Deserialize)]
-pub enum MptNodeData {
+pub(crate) enum MptNodeData {
     /// Represents an empty trie node.
     #[default]
     Null,
@@ -105,7 +105,7 @@ pub enum MptNodeData {
 /// representation or indirectly through a hash of their encoding. This enum provides a
 /// clear and type-safe way to represent these references.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Ord, PartialOrd, Serialize, Deserialize)]
-pub enum MptNodeReference {
+pub(crate) enum MptNodeReference {
     /// Represents a direct reference to another node using its byte encoding. Typically
     /// used for short encodings that are less than 32 bytes in length.
     Bytes(Vec<u8>),
@@ -241,7 +241,7 @@ impl MptNode {
     ///
     /// This method effectively removes all key-value pairs from the trie.
     #[inline]
-    pub fn clear(&mut self) {
+    pub(crate) fn clear(&mut self) {
         self.data = MptNodeData::Null;
         self.invalidate_ref_cache();
     }
@@ -250,7 +250,7 @@ impl MptNode {
     ///
     /// This method allows for the deserialization of a previously serialized [MptNode].
     #[inline]
-    pub fn decode(bytes: impl AsRef<[u8]>) -> Result<MptNode, Error> {
+    pub(crate) fn decode(bytes: impl AsRef<[u8]>) -> Result<MptNode, Error> {
         rlp::decode(bytes.as_ref()).map_err(Error::from)
     }
 
@@ -259,7 +259,7 @@ impl MptNode {
     /// This method provides a reference to the node's data, allowing for inspection and
     /// manipulation.
     #[inline]
-    pub fn as_data(&self) -> &MptNodeData {
+    pub(crate) fn as_data(&self) -> &MptNodeData {
         &self.data
     }
 
@@ -269,7 +269,7 @@ impl MptNode {
     /// This method provides a way to obtain a compact representation of the node for
     /// storage or transmission purposes.
     #[inline]
-    pub fn reference(&self) -> MptNodeReference {
+    pub(crate) fn reference(&self) -> MptNodeReference {
         self.cached_reference.borrow_mut().get_or_insert_with(|| self.calc_reference()).clone()
     }
 
@@ -277,7 +277,7 @@ impl MptNode {
     ///
     /// This method provides a unique identifier for the node based on its content.
     #[inline]
-    pub fn hash(&self) -> B256 {
+    pub(crate) fn hash(&self) -> B256 {
         match self.data {
             MptNodeData::Null => EMPTY_ROOT_HASH,
             _ => match self
@@ -332,7 +332,7 @@ impl MptNode {
     /// This method checks if the node represents an empty trie, i.e., it doesn't contain
     /// any key-value pairs.
     #[inline]
-    pub fn is_empty(&self) -> bool {
+    pub(crate) fn is_empty(&self) -> bool {
         matches!(&self.data, MptNodeData::Null)
     }
 
@@ -340,7 +340,7 @@ impl MptNode {
     ///
     /// A digest is a compact representation of a sub-trie, represented by its hash.
     #[inline]
-    pub fn is_digest(&self) -> bool {
+    pub(crate) fn is_digest(&self) -> bool {
         matches!(&self.data, MptNodeData::Digest(_))
     }
 
@@ -349,7 +349,7 @@ impl MptNode {
     /// Nibbles are half-bytes, and in the context of the MPT, they represent parts of
     /// keys.
     #[inline]
-    pub fn nibs(&self) -> Vec<u8> {
+    pub(crate) fn nibs(&self) -> Vec<u8> {
         match &self.data {
             MptNodeData::Null | MptNodeData::Branch(_) | MptNodeData::Digest(_) => vec![],
             MptNodeData::Leaf(prefix, _) | MptNodeData::Extension(prefix, _) => prefix_nibs(prefix),
@@ -362,7 +362,7 @@ impl MptNode {
     /// returns a reference to the associated value. If [None] is returned, the key is
     /// provably not in the trie.
     #[inline]
-    pub fn get(&self, key: &[u8]) -> Result<Option<&[u8]>, Error> {
+    pub(crate) fn get(&self, key: &[u8]) -> Result<Option<&[u8]>, Error> {
         self.get_internal(&to_nibs(key))
     }
 
@@ -371,7 +371,7 @@ impl MptNode {
     /// If the key is not present in the trie, this method returns `None`. Otherwise, it
     /// returns the RLP-decoded value.
     #[inline]
-    pub fn get_rlp<T: alloy_rlp::Decodable>(&self, key: &[u8]) -> Result<Option<T>, Error> {
+    pub(crate) fn get_rlp<T: alloy_rlp::Decodable>(&self, key: &[u8]) -> Result<Option<T>, Error> {
         match self.get(key)? {
             Some(mut bytes) => Ok(Some(T::decode(&mut bytes)?)),
             None => Ok(None),
@@ -414,7 +414,7 @@ impl MptNode {
     /// This method attempts to remove a key-value pair from the trie. If the key is
     /// present, it returns `true`. Otherwise, it returns `false`.
     #[inline]
-    pub fn delete(&mut self, key: &[u8]) -> Result<bool, Error> {
+    pub(crate) fn delete(&mut self, key: &[u8]) -> Result<bool, Error> {
         self.delete_internal(&to_nibs(key))
     }
 
@@ -530,7 +530,7 @@ impl MptNode {
     /// insertion is successful, it returns `true`. If the key already exists, it updates
     /// the value and returns `false`.
     #[inline]
-    pub fn insert(&mut self, key: &[u8], value: Vec<u8>) -> Result<bool, Error> {
+    pub(crate) fn insert(&mut self, key: &[u8], value: Vec<u8>) -> Result<bool, Error> {
         if value.is_empty() {
             panic!("value must not be empty");
         }
@@ -541,7 +541,7 @@ impl MptNode {
     ///
     /// This method inserts a value that's been encoded using RLP into the trie.
     #[inline]
-    pub fn insert_rlp(&mut self, key: &[u8], value: impl Encodable) -> Result<bool, Error> {
+    pub(crate) fn insert_rlp(&mut self, key: &[u8], value: impl Encodable) -> Result<bool, Error> {
         self.insert_internal(&to_nibs(key), alloy_rlp::encode(value))
     }
 
@@ -668,7 +668,7 @@ impl MptNode {
     ///
     /// This method provides a count of all the nodes that can be traversed within the
     /// trie.
-    pub fn size(&self) -> usize {
+    pub(crate) fn size(&self) -> usize {
         match self.as_data() {
             MptNodeData::Null => 0,
             MptNodeData::Branch(children) => {
@@ -684,7 +684,7 @@ impl MptNode {
     ///
     /// This method is primarily used for debugging purposes, providing a visual
     /// representation of the trie's structure.
-    pub fn debug_rlp<T: alloy_rlp::Decodable + Debug>(&self) -> Vec<String> {
+    pub(crate) fn debug_rlp<T: alloy_rlp::Decodable + Debug>(&self) -> Vec<String> {
         // convert the nibs to hex
         let nibs: String = self.nibs().iter().fold(String::new(), |mut output, n| {
             let _ = write!(output, "{:x}", n);
@@ -740,7 +740,7 @@ impl MptNode {
 ///
 /// A nibble is 4 bits or half of an 8-bit byte. This function takes each byte from the
 /// input slice, splits it into two nibbles, and appends them to the resulting vector.
-pub fn to_nibs(slice: &[u8]) -> Vec<u8> {
+pub(crate) fn to_nibs(slice: &[u8]) -> Vec<u8> {
     let mut result = Vec::with_capacity(2 * slice.len());
     for byte in slice {
         result.push(byte >> 4);
@@ -759,7 +759,7 @@ pub fn to_nibs(slice: &[u8]) -> Vec<u8> {
 /// The remaining nibbles are then combined into bytes, with each pair of nibbles forming
 /// a single byte. The resulting vector starts with the prefix, followed by the encoded
 /// bytes.
-pub fn to_encoded_path(mut nibs: &[u8], is_leaf: bool) -> Vec<u8> {
+pub(crate) fn to_encoded_path(mut nibs: &[u8], is_leaf: bool) -> Vec<u8> {
     let mut prefix = (is_leaf as u8) * 0x20;
     if nibs.len() % 2 != 0 {
         prefix += 0x10 + nibs[0];
@@ -802,7 +802,7 @@ mod tests {
     use super::*;
 
     #[test]
-    pub fn test_trie_pointer_no_keccak() {
+    fn test_trie_pointer_no_keccak() {
         let cases = [("do", "verb"), ("dog", "puppy"), ("doge", "coin"), ("horse", "stallion")];
         for (k, v) in cases {
             let node: MptNode =
@@ -814,7 +814,7 @@ mod tests {
     }
 
     #[test]
-    pub fn test_to_encoded_path() {
+    fn test_to_encoded_path() {
         // extension node with an even path length
         let nibbles = vec![0x0a, 0x0b, 0x0c, 0x0d];
         assert_eq!(to_encoded_path(&nibbles, false), vec![0x00, 0xab, 0xcd]);
@@ -830,7 +830,7 @@ mod tests {
     }
 
     #[test]
-    pub fn test_lcp() {
+    fn test_lcp() {
         let cases = [
             (vec![], vec![], 0),
             (vec![0xa], vec![0xa], 1),
@@ -847,7 +847,7 @@ mod tests {
     }
 
     #[test]
-    pub fn test_empty() {
+    fn test_empty() {
         let trie = MptNode::default();
 
         assert!(trie.is_empty());
@@ -865,7 +865,7 @@ mod tests {
     }
 
     #[test]
-    pub fn test_empty_key() {
+    fn test_empty_key() {
         let mut trie = MptNode::default();
 
         trie.insert(&[], b"empty".to_vec()).unwrap();
@@ -874,7 +874,7 @@ mod tests {
     }
 
     #[test]
-    pub fn test_clear() {
+    fn test_clear() {
         let mut trie = MptNode::default();
         trie.insert(b"dog", b"puppy".to_vec()).unwrap();
         assert!(!trie.is_empty());
@@ -886,7 +886,7 @@ mod tests {
     }
 
     #[test]
-    pub fn test_tiny() {
+    fn test_tiny() {
         // trie consisting of an extension, a branch and two leafs
         let mut trie = MptNode::default();
         trie.insert_rlp(b"a", 0u8).unwrap();
@@ -908,7 +908,7 @@ mod tests {
     }
 
     #[test]
-    pub fn test_partial() {
+    fn test_partial() {
         let mut trie = MptNode::default();
         trie.insert_rlp(b"aa", 0u8).unwrap();
         trie.insert_rlp(b"ab", 1u8).unwrap();
@@ -930,7 +930,7 @@ mod tests {
     }
 
     #[test]
-    pub fn test_branch_value() {
+    fn test_branch_value() {
         let mut trie = MptNode::default();
         trie.insert(b"do", b"verb".to_vec()).unwrap();
         // leads to a branch with value which is not supported
@@ -938,7 +938,7 @@ mod tests {
     }
 
     #[test]
-    pub fn test_insert() {
+    fn test_insert() {
         let mut trie = MptNode::default();
         let vals = vec![
             ("painting", "place"),
@@ -973,7 +973,7 @@ mod tests {
     }
 
     #[test]
-    pub fn test_keccak_trie() {
+    fn test_keccak_trie() {
         const N: usize = 512;
 
         // insert
@@ -1012,7 +1012,7 @@ mod tests {
     }
 
     #[test]
-    pub fn test_index_trie() {
+    fn test_index_trie() {
         const N: usize = 512;
 
         // insert

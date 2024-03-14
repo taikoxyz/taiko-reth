@@ -1,4 +1,5 @@
 #![allow(missing_docs)]
+#![allow(dead_code)]
 //! Main `t8n` command
 //!
 //! Runs an EVM state transition using revm.
@@ -8,15 +9,11 @@ mod provider;
 mod trie;
 mod utils;
 
-use alloy_rlp::Rlp;
-use futures::SinkExt;
 use mem_db::*;
-use proptest::collection::vec;
 use provider::*;
-use reth_beacon_consensus::BeaconConsensus;
 use reth_revm::{
     eth_dao_fork::{DAO_HARDFORK_BENEFICIARY, DAO_HARDKFORK_ACCOUNTS},
-    primitives::{calc_excess_blob_gas, AnalysisKind, ResultAndState},
+    primitives::{AnalysisKind, ResultAndState},
     revm::{
         primitives::{AccountInfo, BlobExcessGasAndPrice, Bytecode},
         Evm,
@@ -43,7 +40,6 @@ use clap::Parser;
 use std::{
     fs::{self, File},
     path::PathBuf,
-    sync::Arc,
 };
 
 const STDIN_ARG_NAME: &str = "stdin";
@@ -62,12 +58,12 @@ pub struct Command {
     input_txs: String,
     #[arg(long = "output.basedir")]
     output_basedir: PathBuf,
-    #[arg(long = "output.alloc", value_parser = output_source_value_parser)]
-    output_alloc: OutputTarget,
-    #[arg(long = "output.body", value_parser = output_source_value_parser)]
-    output_body: OutputTarget,
-    #[arg(long = "output.result", value_parser = output_source_value_parser)]
-    output_result: OutputTarget,
+    #[arg(long = "output.alloc")]
+    output_alloc: String,
+    #[arg(long = "output.body")]
+    output_body: String,
+    #[arg(long = "output.result")]
+    output_result: String,
     #[arg(long)]
     trace: bool,
     #[arg(long = "trace.tracer")]
@@ -225,7 +221,6 @@ impl Command {
             evm.db_mut().commit(state);
 
             // Push transaction changeset and calculate header bloom filter for receipt.
-            #[cfg(not(feature = "optimism"))]
             receipts.push(
                 Receipt {
                     tx_type: tx.tx_type(),

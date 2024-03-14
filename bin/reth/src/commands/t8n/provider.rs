@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use secp256k1::SecretKey;
 use serde::{Deserialize, Serialize};
 

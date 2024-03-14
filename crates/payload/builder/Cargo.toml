@@ -23,7 +23,6 @@ reth-node-api.workspace = true
 
 # ethereum
 alloy-rlp.workspace = true
-alloy-rpc-types.workspace = true
 revm-primitives.workspace = true
 
 # async

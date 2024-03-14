@@ -32,15 +32,15 @@ use serde::{Deserialize, Serialize};
     RlpDecodable,
     RlpMaxEncodedLen,
 )]
-pub struct StateAccount {
+pub(crate) struct StateAccount {
     /// The number of transactions sent from this account's address.
-    pub nonce: TxNumber,
+    pub(crate) nonce: TxNumber,
     /// The current balance of the account in Wei.
-    pub balance: U256,
+    pub(crate) balance: U256,
     /// The root of the account's storage trie, representing all stored contract data.
-    pub storage_root: B256,
+    pub(crate) storage_root: B256,
     /// The Keccak-256 hash of the account's associated bytecode (if it's a contract).
-    pub code_hash: B256,
+    pub(crate) code_hash: B256,
 }
 
 impl Default for StateAccount {

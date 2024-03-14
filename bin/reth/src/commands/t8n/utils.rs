@@ -8,45 +8,8 @@ use reth_primitives::{
 };
 #[cfg(feature = "optimism")]
 use reth_rpc_types::optimism::OptimismTransactionFields;
-use reth_rpc_types::{
-    other::{self, OtherFields},
-    AccessList, Signature, Transaction,
-};
+use reth_rpc_types::{AccessList, Signature, Transaction};
 use secp256k1::SecretKey;
-use serde::Serialize;
-use std::path::PathBuf;
-/// OutputTarget represents both stdout, stderr and file output
-#[derive(Debug, Clone)]
-pub enum OutputTarget {
-    Stdout,
-    Stderr,
-    File(PathBuf),
-}
-
-impl OutputTarget {
-    /// write buffer to output target
-    pub fn to_json<T>(&self, value: &T) -> eyre::Result<()>
-    where
-        T: Serialize + ?Sized,
-    {
-        match self {
-            OutputTarget::Stdout => serde_json::to_writer(std::io::stdout(), value),
-            OutputTarget::Stderr => serde_json::to_writer(std::io::stderr(), value),
-            OutputTarget::File(path) => serde_json::to_writer(std::fs::File::open(path)?, value),
-        }
-        .map_err(Into::into)
-    }
-}
-
-/// Clap value parser for [OutputTarget]s that takes either a specify "stdout", "stderr" or the path
-/// to the OutputSource.
-pub(crate) fn output_source_value_parser(s: &str) -> eyre::Result<OutputTarget, eyre::Error> {
-    Ok(match s {
-        "stdout" => OutputTarget::Stdout,
-        "stderr" => OutputTarget::Stderr,
-        x => OutputTarget::File(PathBuf::from(x)),
-    })
-}
 
 // Get the `odd_y_parity` from the `v` value depends on chain_id
 #[inline]

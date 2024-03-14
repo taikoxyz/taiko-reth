@@ -12,9 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-pub mod account;
-pub mod mpt;
+mod account;
+mod mpt;
 
-use reth_primitives::{b256, B256};
-
-pub use self::{account::StateAccount, mpt::*};
+pub(crate) use self::{account::StateAccount, mpt::*};
