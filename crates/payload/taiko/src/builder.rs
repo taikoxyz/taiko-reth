@@ -24,42 +24,7 @@ use tracing::{debug, trace, warn};
 
 /// Taiko's payload builder
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct TaikoPayloadBuilder {
-    /// The rollup's compute pending block configuration option.
-    // TODO(clabby): Implement this feature.
-    compute_pending_block: bool,
-    /// The rollup's chain spec.
-    chain_spec: Arc<ChainSpec>,
-}
-
-impl TaikoPayloadBuilder {
-    /// TaikoPayloadBuilder constructor.
-    pub fn new(chain_spec: Arc<ChainSpec>) -> Self {
-        Self { compute_pending_block: true, chain_spec }
-    }
-
-    /// Sets the rollup's compute pending block configuration option.
-    pub fn set_compute_pending_block(mut self, compute_pending_block: bool) -> Self {
-        self.compute_pending_block = compute_pending_block;
-        self
-    }
-
-    /// Enables the rollup's compute pending block configuration option.
-    pub fn compute_pending_block(self) -> Self {
-        self.set_compute_pending_block(true)
-    }
-
-    /// Returns the rollup's compute pending block configuration option.
-    pub fn is_compute_pending_block(&self) -> bool {
-        self.compute_pending_block
-    }
-
-    /// Sets the rollup's chainspec.
-    pub fn set_chain_spec(mut self, chain_spec: Arc<ChainSpec>) -> Self {
-        self.chain_spec = chain_spec;
-        self
-    }
-}
+pub struct TaikoPayloadBuilder;
 
 /// Implementation of the [PayloadBuilder] trait for [TaikoPayloadBuilder].
 impl<Pool, Client> PayloadBuilder<Pool, Client> for TaikoPayloadBuilder
@@ -74,24 +39,13 @@ where
         &self,
         args: BuildArguments<Pool, Client, TaikoPayloadBuilderAttributes, TaikoBuiltPayload>,
     ) -> Result<BuildOutcome<TaikoBuiltPayload>, PayloadBuilderError> {
-        taiko_payload_builder(args, self.compute_pending_block)
+        taiko_payload_builder(args)
     }
 
     fn on_missing_payload(
         &self,
         args: BuildArguments<Pool, Client, TaikoPayloadBuilderAttributes, TaikoBuiltPayload>,
     ) -> Option<TaikoBuiltPayload> {
-        // In Optimism, the PayloadAttributes can specify a `no_tx_pool` option that implies we
-        // should not pull transactions from the tx pool. In this case, we build the payload
-        // upfront with the list of transactions sent in the attributes without caring about
-        // the results of the polling job, if a best payload has not already been built.
-        // if args.config.attributes.no_tx_pool {
-        //     if let Ok(BuildOutcome::Better { payload, .. }) = self.try_build(args) {
-        //         trace!(target: "payload_builder", "[OPTIMISM] Forced best payload");
-        //         return Some(payload);
-        //     }
-        // }
-
         None
     }
 
@@ -208,10 +162,7 @@ where
     }
 }
 
-/// Constructs an Ethereum transaction payload from the transactions sent through the
-/// Payload attributes by the sequencer. If the `no_tx_pool` argument is passed in
-/// the payload attributes, the transaction pool will be ignored and the only transactions
-/// included in the payload will be those sent through the attributes.
+/// Constructs an Ethereum transaction payload using the best transactions from the pool.
 ///
 /// Given build arguments including an Ethereum client, transaction pool,
 /// and configuration, this function creates a transaction payload. Returns
@@ -219,7 +170,6 @@ where
 #[inline]
 pub(crate) fn taiko_payload_builder<Pool, Client>(
     args: BuildArguments<Pool, Client, TaikoPayloadBuilderAttributes, TaikoBuiltPayload>,
-    _compute_pending_block: bool,
 ) -> Result<BuildOutcome<TaikoBuiltPayload>, PayloadBuilderError>
 where
     Client: StateProviderFactory,
@@ -332,10 +282,6 @@ where
             success: result.is_success(),
             cumulative_gas_used,
             logs: result.into_logs().into_iter().map(Into::into).collect(),
-            #[cfg(feature = "optimism")]
-            deposit_nonce: todo!(),
-            #[cfg(feature = "optimism")]
-            deposit_receipt_version: todo!(),
         }));
 
         // append transaction to the list of executed transactions
@@ -359,19 +305,12 @@ where
     // and 4788 contract call
     db.merge_transitions(BundleRetention::PlainState);
 
-    // TODO:(petar) Not sure what we change here?
     let bundle = BundleStateWithReceipts::new(
         db.take_bundle(),
         Receipts::from_vec(vec![receipts]),
         block_number,
     );
-    let receipts_root = bundle
-        .optimism_receipts_root_slow(
-            block_number,
-            chain_spec.as_ref(),
-            attributes.payload_attributes.timestamp,
-        )
-        .expect("Number is in range");
+    let receipts_root = bundle.receipts_root_slow(block_number).expect("Number is in range");
     let logs_bloom = bundle.block_logs_bloom(block_number).expect("Number is in range");
 
     // calculate the state root
@@ -429,13 +368,8 @@ where
     let sealed_block = block.seal_slow();
     debug!(target: "payload_builder", ?sealed_block, "sealed built block");
 
-    let mut payload = TaikoBuiltPayload::new(
-        attributes.payload_attributes.id,
-        sealed_block,
-        total_fees,
-        // chain_spec,
-        // attributes,
-    );
+    let mut payload =
+        TaikoBuiltPayload::new(attributes.payload_attributes.id, sealed_block, total_fees);
 
     // extend the payload with the blob sidecars from the executed txs
     payload.extend_sidecars(blob_sidecars);

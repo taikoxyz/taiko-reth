@@ -8,11 +8,9 @@
 #![cfg_attr(all(not(test), feature = "taiko"), warn(unused_crate_dependencies))]
 #![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
 
-#[cfg(feature = "taiko")]
 pub use builder::*;
 use reth_primitives::Transaction;
 
 pub mod error;
 
-#[cfg(feature = "taiko")]
 mod builder;

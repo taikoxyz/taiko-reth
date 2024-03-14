@@ -24,14 +24,14 @@ pub struct EthereumNode;
 impl EthereumNode {
     /// Returns a [ComponentsBuilder] configured for a regular Ethereum node.
     pub fn components<Node>(
-    ) -> ComponentsBuilder<Node, EthereumPoolBuilder, EthereumPayloadBuilder, EthereumNetworkBuilder>
+    ) -> ComponentsBuilder<Node, EthereumPoolBuilder, TaikoPayloadBuilder, EthereumNetworkBuilder>
     where
         Node: FullNodeTypes<Engine = EthEngineTypes>,
     {
         ComponentsBuilder::default()
             .node_types::<Node>()
             .pool(EthereumPoolBuilder::default())
-            .payload(EthereumPayloadBuilder::default())
+            .payload(TaikoPayloadBuilder::default())
             .network(EthereumNetworkBuilder::default())
     }
 }
@@ -52,7 +52,7 @@ where
 {
     type PoolBuilder = EthereumPoolBuilder;
     type NetworkBuilder = EthereumNetworkBuilder;
-    type PayloadBuilder = EthereumPayloadBuilder;
+    type PayloadBuilder = TaikoPayloadBuilder;
 
     fn components(
         self,
@@ -60,7 +60,7 @@ where
         ComponentsBuilder::default()
             .node_types::<N>()
             .pool(EthereumPoolBuilder::default())
-            .payload(EthereumPayloadBuilder::default())
+            .payload(TaikoPayloadBuilder::default())
             .network(EthereumNetworkBuilder::default())
     }
 }
@@ -136,12 +136,12 @@ where
     }
 }
 
-/// A basic ethereum payload service.
+/// A Taiko payload service.
 #[derive(Debug, Default, Clone)]
 #[non_exhaustive]
-pub struct EthereumPayloadBuilder;
+pub struct TaikoPayloadBuilder;
 
-impl<Node, Pool> PayloadServiceBuilder<Node, Pool> for EthereumPayloadBuilder
+impl<Node, Pool> PayloadServiceBuilder<Node, Pool> for TaikoPayloadBuilder
 where
     Node: FullNodeTypes<Engine = EthEngineTypes>,
     Pool: TransactionPool + Unpin + 'static,
@@ -151,7 +151,7 @@ where
         ctx: &BuilderContext<Node>,
         pool: Pool,
     ) -> eyre::Result<PayloadBuilderHandle<Node::Engine>> {
-        let payload_builder = reth_ethereum_payload_builder::EthereumPayloadBuilder::default();
+        let payload_builder = reth_taiko_payload_builder::TaikoPayloadBuilder::default();
         let conf = ctx.payload_builder_config();
 
         let payload_job_config = BasicPayloadJobGeneratorConfig::default()

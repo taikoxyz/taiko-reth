@@ -378,7 +378,19 @@ where
             Ok(outcome) => {
                 match &outcome {
                     CanonicalOutcome::AlreadyCanonical { header } => {
+                        // CHANGE(taiko): Taiko allows reorg on L2
+                        #[cfg(not(feature = "taiko"))]
                         if self.on_head_already_canonical(header, &mut attrs) {
+                            let _ = self.update_head(header.clone());
+                            self.listeners.notify(
+                                BeaconConsensusEngineEvent::CanonicalChainCommitted(
+                                    Box::new(header.clone()),
+                                    elapsed,
+                                ),
+                            );
+                        }
+                        #[cfg(feature = "taiko")]
+                        {
                             let _ = self.update_head(header.clone());
                             self.listeners.notify(
                                 BeaconConsensusEngineEvent::CanonicalChainCommitted(
@@ -1220,6 +1232,19 @@ where
             attrs,
         ) {
             Ok(attributes) => {
+                // TODO:(petar) write the l1 Origin to db
+
+                // // L1Origin **MUST NOT** be nil, it's a required field in PayloadAttributesV1.
+                // l1Origin := payloadAttributes.L1Origin
+                //
+                // // Set the block hash before inserting the L1Origin into database.
+                // l1Origin.L2BlockHash = block.Hash()
+                //
+                // // Write L1Origin.
+                // rawdb.WriteL1Origin(api.eth.ChainDb(), l1Origin.BlockID, l1Origin)
+                // // Write the head L1Origin.
+                // rawdb.WriteHeadL1Origin(api.eth.ChainDb(), l1Origin.BlockID)
+
                 // send the payload to the builder and return the receiver for the pending payload
                 // id, initiating payload job is handled asynchronously
                 let pending_payload_id = self.payload_builder.send_new_payload(attributes);
