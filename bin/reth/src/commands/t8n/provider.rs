@@ -37,7 +37,7 @@ pub(crate) struct ExecutionResult {
     pub(crate) current_blob_gas_used: Option<u64>,
 }
 
-#[derive(Deserialize, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct PrestateAccount {
     #[serde(default)]

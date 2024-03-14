@@ -15,7 +15,7 @@ use reth_revm::{
     eth_dao_fork::{DAO_HARDFORK_BENEFICIARY, DAO_HARDKFORK_ACCOUNTS},
     primitives::{AnalysisKind, ResultAndState},
     revm::{
-        primitives::{AccountInfo, BlobExcessGasAndPrice, Bytecode},
+        primitives::{AccountInfo, BlobExcessGasAndPrice, Bytecode, HashMap},
         Evm,
     },
     state_change::apply_beacon_root_contract_call,
@@ -39,6 +39,7 @@ use clap::Parser;
 
 use std::{
     fs::{self, File},
+    io::{self, Write},
     path::PathBuf,
 };
 
@@ -207,7 +208,7 @@ impl Command {
                     info!(
                         name: "rejected tx",
                         index = idx,
-                        hash = ?tx.hash(),
+                        hash = ?tx.as_ref().hash(),
                         from = ?tx.signer(),
                         error = ?err
                     );
@@ -294,6 +295,49 @@ impl Command {
         result: ExecutionResult,
         body: Bytes,
     ) -> eyre::Result<()> {
+        let mut stdout_output: HashMap<String, String> = HashMap::default();
+        let mut stderr_output: HashMap<String, String> = HashMap::default();
+
+        let body = hex::encode(body);
+        let alloc_json = serde_json::to_string_pretty(&alloc)?;
+        let result_json = serde_json::to_string_pretty(&result)?;
+        let body_json = serde_json::to_string_pretty(&body)?;
+
+        let mut dispatch = |name: &str, value: String| -> eyre::Result<()> {
+            match name {
+                STDOUT_ARG_NAME => {
+                    stdout_output.insert(name.to_string(), value);
+                }
+                STDERR_ARG_NAME => {
+                    stderr_output.insert(name.to_string(), value);
+                }
+                _ => {
+                    let path = self.output_basedir.join(name);
+                    fs::write(path, value)?;
+                }
+            }
+            Ok(())
+        };
+
+        dispatch("alloc", alloc_json)?;
+        dispatch("result", result_json)?;
+        dispatch("body", body_json)?;
+
+        if !stdout_output.is_empty() {
+            let stdout_json = serde_json::to_string_pretty(&stdout_output)?;
+            let mut stdout = io::stdout();
+            stdout.write_all(stdout_json.as_bytes())?;
+            writeln!(&mut stdout)?;
+            stdout.flush()?;
+        }
+
+        if !stderr_output.is_empty() {
+            let stderr_json = serde_json::to_string_pretty(&stderr_output)?;
+            let mut stderr = io::stderr();
+            stderr.write_all(stderr_json.as_bytes())?;
+            writeln!(&mut stderr)?;
+            stderr.flush()?;
+        }
         Ok(())
     }
 
@@ -303,7 +347,7 @@ impl Command {
             self.input_env == STDIN_ARG_NAME ||
             self.input_txs == STDIN_ARG_NAME
         {
-            input = serde_json::from_reader(std::io::stdin())?;
+            input = serde_json::from_reader(io::stdin())?;
         }
 
         if self.input_alloc != STDIN_ARG_NAME {
@@ -371,7 +415,7 @@ fn dump_db(db: MemDb) -> PrestateAlloc {
                 PrestateAccount {
                     balance: v.info.balance,
                     nonce: v.info.nonce,
-                    storage: v.storage,
+                    storage: v.storage.into(),
                     code: v.info.code.map(|v| v.bytecode),
                 },
             )
