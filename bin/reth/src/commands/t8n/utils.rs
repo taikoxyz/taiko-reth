@@ -1,12 +1,10 @@
-use clap::{
-    builder::{NonEmptyStringValueParser, TypedValueParser},
-    Arg, Command, Error,
-};
 use eyre::{eyre, ContextCompat, Report};
+#[cfg(feature = "optimism")]
+use reth_primitives::TxDeposit;
 use reth_primitives::{
     sign_message, Address, Signature as PrimitiveSignature, Transaction as PrimitiveTransaction,
-    TransactionKind, TransactionSigned, TxDeposit, TxEip1559, TxEip2930, TxEip4844, TxLegacy,
-    TxType, B256, U256,
+    TransactionKind, TransactionSigned, TxEip1559, TxEip2930, TxEip4844, TxLegacy, TxType, B256,
+    U256,
 };
 #[cfg(feature = "optimism")]
 use reth_rpc_types::optimism::OptimismTransactionFields;
@@ -15,11 +13,8 @@ use reth_rpc_types::{
     AccessList, Signature, Transaction,
 };
 use secp256k1::SecretKey;
-use serde::{
-    de::{self, DeserializeOwned, Visitor},
-    Serialize,
-};
-use std::{path::PathBuf, str::FromStr};
+use serde::Serialize;
+use std::path::PathBuf;
 /// OutputTarget represents both stdout, stderr and file output
 #[derive(Debug, Clone)]
 pub enum OutputTarget {

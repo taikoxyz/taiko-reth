@@ -5536,6 +5536,7 @@ dependencies = [
  "serde_json",
  "similar-asserts",
  "tempfile",
+ "thiserror",
  "tokio",
  "toml",
  "tracing",
