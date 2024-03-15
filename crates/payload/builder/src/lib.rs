@@ -120,5 +120,5 @@ pub use optimism::{OptimismBuiltPayload, OptimismPayloadBuilderAttributes};
 pub use payload::{EthBuiltPayload, EthPayloadBuilderAttributes};
 pub use reth_rpc_types::engine::PayloadId;
 pub use service::{PayloadBuilderHandle, PayloadBuilderService, PayloadStore};
-pub use taiko::{TaikoBuiltPayload, TaikoPayloadBuilderAttributes};
+pub use taiko::{TaikoBuiltPayload, TaikoExecutionPayload, TaikoPayloadBuilderAttributes};
 pub use traits::{KeepPayloadJobAlive, PayloadJob, PayloadJobGenerator};

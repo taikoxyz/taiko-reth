@@ -6,14 +6,17 @@ use reth_primitives::{
     revm_primitives::{BlobExcessGasAndPrice, BlockEnv, CfgEnv, CfgEnvWithHandlerCfg, SpecId},
     Address, BlobTransactionSidecar, ChainSpec, Header, SealedBlock, Withdrawals, B256, U256,
 };
-use reth_rpc_types::engine::{
-    ExecutionPayloadEnvelopeV2, ExecutionPayloadEnvelopeV3, ExecutionPayloadV1, PayloadAttributes,
-    PayloadId,
+use reth_rpc_types::{
+    engine::{
+        BlobsBundleV1, ExecutionPayloadEnvelopeV2, ExecutionPayloadEnvelopeV3, ExecutionPayloadV1,
+        PayloadAttributes, PayloadId,
+    },
+    ExecutionPayloadV3,
 };
 use reth_rpc_types_compat::engine::payload::{
     block_to_payload_v3, convert_block_to_payload_field_v2, try_block_to_payload_v1,
 };
-use revm_primitives::Bytes;
+use revm_primitives::{ruint::aliases::B256, Bytes};
 use serde::{Deserialize, Serialize};
 // use std::sync::Arc;
 
@@ -188,8 +191,6 @@ pub struct TaikoBuiltPayload {
     /// The blobs, proofs, and commitments in the block. If the block is pre-cancun, this will be
     /// empty.
     pub(crate) sidecars: Vec<BlobTransactionSidecar>,
-    // /// The rollup's chainspec.
-    // pub(crate) chain_spec: Arc<ChainSpec>,
     // /// The payload attributes.
     // pub(crate) attributes: TaikoPayloadBuilderAttributes,
 }
@@ -286,5 +287,112 @@ impl From<TaikoBuiltPayload> for ExecutionPayloadEnvelopeV3 {
             should_override_builder: false,
             blobs_bundle: sidecars.into_iter().map(Into::into).collect::<Vec<_>>().into(),
         }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TaikoExecutionPayload {
+    /// Inner V3 payload
+    #[serde(flatten)]
+    pub payload_inner: ExecutionPayloadV3,
+
+    /// Allow passing txHash directly instead of transactions list
+    pub tx_hash: B256,
+    /// Allow passing WithdrawalsHash directly instead of withdrawals
+    pub withdrawals_hash: B256,
+    /// Whether this is a Taiko L2 block, only used by ExecutableDataToBlock
+    pub taiko_block: bool,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TaikoExecutionPayloadEnvelope {
+    /// Taiko execution payload
+    pub execution_payload: TaikoExecutionPayload,
+    /// The expected value to be received by the feeRecipient in wei
+    pub block_value: U256,
+    /// The blobs, commitments, and proofs associated with the executed payload.
+    pub blobs_bundle: BlobsBundleV1,
+    /// Introduced in V3, this represents a suggestion from the execution layer if the payload
+    /// should be used instead of an externally provided one.
+    pub should_override_builder: bool,
+}
+
+impl From<TaikoBuiltPayload> for TaikoExecutionPayloadEnvelope {
+    fn from(value: TaikoBuiltPayload) -> Self {
+        let TaikoBuiltPayload { block, fees, sidecars, .. } = value;
+
+        TaikoExecutionPayloadEnvelope {
+            execution_payload: TaikoExecutionPayload {
+                payload_inner: ExecutionPayloadV3 {
+        payload_inner: ExecutionPayloadV2 {
+            payload_inner: ExecutionPayloadV1 {
+                parent_hash: block.parent_hash,
+                fee_recipient: block.beneficiary,
+                state_root: block.state_root,
+                receipts_root: block.receipts_root,
+                logs_bloom: block.logs_bloom,
+                prev_randao: block.mix_hash,
+                block_number: block.number,
+                gas_limit: block.gas_limit,
+                gas_used: block.gas_used,
+                timestamp: block.timestamp,
+                extra_data: block.extra_data.clone(),
+                base_fee_per_gas: U256::from(block.base_fee_per_gas.unwrap_or_default()),
+                block_hash: block.hash(),
+                transactions,
+            },
+            withdrawals,
+        },
+
+        blob_gas_used: value.blob_gas_used.unwrap_or_default(),
+        excess_blob_gas: value.excess_blob_gas.unwrap_or_default(),
+    }
+                tx_hash: B256::default(),
+                withdrawals_hash: B256::default(),
+                taiko_block: true,
+            },
+            block_value: fees,
+            blobs_bundle: sidecars.into_iter().map(Into::into).collect::<Vec<_>>().into(),
+            should_override_builder: false,
+        }
+    }
+}
+/// Converts [SealedBlock] to [ExecutionPayloadV3]
+pub fn block_to_payload_v3(value: SealedBlock) -> ExecutionPayloadV3 {
+    let transactions = value.raw_transactions();
+
+    let withdrawals: Vec<reth_rpc_types::withdrawal::Withdrawal> = value
+        .withdrawals
+        .clone()
+        .unwrap_or_default()
+        .into_iter()
+        .map(convert_withdrawal_to_standalone_withdraw)
+        .collect();
+
+    ExecutionPayloadV3 {
+        payload_inner: ExecutionPayloadV2 {
+            payload_inner: ExecutionPayloadV1 {
+                parent_hash: value.parent_hash,
+                fee_recipient: value.beneficiary,
+                state_root: value.state_root,
+                receipts_root: value.receipts_root,
+                logs_bloom: value.logs_bloom,
+                prev_randao: value.mix_hash,
+                block_number: value.number,
+                gas_limit: value.gas_limit,
+                gas_used: value.gas_used,
+                timestamp: value.timestamp,
+                extra_data: value.extra_data.clone(),
+                base_fee_per_gas: U256::from(value.base_fee_per_gas.unwrap_or_default()),
+                block_hash: value.hash(),
+                transactions,
+            },
+            withdrawals,
+        },
+
+        blob_gas_used: value.blob_gas_used.unwrap_or_default(),
+        excess_blob_gas: value.excess_blob_gas.unwrap_or_default(),
     }
 }
