@@ -1095,7 +1095,8 @@ where
     #[instrument(level = "trace", skip(self, payload, cancun_fields), fields(block_hash= ?payload.block_hash(), block_number = %payload.block_number(), is_pipeline_idle = %self.sync.is_pipeline_idle()), target = "consensus::engine")]
     fn on_new_payload(
         &mut self,
-        payload: ExecutionPayload,
+        #[cfg(not(feature = "taiko"))] payload: ExecutionPayload,
+        #[cfg(feature = "taiko")] payload: TaikoExecutionPayload,
         cancun_fields: Option<CancunPayloadFields>,
     ) -> Result<PayloadStatus, BeaconOnNewPayloadError> {
         let block = match self.ensure_well_formed_payload(payload, cancun_fields) {
@@ -1177,7 +1178,8 @@ where
     // This validation **MUST** be instantly run in all cases even during active sync process.
     fn ensure_well_formed_payload(
         &self,
-        payload: ExecutionPayload,
+        #[cfg(not(feature = "taiko"))] payload: ExecutionPayload,
+        #[cfg(feature = "taiko")] payload: TaikoExecutionPayload,
         cancun_fields: Option<CancunPayloadFields>,
     ) -> Result<SealedBlock, PayloadStatus> {
         let parent_hash = payload.parent_hash();

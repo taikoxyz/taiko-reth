@@ -8,12 +8,15 @@
 #![cfg_attr(not(test), warn(unused_crate_dependencies))]
 #![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
 
-use reth_primitives::{ChainSpec, SealedBlock};
+use reth_payload_builder::TaikoExecutionPayload;
+use reth_primitives::{
+    revm_primitives::FixedBytes, Block, ChainSpec, Header, SealedBlock, EMPTY_OMMER_ROOT_HASH,
+};
 use reth_rpc_types::{engine::MaybeCancunPayloadFields, ExecutionPayload, PayloadError};
 use reth_rpc_types_compat::engine::payload::{try_into_block, validate_block_hash};
 use std::sync::Arc;
 
-/// Execution payload validator.
+/// Execution payload validator.;
 #[derive(Clone, Debug)]
 pub struct ExecutionPayloadValidator {
     /// Chain spec to validate against.
@@ -52,20 +55,20 @@ impl ExecutionPayloadValidator {
         if let Some(versioned_hashes) = cancun_fields.versioned_hashes() {
             if num_blob_versioned_hashes != versioned_hashes.len() {
                 // Number of blob versioned hashes does not match
-                return Err(PayloadError::InvalidVersionedHashes)
+                return Err(PayloadError::InvalidVersionedHashes);
             }
             // we can use `zip` safely here because we already compared their length
             for (payload_versioned_hash, block_versioned_hash) in
                 versioned_hashes.iter().zip(sealed_block.blob_versioned_hashes_iter())
             {
                 if payload_versioned_hash != block_versioned_hash {
-                    return Err(PayloadError::InvalidVersionedHashes)
+                    return Err(PayloadError::InvalidVersionedHashes);
                 }
             }
         } else {
             // No Cancun fields, if block includes any blobs, this is an error
             if num_blob_versioned_hashes > 0 {
-                return Err(PayloadError::InvalidVersionedHashes)
+                return Err(PayloadError::InvalidVersionedHashes);
             }
         }
 
@@ -97,19 +100,29 @@ impl ExecutionPayloadValidator {
     /// <https://github.com/ethereum/execution-apis/blob/fe8e13c288c592ec154ce25c534e26cb7ce0530d/src/engine/cancun.md#specification>
     pub fn ensure_well_formed_payload(
         &self,
-        payload: ExecutionPayload,
+        #[cfg(not(feature = "taiko"))] payload: ExecutionPayload,
+        #[cfg(feature = "taiko")] payload: TaikoExecutionPayload,
         cancun_fields: MaybeCancunPayloadFields,
     ) -> Result<SealedBlock, PayloadError> {
         let block_hash = payload.block_hash();
 
         // First parse the block
+        #[cfg(not(feature = "taiko"))]
         let block = try_into_block(payload, cancun_fields.parent_beacon_block_root())?;
+        #[cfg(feature = "taiko")]
+        let block = if payload.payload_inner.payload_inner.payload_inner.transactions.is_empty()
+            && payload.payload_inner.payload_inner.withdrawals.is_empty()
+        {
+            create_taiko_block(payload, cancun_fields.parent_beacon_block_root())
+        } else {
+            try_into_block(payload.payload_inner, cancun_fields.parent_beacon_block_root())?
+        };
 
         let cancun_active = self.is_cancun_active_at_timestamp(block.timestamp);
 
         if !cancun_active && block.has_blob_transactions() {
             // cancun not active but blob transactions present
-            return Err(PayloadError::PreCancunBlockWithBlobTransactions)
+            return Err(PayloadError::PreCancunBlockWithBlobTransactions);
         }
 
         // Ensure the hash included in the payload matches the block hash
@@ -119,5 +132,51 @@ impl ExecutionPayloadValidator {
         self.ensure_matching_blob_versioned_hashes(&sealed_block, &cancun_fields)?;
 
         Ok(sealed_block)
+    }
+}
+
+fn create_taiko_block(
+    payload: TaikoExecutionPayload,
+    parent_beacon_block_root: Option<FixedBytes<32>>,
+) -> Block {
+    Block {
+        header: Header {
+            parent_hash: payload.payload_inner.payload_inner.payload_inner.parent_hash,
+            beneficiary: payload.payload_inner.payload_inner.payload_inner.fee_recipient,
+            state_root: payload.payload_inner.payload_inner.payload_inner.state_root,
+            transactions_root: payload.tx_hash,
+            receipts_root: payload.payload_inner.payload_inner.payload_inner.receipts_root,
+            withdrawals_root: Some(payload.withdrawals_hash),
+            logs_bloom: payload.payload_inner.payload_inner.payload_inner.logs_bloom,
+            number: payload.payload_inner.payload_inner.payload_inner.block_number,
+            gas_limit: payload.payload_inner.payload_inner.payload_inner.gas_limit,
+            gas_used: payload.payload_inner.payload_inner.payload_inner.gas_used,
+            timestamp: payload.payload_inner.payload_inner.payload_inner.timestamp,
+            mix_hash: payload.payload_inner.payload_inner.payload_inner.prev_randao,
+            base_fee_per_gas: Some(
+                payload
+                    .payload_inner
+                    .payload_inner
+                    .payload_inner
+                    .base_fee_per_gas
+                    .uint_try_to()
+                    .map_err(|_| {
+                        PayloadError::BaseFee(
+                            payload.payload_inner.payload_inner.payload_inner.base_fee_per_gas,
+                        )
+                    })?,
+            ),
+            blob_gas_used: None,
+            excess_blob_gas: None,
+            parent_beacon_block_root,
+            extra_data: payload.payload_inner.payload_inner.payload_inner.extra_data,
+            // Defaults
+            ommers_hash: EMPTY_OMMER_ROOT_HASH,
+            difficulty: Default::default(),
+            nonce: Default::default(),
+        },
+        body: vec![],
+        withdrawals: None,
+        ommers: Default::default(),
     }
 }

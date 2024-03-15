@@ -16,3 +16,4 @@ workspace = true
 reth-primitives.workspace = true
 reth-rpc-types.workspace = true
 reth-rpc-types-compat.workspace = true
+reth-payload-builder.workspace = true
