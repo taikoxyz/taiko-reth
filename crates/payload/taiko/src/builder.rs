@@ -8,7 +8,7 @@ use reth_primitives::{
     eip4844::calculate_excess_blob_gas,
     proofs,
     revm::env::tx_env_with_recovered,
-    Block, ChainSpec, Hardfork, Header, IntoRecoveredTransaction, Receipt, Receipts,
+    Address, Block, ChainSpec, Hardfork, Header, IntoRecoveredTransaction, Receipt, Receipts,
     TransactionSigned, TxType, EMPTY_OMMER_ROOT_HASH, U256,
 };
 use reth_provider::{BundleStateWithReceipts, StateProviderFactory};
@@ -362,6 +362,13 @@ where
         excess_blob_gas,
     };
 
+    // Validate the anchor Tx
+    if let Some(anchor) = executed_txs.first() {
+        if !validate_anchor_tx(&anchor, &header) {
+            return Err(PayloadBuilderError::Other(Err("Invalid anchor transaction")));
+        }
+    }
+
     // seal the block
     let block = Block { header, body: executed_txs, ommers: vec![], withdrawals };
 
@@ -375,4 +382,45 @@ where
     payload.extend_sidecars(blob_sidecars);
 
     Ok(BuildOutcome::Better { payload, cached_reads })
+}
+
+// Checks if the given transaction is a valid TaikoL2.anchor transaction.
+fn validate_anchor_tx(tx: &TransactionSigned, header: &Header) -> bool {
+    if !tx.is_eip1559() {
+        return false;
+    }
+
+    let Some(to) = tx.to() else {
+        return false;
+    };
+
+    // TODO:(petar) This should check for TaikoL2Address
+    if to != Address::default() {
+        return false;
+    }
+
+    // TODO:(petar) This should check for the AnchorPrefix
+    if !tx.input().starts_with(&[]) {
+        return false;
+    }
+
+    if !tx.value().is_zero() {
+        return false;
+    }
+
+    // TODO:(petar) This should check whether the gas limit is different then the AnchorGasLimit
+    if tx.gas_limit() != 0 {
+        return false;
+    }
+
+    if tx.max_fee_per_gas() != header.base_fee_per_gas {
+        return false;
+    }
+
+    let Some(signer) = tx.recover_signer() else {
+        return false;
+    };
+
+    // TODO:(petar) This should check whether the signer is equal to the GoldenTouchAccount
+    signer == Default::default()
 }
