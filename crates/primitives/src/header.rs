@@ -186,7 +186,11 @@ impl Header {
     ///
     /// Note: This check is relevant only pre-merge.
     pub fn is_timestamp_in_past(&self, parent_timestamp: u64) -> bool {
+        #[cfg(not(feature = "taiko"))]
         self.timestamp <= parent_timestamp
+	    // CHANGE(taiko): a block that has the same timestamp as its parents is allowed in Taiko protocol.
+        #[cfg(feature = "taiko")]
+        self.timestamp < parent_timestamp
     }
 
     /// Checks if the block's timestamp is in the future based on the present timestamp.

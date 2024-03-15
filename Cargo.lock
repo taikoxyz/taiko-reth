@@ -6350,6 +6350,7 @@ dependencies = [
 name = "reth-payload-validator"
 version = "0.2.0-beta.1"
 dependencies = [
+ "reth-payload-builder",
  "reth-primitives",
  "reth-rpc-types",
  "reth-rpc-types-compat",
