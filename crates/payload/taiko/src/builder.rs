@@ -17,7 +17,7 @@ use reth_transaction_pool::{BestTransactionsAttributes, TransactionPool};
 use revm::{
     db::states::bundle_state::BundleRetention,
     primitives::{EVMError, EnvWithHandlerCfg, InvalidTransaction, ResultAndState},
-    DatabaseCommit, State,
+    DatabaseCommit, State, StateBuilder,
 };
 use std::sync::Arc;
 use tracing::{debug, trace, warn};
@@ -69,7 +69,7 @@ where
                 warn!(target: "payload_builder", parent_hash=%parent_block.hash(), %err, "failed to get state for empty payload");
                 err
             })?;
-        let mut db = State::builder()
+        let mut db = StateBuilder::new()
             .with_database_boxed(Box::new(StateProviderDatabase::new(&state)))
             .with_bundle_update()
             .build();
@@ -179,8 +179,10 @@ where
 
     let state_provider = client.state_by_block_hash(config.parent_block.hash())?;
     let state = StateProviderDatabase::new(&state_provider);
-    let mut db =
-        State::builder().with_database_ref(cached_reads.as_db(&state)).with_bundle_update().build();
+    let mut db = StateBuilder::new()
+        .with_database_ref(cached_reads.as_db(&state))
+        .with_bundle_update()
+        .build();
     let extra_data = config.extra_data();
     let PayloadConfig {
         initialized_block_env,

@@ -4,19 +4,20 @@ use reth_node_api::{BuiltPayload, PayloadBuilderAttributes};
 use reth_primitives::{
     revm::config::revm_spec_by_timestamp_after_merge,
     revm_primitives::{BlobExcessGasAndPrice, BlockEnv, CfgEnv, CfgEnvWithHandlerCfg, SpecId},
-    Address, BlobTransactionSidecar, ChainSpec, Header, SealedBlock, Withdrawals, B256, U256,
+    Address, BlobTransactionSidecar, Bytes, ChainSpec, Header, SealedBlock, Withdrawals, B256,
+    U256,
 };
 use reth_rpc_types::{
     engine::{
         BlobsBundleV1, ExecutionPayloadEnvelopeV2, ExecutionPayloadEnvelopeV3, ExecutionPayloadV1,
         PayloadAttributes, PayloadId,
     },
-    ExecutionPayloadV3,
+    ExecutionPayloadV2, ExecutionPayloadV3,
 };
-use reth_rpc_types_compat::engine::payload::{
-    block_to_payload_v3, convert_block_to_payload_field_v2, try_block_to_payload_v1,
+use reth_rpc_types_compat::engine::{
+    convert_withdrawal_to_standalone_withdraw,
+    payload::{block_to_payload_v3, convert_block_to_payload_field_v2, try_block_to_payload_v1},
 };
-use revm_primitives::{ruint::aliases::B256, Bytes};
 use serde::{Deserialize, Serialize};
 // use std::sync::Arc;
 
@@ -323,76 +324,49 @@ impl From<TaikoBuiltPayload> for TaikoExecutionPayloadEnvelope {
     fn from(value: TaikoBuiltPayload) -> Self {
         let TaikoBuiltPayload { block, fees, sidecars, .. } = value;
 
+        let withdrawals: Vec<reth_rpc_types::withdrawal::Withdrawal> = block
+            .withdrawals
+            .clone()
+            .unwrap_or_default()
+            .into_iter()
+            .map(convert_withdrawal_to_standalone_withdraw)
+            .collect();
+
         TaikoExecutionPayloadEnvelope {
             execution_payload: TaikoExecutionPayload {
                 payload_inner: ExecutionPayloadV3 {
-        payload_inner: ExecutionPayloadV2 {
-            payload_inner: ExecutionPayloadV1 {
-                parent_hash: block.parent_hash,
-                fee_recipient: block.beneficiary,
-                state_root: block.state_root,
-                receipts_root: block.receipts_root,
-                logs_bloom: block.logs_bloom,
-                prev_randao: block.mix_hash,
-                block_number: block.number,
-                gas_limit: block.gas_limit,
-                gas_used: block.gas_used,
-                timestamp: block.timestamp,
-                extra_data: block.extra_data.clone(),
-                base_fee_per_gas: U256::from(block.base_fee_per_gas.unwrap_or_default()),
-                block_hash: block.hash(),
-                transactions,
-            },
-            withdrawals,
-        },
+                    payload_inner: ExecutionPayloadV2 {
+                        payload_inner: ExecutionPayloadV1 {
+                            parent_hash: block.parent_hash,
+                            fee_recipient: block.beneficiary,
+                            state_root: block.state_root,
+                            receipts_root: block.receipts_root,
+                            logs_bloom: block.logs_bloom,
+                            prev_randao: block.mix_hash,
+                            block_number: block.number,
+                            gas_limit: block.gas_limit,
+                            gas_used: block.gas_used,
+                            timestamp: block.timestamp,
+                            extra_data: block.extra_data.clone(),
+                            base_fee_per_gas: U256::from(
+                                block.header.base_fee_per_gas.unwrap_or_default(),
+                            ),
+                            block_hash: block.hash(),
+                            transactions: vec![],
+                        },
+                        withdrawals,
+                    },
 
-        blob_gas_used: value.blob_gas_used.unwrap_or_default(),
-        excess_blob_gas: value.excess_blob_gas.unwrap_or_default(),
-    }
-                tx_hash: B256::default(),
-                withdrawals_hash: B256::default(),
+                    blob_gas_used: block.header.blob_gas_used.unwrap_or_default(),
+                    excess_blob_gas: block.header.excess_blob_gas.unwrap_or_default(),
+                },
+                tx_hash: block.header.transactions_root,
+                withdrawals_hash: block.header.withdrawals_root.unwrap_or_default(),
                 taiko_block: true,
             },
             block_value: fees,
             blobs_bundle: sidecars.into_iter().map(Into::into).collect::<Vec<_>>().into(),
             should_override_builder: false,
         }
-    }
-}
-/// Converts [SealedBlock] to [ExecutionPayloadV3]
-pub fn block_to_payload_v3(value: SealedBlock) -> ExecutionPayloadV3 {
-    let transactions = value.raw_transactions();
-
-    let withdrawals: Vec<reth_rpc_types::withdrawal::Withdrawal> = value
-        .withdrawals
-        .clone()
-        .unwrap_or_default()
-        .into_iter()
-        .map(convert_withdrawal_to_standalone_withdraw)
-        .collect();
-
-    ExecutionPayloadV3 {
-        payload_inner: ExecutionPayloadV2 {
-            payload_inner: ExecutionPayloadV1 {
-                parent_hash: value.parent_hash,
-                fee_recipient: value.beneficiary,
-                state_root: value.state_root,
-                receipts_root: value.receipts_root,
-                logs_bloom: value.logs_bloom,
-                prev_randao: value.mix_hash,
-                block_number: value.number,
-                gas_limit: value.gas_limit,
-                gas_used: value.gas_used,
-                timestamp: value.timestamp,
-                extra_data: value.extra_data.clone(),
-                base_fee_per_gas: U256::from(value.base_fee_per_gas.unwrap_or_default()),
-                block_hash: value.hash(),
-                transactions,
-            },
-            withdrawals,
-        },
-
-        blob_gas_used: value.blob_gas_used.unwrap_or_default(),
-        excess_blob_gas: value.excess_blob_gas.unwrap_or_default(),
     }
 }

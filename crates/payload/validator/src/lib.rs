@@ -113,7 +113,7 @@ impl ExecutionPayloadValidator {
         let block = if payload.payload_inner.payload_inner.payload_inner.transactions.is_empty()
             && payload.payload_inner.payload_inner.withdrawals.is_empty()
         {
-            create_taiko_block(payload, cancun_fields.parent_beacon_block_root())
+            create_taiko_block(payload, cancun_fields.parent_beacon_block_root())?
         } else {
             try_into_block(payload.payload_inner, cancun_fields.parent_beacon_block_root())?
         };
@@ -138,8 +138,8 @@ impl ExecutionPayloadValidator {
 fn create_taiko_block(
     payload: TaikoExecutionPayload,
     parent_beacon_block_root: Option<FixedBytes<32>>,
-) -> Block {
-    Block {
+) -> Result<Block, PayloadError> {
+    Ok(Block {
         header: Header {
             parent_hash: payload.payload_inner.payload_inner.payload_inner.parent_hash,
             beneficiary: payload.payload_inner.payload_inner.payload_inner.fee_recipient,
@@ -159,7 +159,7 @@ fn create_taiko_block(
                     .payload_inner
                     .payload_inner
                     .base_fee_per_gas
-                    .uint_try_to()
+                    .try_into()
                     .map_err(|_| {
                         PayloadError::BaseFee(
                             payload.payload_inner.payload_inner.payload_inner.base_fee_per_gas,
@@ -178,5 +178,5 @@ fn create_taiko_block(
         body: vec![],
         withdrawals: None,
         ommers: Default::default(),
-    }
+    })
 }
