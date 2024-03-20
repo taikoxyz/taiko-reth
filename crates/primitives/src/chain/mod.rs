@@ -8,6 +8,9 @@ pub use spec::{
 #[cfg(feature = "optimism")]
 pub use spec::{BASE_MAINNET, BASE_SEPOLIA};
 
+#[cfg(feature = "taiko")]
+mod taiko;
+
 // The chain spec module.
 mod spec;
 // The chain info module.

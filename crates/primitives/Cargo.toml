@@ -60,6 +60,7 @@ arbitrary = { workspace = true, features = ["derive"], optional = true }
 proptest = { workspace = true, optional = true }
 proptest-derive = { workspace = true, optional = true }
 strum = { workspace = true, features = ["derive"] }
+num_enum = "0.7.2"
 
 [dev-dependencies]
 arbitrary = { workspace = true, features = ["derive"] }
