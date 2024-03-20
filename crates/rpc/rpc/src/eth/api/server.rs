@@ -449,6 +449,20 @@ where
     ) -> Result<Vec<reth_primitives::Header>> {
         // TODO:(petar) add fetching from db
     }
+
+    /// TxPoolContent retrieves the transaction pool content with the given upper limits.
+    #[cfg(feature = "taiko")]
+    async fn tx_pool_content(
+        &self,
+        beneficiary: Address,
+        base_fee: u64,
+        block_max_gas_limit: u64,
+        max_bytes_per_tx_list: u64,
+        locals: Vec<String>,
+        max_transactions_lists: u64,
+    ) -> Result<Vec<reth_primitives::Transaction>> {
+        // TODO:(petar) add fetching from db
+    }
 }
 
 #[cfg(test)]
