@@ -67,3 +67,4 @@ optimism = [
     "reth-payload-builder/optimism",
     "reth-blockchain-tree/optimism",
 ]
+taiko = ["reth-primitives/taiko", "reth-payload-builder/taiko"]

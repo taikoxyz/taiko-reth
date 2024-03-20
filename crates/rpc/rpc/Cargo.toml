@@ -81,7 +81,7 @@ tracing-futures = "0.2"
 schnellru.workspace = true
 futures.workspace = true
 derive_more.workspace = true
-dyn-clone.workspace = true 
+dyn-clone.workspace = true
 
 [dev-dependencies]
 jsonrpsee = { workspace = true, features = ["client"] }
@@ -101,3 +101,4 @@ optimism = [
     "reth-provider/optimism",
     "reth-transaction-pool/optimism",
 ]
+taiko = ["reth-primitives/taiko", "reth-rpc-api/taiko"]

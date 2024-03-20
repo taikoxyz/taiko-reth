@@ -74,6 +74,7 @@ optimism = [
     "reth-provider/optimism",
     "revm/optimism",
 ]
+taiko = ["reth-primitives/taiko"]
 
 [[bench]]
 name = "truncate"

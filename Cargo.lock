@@ -5527,6 +5527,7 @@ dependencies = [
  "reth-rpc-types-compat",
  "reth-stages",
  "reth-static-file",
+ "reth-taiko-payload-builder",
  "reth-tasks",
  "reth-tracing",
  "reth-transaction-pool",

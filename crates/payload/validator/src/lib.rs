@@ -8,6 +8,7 @@
 #![cfg_attr(not(test), warn(unused_crate_dependencies))]
 #![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
 
+#[cfg(feature = "taiko")]
 use reth_payload_builder::TaikoExecutionPayload;
 use reth_primitives::{
     revm_primitives::FixedBytes, Block, ChainSpec, Header, SealedBlock, EMPTY_OMMER_ROOT_HASH,
@@ -135,6 +136,7 @@ impl ExecutionPayloadValidator {
     }
 }
 
+#[cfg(feature = "taiko")]
 fn create_taiko_block(
     payload: TaikoExecutionPayload,
     parent_beacon_block_root: Option<FixedBytes<32>>,

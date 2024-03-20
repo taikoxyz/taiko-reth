@@ -22,3 +22,4 @@ serde_json.workspace = true
 
 [features]
 optimism = ["reth-primitives/optimism", "reth-rpc-types/optimism"]
+taiko = ["reth-primitives/taiko"]

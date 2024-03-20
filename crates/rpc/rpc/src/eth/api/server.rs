@@ -25,7 +25,7 @@ use reth_rpc_api::EthApiServer;
 use reth_rpc_types::{
     state::StateOverride, AccessListWithGasUsed, BlockOverrides, Bundle,
     EIP1186AccountProofResponse, EthCallResponse, FeeHistory, Header, Index, RichBlock,
-    StateContext, SyncStatus, TransactionReceipt, TransactionRequest, Work,
+    StateContext, SyncStatus, Transaction, TransactionReceipt, TransactionRequest, Work,
 };
 use reth_transaction_pool::TransactionPool;
 use serde_json::Value;
@@ -431,23 +431,23 @@ where
 
     /// HeadL1Origin returns the latest L2 block's corresponding L1 origin.
     #[cfg(feature = "taiko")]
-    pub async fn head_l1_origin(&self) -> Result<reth_primitives::L1Origin> {
+    async fn head_l1_origin(&self) -> Result<reth_primitives::L1Origin> {
         // TODO:(petar) add fetching from db
+        todo!();
     }
 
     /// L1OriginByID returns the L2 block's corresponding L1 origin.
     #[cfg(feature = "taiko")]
-    pub async fn l1_origin_by_id(&self, block_id: u64) -> Result<reth_primitives::L1Origin> {
+    async fn l1_origin_by_id(&self, block_id: u64) -> Result<reth_primitives::L1Origin> {
         // TODO:(petar) add fetching from db
+        todo!();
     }
 
     /// GetL2ParentHeaders
     #[cfg(feature = "taiko")]
-    pub async fn get_l2_parent_headers(
-        &self,
-        block_id: u64,
-    ) -> Result<Vec<reth_primitives::Header>> {
+    async fn get_l2_parent_headers(&self, block_id: u64) -> Result<Vec<reth_primitives::Header>> {
         // TODO:(petar) add fetching from db
+        todo!();
     }
 
     /// TxPoolContent retrieves the transaction pool content with the given upper limits.
@@ -460,8 +460,9 @@ where
         max_bytes_per_tx_list: u64,
         locals: Vec<String>,
         max_transactions_lists: u64,
-    ) -> Result<Vec<reth_primitives::Transaction>> {
+    ) -> Result<Vec<Transaction>> {
         // TODO:(petar) add fetching from db
+        todo!();
     }
 }
 
