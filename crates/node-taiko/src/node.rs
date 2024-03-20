@@ -19,24 +19,24 @@ use reth_transaction_pool::{
 /// Type configuration for a regular Ethereum node.
 #[derive(Debug, Default, Clone, Copy)]
 #[non_exhaustive]
-pub struct EthereumNode;
+pub struct TaikoNode;
 
-impl EthereumNode {
+impl TaikoNode {
     /// Returns a [ComponentsBuilder] configured for a regular Ethereum node.
     pub fn components<Node>(
-    ) -> ComponentsBuilder<Node, EthereumPoolBuilder, TaikoPayloadBuilder, EthereumNetworkBuilder>
+    ) -> ComponentsBuilder<Node, TaikoPoolBuilder, TaikoPayloadBuilder, TaikoNetworkBuilder>
     where
         Node: FullNodeTypes<Engine = EthEngineTypes>,
     {
         ComponentsBuilder::default()
             .node_types::<Node>()
-            .pool(EthereumPoolBuilder::default())
+            .pool(TaikoPoolBuilder::default())
             .payload(TaikoPayloadBuilder::default())
-            .network(EthereumNetworkBuilder::default())
+            .network(TaikoNetworkBuilder::default())
     }
 }
 
-impl NodeTypes for EthereumNode {
+impl NodeTypes for TaikoNode {
     type Primitives = ();
     type Engine = EthEngineTypes;
     type Evm = EthEvmConfig;
@@ -46,12 +46,12 @@ impl NodeTypes for EthereumNode {
     }
 }
 
-impl<N> Node<N> for EthereumNode
+impl<N> Node<N> for TaikoNode
 where
     N: FullNodeTypes<Engine = EthEngineTypes>,
 {
-    type PoolBuilder = EthereumPoolBuilder;
-    type NetworkBuilder = EthereumNetworkBuilder;
+    type PoolBuilder = TaikoPoolBuilder;
+    type NetworkBuilder = TaikoNetworkBuilder;
     type PayloadBuilder = TaikoPayloadBuilder;
 
     fn components(
@@ -59,23 +59,23 @@ where
     ) -> ComponentsBuilder<N, Self::PoolBuilder, Self::PayloadBuilder, Self::NetworkBuilder> {
         ComponentsBuilder::default()
             .node_types::<N>()
-            .pool(EthereumPoolBuilder::default())
+            .pool(TaikoPoolBuilder::default())
             .payload(TaikoPayloadBuilder::default())
-            .network(EthereumNetworkBuilder::default())
+            .network(TaikoNetworkBuilder::default())
     }
 }
 
-/// A basic ethereum transaction pool.
+/// A basic Taiko transaction pool.
 ///
 /// This contains various settings that can be configured and take precedence over the node's
 /// config.
 #[derive(Debug, Default, Clone, Copy)]
 #[non_exhaustive]
-pub struct EthereumPoolBuilder {
+pub struct TaikoPoolBuilder {
     // TODO add options for txpool args
 }
 
-impl<Node> PoolBuilder<Node> for EthereumPoolBuilder
+impl<Node> PoolBuilder<Node> for TaikoPoolBuilder
 where
     Node: FullNodeTypes,
 {
@@ -178,13 +178,13 @@ where
     }
 }
 
-/// A basic ethereum payload service.
+/// A basic Taiko network service.
 #[derive(Debug, Default, Clone, Copy)]
-pub struct EthereumNetworkBuilder {
+pub struct TaikoNetworkBuilder {
     // TODO add closure to modify network
 }
 
-impl<Node, Pool> NetworkBuilder<Node, Pool> for EthereumNetworkBuilder
+impl<Node, Pool> NetworkBuilder<Node, Pool> for TaikoNetworkBuilder
 where
     Node: FullNodeTypes,
     Pool: TransactionPool + Unpin + 'static,

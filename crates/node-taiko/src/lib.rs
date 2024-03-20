@@ -18,4 +18,4 @@ pub use engine::EthEngineTypes;
 pub mod evm;
 pub use evm::EthEvmConfig;
 pub mod node;
-pub use node::EthereumNode;
+pub use node::TaikoNode;
