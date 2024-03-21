@@ -122,5 +122,7 @@ pub use payload::{EthBuiltPayload, EthPayloadBuilderAttributes};
 pub use reth_rpc_types::engine::PayloadId;
 pub use service::{PayloadBuilderHandle, PayloadBuilderService, PayloadStore};
 #[cfg(feature = "taiko")]
-pub use taiko::{TaikoBuiltPayload, TaikoExecutionPayload, TaikoPayloadBuilderAttributes};
+pub use taiko::{
+    TaikoBuiltPayload, TaikoExecutionPayload, TaikoPayloadAttributes, TaikoPayloadBuilderAttributes,
+};
 pub use traits::{KeepPayloadJobAlive, PayloadJob, PayloadJobGenerator};

@@ -2,7 +2,10 @@ use reth_node_api::{
     validate_version_specific_fields, AttributesValidationError, EngineApiMessageVersion,
     EngineTypes, PayloadOrAttributes,
 };
-use reth_payload_builder::{EthBuiltPayload, EthPayloadBuilderAttributes};
+use reth_payload_builder::{
+    EthBuiltPayload, EthPayloadBuilderAttributes, TaikoBuiltPayload, TaikoExecutionPayload,
+    TaikoPayloadAttributes, TaikoPayloadBuilderAttributes,
+};
 use reth_primitives::ChainSpec;
 use reth_rpc_types::{
     engine::{
@@ -11,19 +14,20 @@ use reth_rpc_types::{
     },
     ExecutionPayloadV1,
 };
+use serde::{Deserialize, Serialize};
 
 /// The types used in the default mainnet ethereum beacon consensus engine.
-#[derive(Debug, Default, Clone, serde::Deserialize, serde::Serialize)]
+#[derive(Debug, Default, Clone, Deserialize, Serialize)]
 #[non_exhaustive]
-pub struct EthEngineTypes;
+pub struct TaikoEngineTypes;
 
-impl EngineTypes for EthEngineTypes {
-    type PayloadAttributes = EthPayloadAttributes;
-    type PayloadBuilderAttributes = EthPayloadBuilderAttributes;
-    type BuiltPayload = EthBuiltPayload;
+impl EngineTypes for TaikoEngineTypes {
+    type PayloadAttributes = TaikoPayloadAttributes;
+    type PayloadBuilderAttributes = TaikoPayloadBuilderAttributes;
+    type BuiltPayload = TaikoBuiltPayload;
     type ExecutionPayloadV1 = ExecutionPayloadV1;
     type ExecutionPayloadV2 = ExecutionPayloadEnvelopeV2;
-    type ExecutionPayloadV3 = ExecutionPayloadEnvelopeV3;
+    type ExecutionPayloadV3 = TaikoExecutionPayload;
 
     fn validate_version_specific_fields(
         chain_spec: &ChainSpec,

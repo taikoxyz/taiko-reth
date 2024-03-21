@@ -1,6 +1,6 @@
 //! Ethereum Node types config.
 
-use crate::{EthEngineTypes, EthEvmConfig};
+use crate::{TaikoEngineTypes, TaikoEvmConfig};
 use reth_basic_payload_builder::{BasicPayloadJobGenerator, BasicPayloadJobGeneratorConfig};
 use reth_network::NetworkHandle;
 use reth_node_builder::{
@@ -22,11 +22,11 @@ use reth_transaction_pool::{
 pub struct TaikoNode;
 
 impl TaikoNode {
-    /// Returns a [ComponentsBuilder] configured for a regular Ethereum node.
+    /// Returns a [ComponentsBuilder] configured for a Taiko node.
     pub fn components<Node>(
     ) -> ComponentsBuilder<Node, TaikoPoolBuilder, TaikoPayloadBuilder, TaikoNetworkBuilder>
     where
-        Node: FullNodeTypes<Engine = EthEngineTypes>,
+        Node: FullNodeTypes<Engine = TaikoEngineTypes>,
     {
         ComponentsBuilder::default()
             .node_types::<Node>()
@@ -38,17 +38,17 @@ impl TaikoNode {
 
 impl NodeTypes for TaikoNode {
     type Primitives = ();
-    type Engine = EthEngineTypes;
-    type Evm = EthEvmConfig;
+    type Engine = TaikoEngineTypes;
+    type Evm = TaikoEvmConfig;
 
     fn evm_config(&self) -> Self::Evm {
-        EthEvmConfig::default()
+        TaikoEvmConfig::default()
     }
 }
 
 impl<N> Node<N> for TaikoNode
 where
-    N: FullNodeTypes<Engine = EthEngineTypes>,
+    N: FullNodeTypes<Engine = TaikoEngineTypes>,
 {
     type PoolBuilder = TaikoPoolBuilder;
     type NetworkBuilder = TaikoNetworkBuilder;
@@ -143,7 +143,7 @@ pub struct TaikoPayloadBuilder;
 
 impl<Node, Pool> PayloadServiceBuilder<Node, Pool> for TaikoPayloadBuilder
 where
-    Node: FullNodeTypes<Engine = EthEngineTypes>,
+    Node: FullNodeTypes<Engine = TaikoEngineTypes>,
     Pool: TransactionPool + Unpin + 'static,
 {
     async fn spawn_payload_service(

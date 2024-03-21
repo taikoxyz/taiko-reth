@@ -5,12 +5,12 @@ use reth_primitives::{
     Address, ChainSpec, Head, Header, Transaction, U256,
 };
 
-/// Ethereum-related EVM configuration.
+/// Taiko-related EVM configuration.
 #[derive(Debug, Clone, Copy, Default)]
 #[non_exhaustive]
-pub struct EthEvmConfig;
+pub struct TaikoEvmConfig;
 
-impl ConfigureEvmEnv for EthEvmConfig {
+impl ConfigureEvmEnv for TaikoEvmConfig {
     type TxMeta = ();
 
     fn fill_tx_env<T>(tx_env: &mut TxEnv, transaction: T, sender: Address, _meta: ())
@@ -44,7 +44,7 @@ impl ConfigureEvmEnv for EthEvmConfig {
     }
 }
 
-impl ConfigureEvm for EthEvmConfig {}
+impl ConfigureEvm for TaikoEvmConfig {}
 
 #[cfg(test)]
 mod tests {
@@ -60,7 +60,7 @@ mod tests {
         let chain_spec = ChainSpec::default();
         let total_difficulty = U256::ZERO;
 
-        EthEvmConfig::fill_cfg_and_block_env(
+        TaikoEvmConfig::fill_cfg_and_block_env(
             &mut cfg_env,
             &mut block_env,
             &chain_spec,
