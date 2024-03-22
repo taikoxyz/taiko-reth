@@ -20,4 +20,13 @@ pub enum TaikoPayloadBuilderError {
     /// Thrown when a blob transaction is included in a sequencer's block.
     #[error("blob transaction included in sequencer block")]
     BlobTransactionRejected,
+    /// Thrown when a invalid anchor transaction is included in a sequencer's block.
+    #[error("invalid anchor transaction included in sequencer block")]
+    InvalidAnchorTransaction,
+    /// Thrown when a transaction is not able to be marked as anchor.
+    #[error("failed to mark anchor")]
+    FailedToMarkAnchor,
+    /// Thrown when a transaction is not able to be decoded from the payload.
+    #[error("failed to decode tx")]
+    FailedToDecodeTx,
 }

@@ -891,7 +891,6 @@ impl From<MockTransaction> for Transaction {
                 value,
                 access_list: accesslist.clone(),
                 input: input.clone(),
-                #[cfg(feature = "taiko")]
                 is_anchor: false,
             }),
             MockTransaction::Eip4844 {

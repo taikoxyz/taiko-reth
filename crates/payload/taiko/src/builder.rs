@@ -1,6 +1,4 @@
-use crate::consts::{
-    ANCHOR_GAS_LIMIT, ANCHOR_SELECTOR, GOLDE_TOUCH_ACCOUNT, TAIKO_L2_ADDRESS_SUFFIX,
-};
+use crate::consts::{anchor_selector, golden_touch, ANCHOR_GAS_LIMIT, TAIKO_L2_ADDRESS_SUFFIX};
 use crate::error::TaikoPayloadBuilderError;
 use reth_basic_payload_builder::*;
 use reth_payload_builder::{
@@ -12,18 +10,16 @@ use reth_primitives::{
     hex::FromHex,
     proofs,
     revm::env::tx_env_with_recovered,
-    Address, Block, ChainSpec, Hardfork, Header, IntoRecoveredTransaction, Receipt, Receipts,
-    TransactionSigned, TransactionSignedEcRecovered, TxType, EMPTY_OMMER_ROOT_HASH, U256,
+    Address, Block, Header, Receipt, Receipts, TransactionSigned, EMPTY_OMMER_ROOT_HASH, U256,
 };
 use reth_provider::{BundleStateWithReceipts, StateProviderFactory};
 use reth_revm::database::StateProviderDatabase;
 use reth_transaction_pool::{BestTransactionsAttributes, TransactionPool};
 use revm::{
     db::states::bundle_state::BundleRetention,
-    primitives::{EVMError, EnvWithHandlerCfg, InvalidTransaction, ResultAndState},
-    DatabaseCommit, State, StateBuilder,
+    primitives::{EVMError, EnvWithHandlerCfg, ResultAndState},
+    DatabaseCommit, StateBuilder,
 };
-use std::sync::Arc;
 use tracing::{debug, trace, warn};
 
 /// Taiko's payload builder
@@ -48,7 +44,7 @@ where
 
     fn on_missing_payload(
         &self,
-        args: BuildArguments<Pool, Client, TaikoPayloadBuilderAttributes, TaikoBuiltPayload>,
+        _args: BuildArguments<Pool, Client, TaikoPayloadBuilderAttributes, TaikoBuiltPayload>,
     ) -> Option<TaikoBuiltPayload> {
         None
     }
@@ -207,12 +203,12 @@ where
     let base_fee = initialized_block_env.basefee.to::<u64>();
 
     let mut executed_txs = Vec::new();
-    let mut best_txs = pool.best_transactions_with_attributes(BestTransactionsAttributes::new(
+    let best_txs = pool.best_transactions_with_attributes(BestTransactionsAttributes::new(
         base_fee,
         initialized_block_env.get_blob_gasprice().map(|gasprice| gasprice as u64),
     ));
 
-    let mut total_fees = U256::ZERO;
+    let total_fees = U256::ZERO;
 
     let block_number = initialized_block_env.number.to::<u64>();
 
@@ -226,7 +222,11 @@ where
         &attributes,
     )?;
 
-    let transactions = attributes.block_metadata.unwrap_or_default().tx_list.unwrap_or_default();
+    let transactions = attributes
+        .block_metadata
+        .as_ref()
+        .map(|bm| bm.tx_list.clone().unwrap_or_default())
+        .unwrap_or(vec![]);
 
     let mut receipts = Vec::new();
     for (index, tx) in transactions.into_iter().enumerate() {
@@ -235,18 +235,25 @@ where
             return Ok(BuildOutcome::Cancelled);
         }
 
-        let tx = {
-            let mut bytes = tx.to_vec().as_slice();
-            let signed = TransactionSigned::decode_enveloped(&mut bytes).unwrap();
-            let recovered = signed.try_into_ecrecovered().map_err(|_| {
-                PayloadBuilderError::other(TaikoPayloadBuilderError::TransactionEcRecoverFailed)
-            })?;
-            recovered
+        let mut tx = {
+            let bytes = tx.to_vec();
+            let mut bytes = bytes.as_slice();
+            TransactionSigned::decode_enveloped(&mut bytes).map_err(|_| {
+                PayloadBuilderError::Other(Box::new(TaikoPayloadBuilderError::FailedToDecodeTx))
+            })?
         };
 
         if index == 0 {
-            tx.mark_as_anchor().map_err(|e| PayloadBuilderError::Other(Box::new(e)))?;
+            tx.transaction.mark_as_anchor().map_err(|_| {
+                PayloadBuilderError::Other(Box::new(TaikoPayloadBuilderError::FailedToMarkAnchor))
+            })?;
         }
+
+        let tx = tx.try_into_ecrecovered().map_err(|_| {
+            PayloadBuilderError::other(Box::new(
+                TaikoPayloadBuilderError::TransactionEcRecoverFailed,
+            ))
+        })?;
 
         let mut evm = revm::Evm::builder()
             .with_db(&mut db)
@@ -372,7 +379,9 @@ where
     // Validate the anchor Tx
     if let Some(anchor) = executed_txs.first() {
         if !validate_anchor_tx(&anchor, &header) {
-            return Err(PayloadBuilderError::Other(Err("Invalid anchor transaction")));
+            return Err(PayloadBuilderError::Other(Box::new(
+                TaikoPayloadBuilderError::InvalidAnchorTransaction,
+            )));
         }
     }
 
@@ -394,7 +403,7 @@ where
 fn get_taiko_l2_address(chain_id: u64) -> Address {
     let prefix = chain_id.to_string();
     let zeros = "0".repeat(Address::len_bytes() * 2 - prefix.len() - TAIKO_L2_ADDRESS_SUFFIX.len());
-    Address::from_hex(&format!("0x{prefix}{zeros}{TAIKO_L2_ADDRESS_SUFFIX}"))
+    Address::from_hex(&format!("0x{prefix}{zeros}{TAIKO_L2_ADDRESS_SUFFIX}")).unwrap()
 }
 
 /// Checks if the given transaction is a valid TaikoL2.anchor transaction.
@@ -415,7 +424,7 @@ fn validate_anchor_tx(tx: &TransactionSigned, header: &Header) -> bool {
         return false;
     }
 
-    if !tx.input().starts_with(&ANCHOR_SELECTOR) {
+    if !tx.input().starts_with(&anchor_selector().to_vec()) {
         return false;
     }
 
@@ -427,13 +436,15 @@ fn validate_anchor_tx(tx: &TransactionSigned, header: &Header) -> bool {
         return false;
     }
 
-    if tx.max_fee_per_gas() != header.base_fee_per_gas {
-        return false;
+    if let Some(base_fee_per_gas) = header.base_fee_per_gas {
+        if tx.max_fee_per_gas() != base_fee_per_gas as u128 {
+            return false;
+        }
     }
 
     let Some(signer) = tx.recover_signer() else {
         return false;
     };
 
-    signer == GOLDE_TOUCH_ACCOUNT
+    signer == golden_touch()
 }

@@ -430,28 +430,28 @@ where
     }
 
     /// HeadL1Origin returns the latest L2 block's corresponding L1 origin.
-    #[cfg(feature = "taiko")]
+    // #[cfg(feature = "taiko")]
     async fn head_l1_origin(&self) -> Result<reth_primitives::L1Origin> {
         // TODO:(petar) add fetching from db
         todo!();
     }
 
     /// L1OriginByID returns the L2 block's corresponding L1 origin.
-    #[cfg(feature = "taiko")]
+    // #[cfg(feature = "taiko")]
     async fn l1_origin_by_id(&self, block_id: u64) -> Result<reth_primitives::L1Origin> {
         // TODO:(petar) add fetching from db
         todo!();
     }
 
     /// GetL2ParentHeaders
-    #[cfg(feature = "taiko")]
+    // #[cfg(feature = "taiko")]
     async fn get_l2_parent_headers(&self, block_id: u64) -> Result<Vec<reth_primitives::Header>> {
         // TODO:(petar) add fetching from db
         todo!();
     }
 
     /// TxPoolContent retrieves the transaction pool content with the given upper limits.
-    #[cfg(feature = "taiko")]
+    // #[cfg(feature = "taiko")]
     async fn tx_pool_content(
         &self,
         beneficiary: Address,

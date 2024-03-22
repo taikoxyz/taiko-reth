@@ -40,7 +40,6 @@ pub fn to_primitive_transaction(
             input: tx.input,
             access_list: tx.access_list.into(),
             max_priority_fee_per_gas: tx.max_priority_fee_per_gas.to(),
-            #[cfg(feature = "taiko")]
             is_anchor: false,
         }),
         TypedTransactionRequest::EIP4844(tx) => Transaction::Eip4844(TxEip4844 {
