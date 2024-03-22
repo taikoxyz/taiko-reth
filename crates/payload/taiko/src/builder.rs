@@ -1,3 +1,6 @@
+use crate::consts::{
+    ANCHOR_GAS_LIMIT, ANCHOR_SELECTOR, GOLDE_TOUCH_ACCOUNT, TAIKO_L2_ADDRESS_SUFFIX,
+};
 use crate::error::TaikoPayloadBuilderError;
 use reth_basic_payload_builder::*;
 use reth_payload_builder::{
@@ -6,10 +9,11 @@ use reth_payload_builder::{
 use reth_primitives::{
     constants::{BEACON_NONCE, EMPTY_RECEIPTS, EMPTY_TRANSACTIONS},
     eip4844::calculate_excess_blob_gas,
+    hex::FromHex,
     proofs,
     revm::env::tx_env_with_recovered,
     Address, Block, ChainSpec, Hardfork, Header, IntoRecoveredTransaction, Receipt, Receipts,
-    TransactionSigned, TxType, EMPTY_OMMER_ROOT_HASH, U256,
+    TransactionSigned, TransactionSignedEcRecovered, TxType, EMPTY_OMMER_ROOT_HASH, U256,
 };
 use reth_provider::{BundleStateWithReceipts, StateProviderFactory};
 use reth_revm::database::StateProviderDatabase;
@@ -222,15 +226,20 @@ where
         &attributes,
     )?;
 
+    let transactions = attributes.block_metadata.unwrap_or_default().tx_list.unwrap_or_default();
+
     let mut receipts = Vec::new();
-    for (index, tx) in &attributes
-        .block_metadata
-        .unwrap()
-        .tx_list
+    for (index, tx) in transactions
         .into_iter()
         .map(|tx| {
-            let s = TransactionSigned::decode_enveloped(&tx).unwrap();
-            s
+            let mut bytes = tx.to_vec().as_slice();
+            let signed = TransactionSigned::decode_enveloped(&mut bytes).unwrap();
+            match signed.try_into_ecrecovered() {
+                Ok(recovered) => recovered,
+                Err(_) => {
+                    PayloadBuilderError::other(TaikoPayloadBuilderError::TransactionEcRecoverFailed)
+                }
+            }
         })
         .enumerate()
     {
@@ -240,7 +249,7 @@ where
         }
 
         if index == 0 {
-            tx.mark_as_anchor()?;
+            tx.mark_as_anchor().map_err(|e| PayloadBuilderError::Other(Box::new(e)))?;
         }
 
         let mut evm = revm::Evm::builder()
@@ -386,7 +395,13 @@ where
     Ok(BuildOutcome::Better { payload, cached_reads })
 }
 
-// Checks if the given transaction is a valid TaikoL2.anchor transaction.
+fn get_taiko_l2_address(chain_id: u64) -> Address {
+    let prefix = chain_id.to_string();
+    let zeros = "0".repeat(Address::len_bytes() * 2 - prefix.len() - TAIKO_L2_ADDRESS_SUFFIX.len());
+    Address::from_hex(&format!("0x{prefix}{zeros}{TAIKO_L2_ADDRESS_SUFFIX}"))
+}
+
+/// Checks if the given transaction is a valid TaikoL2.anchor transaction.
 fn validate_anchor_tx(tx: &TransactionSigned, header: &Header) -> bool {
     if !tx.is_eip1559() {
         return false;
@@ -396,13 +411,15 @@ fn validate_anchor_tx(tx: &TransactionSigned, header: &Header) -> bool {
         return false;
     };
 
-    // TODO:(petar) This should check for TaikoL2Address
-    if to != Address::default() {
+    let Some(chain_id) = tx.chain_id() else {
+        return false;
+    };
+
+    if to != get_taiko_l2_address(chain_id) {
         return false;
     }
 
-    // TODO:(petar) This should check for the AnchorPrefix
-    if !tx.input().starts_with(&[]) {
+    if !tx.input().starts_with(&ANCHOR_SELECTOR) {
         return false;
     }
 
@@ -410,8 +427,7 @@ fn validate_anchor_tx(tx: &TransactionSigned, header: &Header) -> bool {
         return false;
     }
 
-    // TODO:(petar) This should check whether the gas limit is different then the AnchorGasLimit
-    if tx.gas_limit() != 0 {
+    if tx.gas_limit() != ANCHOR_GAS_LIMIT {
         return false;
     }
 
@@ -423,6 +439,5 @@ fn validate_anchor_tx(tx: &TransactionSigned, header: &Header) -> bool {
         return false;
     };
 
-    // TODO:(petar) This should check whether the signer is equal to the GoldenTouchAccount
-    signer == Default::default()
+    signer == GOLDE_TOUCH_ACCOUNT
 }

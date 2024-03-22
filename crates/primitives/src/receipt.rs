@@ -27,17 +27,17 @@ pub struct Receipt {
     pub cumulative_gas_used: u64,
     /// Log send from contracts.
     pub logs: Vec<Log>,
-    /// Deposit nonce for Optimism deposit transactions
-    #[cfg(feature = "optimism")]
-    pub deposit_nonce: Option<u64>,
-    /// Deposit receipt version for Optimism deposit transactions
-    ///
-    ///
-    /// The deposit receipt version was introduced in Canyon to indicate an update to how
-    /// receipt hashes should be computed when set. The state transition process
-    /// ensures this is only set for post-Canyon deposit transactions.
-    #[cfg(feature = "optimism")]
-    pub deposit_receipt_version: Option<u64>,
+    // /// Deposit nonce for Optimism deposit transactions
+    // #[cfg(feature = "optimism")]
+    // pub deposit_nonce: Option<u64>,
+    // /// Deposit receipt version for Optimism deposit transactions
+    // ///
+    // ///
+    // /// The deposit receipt version was introduced in Canyon to indicate an update to how
+    // /// receipt hashes should be computed when set. The state transition process
+    // /// ensures this is only set for post-Canyon deposit transactions.
+    // #[cfg(feature = "optimism")]
+    // pub deposit_receipt_version: Option<u64>,
 }
 
 impl Receipt {
@@ -122,7 +122,7 @@ impl Receipts {
             if let Some(receipt) = tx_r.as_ref() {
                 out.push((id as u64, receipt.cumulative_gas_used));
             } else {
-                return Err(PruneSegmentError::ReceiptsPruned)
+                return Err(PruneSegmentError::ReceiptsPruned);
             }
         }
         Ok(out)
@@ -284,7 +284,7 @@ impl ReceiptWithBloom {
         let b = &mut &**buf;
         let rlp_head = alloy_rlp::Header::decode(b)?;
         if !rlp_head.list {
-            return Err(alloy_rlp::Error::UnexpectedString)
+            return Err(alloy_rlp::Error::UnexpectedString);
         }
         let started_len = b.len();
 
@@ -329,7 +329,7 @@ impl ReceiptWithBloom {
             return Err(alloy_rlp::Error::ListLengthMismatch {
                 expected: rlp_head.payload_length,
                 got: consumed,
-            })
+            });
         }
         *buf = *b;
         Ok(this)
@@ -482,7 +482,7 @@ impl<'a> ReceiptWithBloomEncoder<'a> {
     fn encode_inner(&self, out: &mut dyn BufMut, with_header: bool) {
         if matches!(self.receipt.tx_type, TxType::Legacy) {
             self.encode_fields(out);
-            return
+            return;
         }
 
         let mut payload = Vec::new();
