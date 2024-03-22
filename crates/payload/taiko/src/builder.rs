@@ -229,24 +229,20 @@ where
     let transactions = attributes.block_metadata.unwrap_or_default().tx_list.unwrap_or_default();
 
     let mut receipts = Vec::new();
-    for (index, tx) in transactions
-        .into_iter()
-        .map(|tx| {
-            let mut bytes = tx.to_vec().as_slice();
-            let signed = TransactionSigned::decode_enveloped(&mut bytes).unwrap();
-            match signed.try_into_ecrecovered() {
-                Ok(recovered) => recovered,
-                Err(_) => {
-                    PayloadBuilderError::other(TaikoPayloadBuilderError::TransactionEcRecoverFailed)
-                }
-            }
-        })
-        .enumerate()
-    {
+    for (index, tx) in transactions.into_iter().enumerate() {
         // Check if the job was cancelled, if so we can exit early.
         if cancel.is_cancelled() {
             return Ok(BuildOutcome::Cancelled);
         }
+
+        let tx = {
+            let mut bytes = tx.to_vec().as_slice();
+            let signed = TransactionSigned::decode_enveloped(&mut bytes).unwrap();
+            let recovered = signed.try_into_ecrecovered().map_err(|_| {
+                PayloadBuilderError::other(TaikoPayloadBuilderError::TransactionEcRecoverFailed)
+            })?;
+            recovered
+        };
 
         if index == 0 {
             tx.mark_as_anchor().map_err(|e| PayloadBuilderError::Other(Box::new(e)))?;
