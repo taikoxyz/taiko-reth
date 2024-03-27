@@ -3,6 +3,9 @@
 use revm_primitives::{Address, Bytes, B256};
 use serde::{Deserialize, Serialize};
 
+pub const L1_ORIGIN_PREFIX: &str = "TKO:L1O";
+pub const HEAD_L1_ORIGIN_KEY: &str = "TKO:LastL1O";
+
 /// BlockMetadata represents a `BlockMetadata` struct defined in protocol.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
@@ -22,10 +25,20 @@ pub struct TaikoBlockMetadata {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct L1Origin {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub block_id: Option<u64>,
+    pub block_id: u64,
     pub l2_block_hash: B256,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub l1_block_height: Option<u64>,
+    pub l1_block_height: u64,
     pub l1_block_hash: B256,
+}
+
+impl L1Origin {
+    /// l1OriginKey calculates the L1Origin key.
+    /// l1OriginPrefix + l2HeaderHash -> l1OriginKey
+    pub fn key(block_id: u64) -> String {
+        format!("{L1_ORIGIN_PREFIX}{block_id}")
+    }
+
+    pub fn head_key() -> String {
+        HEAD_L1_ORIGIN_KEY.to_string()
+    }
 }

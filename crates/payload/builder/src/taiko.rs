@@ -33,7 +33,7 @@ pub struct TaikoPayloadAttributes {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub block_metadata: Option<TaikoBlockMetadata>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub l1_origin: Option<L1Origin>,
+    pub l1_origin: L1Origin,
 }
 
 /// Taiko Payload Builder Attributes
@@ -46,7 +46,7 @@ pub struct TaikoPayloadBuilderAttributes {
     /// Taiko specific block metadata
     pub block_metadata: Option<TaikoBlockMetadata>,
     /// The L1 origin of the L2 block
-    pub l1_origin: Option<L1Origin>,
+    pub l1_origin: L1Origin,
 }
 
 impl PayloadBuilderAttributes for TaikoPayloadBuilderAttributes {
