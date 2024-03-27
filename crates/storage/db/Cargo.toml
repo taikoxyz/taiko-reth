@@ -13,10 +13,13 @@ workspace = true
 
 [dependencies]
 # reth
-reth-primitives.workspace = true
+reth-primitives = { workspace = true, features = ["taiko"] }
 reth-interfaces.workspace = true
 reth-codecs.workspace = true
-reth-libmdbx = { workspace = true, optional = true, features = ["return-borrowed", "read-tx-timeouts"] }
+reth-libmdbx = { workspace = true, optional = true, features = [
+    "return-borrowed",
+    "read-tx-timeouts",
+] }
 reth-nippy-jar.workspace = true
 reth-tracing.workspace = true
 
@@ -48,7 +51,7 @@ once_cell.workspace = true
 
 [dev-dependencies]
 # reth libs with arbitrary
-reth-primitives = { workspace = true, features = ["arbitrary"] }
+reth-primitives = { workspace = true, features = ["taiko", "arbitrary"] }
 reth-codecs.workspace = true
 reth-interfaces.workspace = true
 
@@ -58,7 +61,11 @@ serde_json.workspace = true
 tempfile.workspace = true
 test-fuzz.workspace = true
 
-pprof = { workspace = true, features = ["flamegraph", "frame-pointer", "criterion"] }
+pprof = { workspace = true, features = [
+    "flamegraph",
+    "frame-pointer",
+    "criterion",
+] }
 criterion.workspace = true
 iai = "0.1.1"
 
