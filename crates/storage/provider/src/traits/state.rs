@@ -1,5 +1,7 @@
 use super::AccountReader;
-use crate::{BlockHashReader, BlockIdReader, BundleStateWithReceipts};
+use crate::{
+    BlockHashReader, BlockIdReader, BundleStateWithReceipts, L1OriginReader, L1OriginWriter,
+};
 use auto_impl::auto_impl;
 use reth_interfaces::provider::{ProviderError, ProviderResult};
 use reth_primitives::{
@@ -40,10 +42,10 @@ pub trait StateProvider: BlockHashReader + AccountReader + StateRootProvider + S
 
         if let Some(code_hash) = acc.bytecode_hash {
             if code_hash == KECCAK_EMPTY {
-                return Ok(None)
+                return Ok(None);
             }
             // Get the code from the code hash
-            return self.bytecode_by_hash(code_hash)
+            return self.bytecode_by_hash(code_hash);
         }
 
         // Return `None` if no code hash is set
@@ -98,7 +100,9 @@ pub trait StateProvider: BlockHashReader + AccountReader + StateRootProvider + S
 /// This affects tracing, or replaying blocks, which will need to be executed on top of the state of
 /// the parent block. For example, in order to trace block `n`, the state after block `n - 1` needs
 /// to be used, since block `n` was executed on its parent block's state.
-pub trait StateProviderFactory: BlockIdReader + Send + Sync {
+pub trait StateProviderFactory:
+    BlockIdReader + L1OriginWriter + L1OriginReader + Send + Sync
+{
     /// Storage provider for latest block.
     fn latest(&self) -> ProviderResult<StateProviderBox>;
 

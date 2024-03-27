@@ -3,7 +3,8 @@ use crate::{
     providers::{database::metrics, static_file::StaticFileWriter, StaticFileProvider},
     to_range,
     traits::{
-        AccountExtReader, BlockSource, ChangeSetReader, ReceiptProvider, StageCheckpointWriter,
+        AccountExtReader, BlockSource, ChangeSetReader, L1OriginReader, L1OriginWriter,
+        ReceiptProvider, StageCheckpointWriter,
     },
     AccountReader, BlockExecutionWriter, BlockHashReader, BlockNumReader, BlockReader, BlockWriter,
     Chain, EvmEnvProvider, HashingWriter, HeaderProvider, HeaderSyncGap, HeaderSyncGapProvider,
@@ -37,10 +38,10 @@ use reth_primitives::{
     stage::{StageCheckpoint, StageId},
     trie::Nibbles,
     Account, Address, Block, BlockHash, BlockHashOrNumber, BlockNumber, BlockWithSenders,
-    ChainInfo, ChainSpec, GotExpected, Head, Header, PruneCheckpoint, PruneModes, PruneSegment,
-    Receipt, SealedBlock, SealedBlockWithSenders, SealedHeader, StaticFileSegment, StorageEntry,
-    TransactionMeta, TransactionSigned, TransactionSignedEcRecovered, TransactionSignedNoHash,
-    TxHash, TxNumber, Withdrawal, Withdrawals, B256, U256,
+    ChainInfo, ChainSpec, GotExpected, Head, Header, L1Origin, PruneCheckpoint, PruneModes,
+    PruneSegment, Receipt, SealedBlock, SealedBlockWithSenders, SealedHeader, StaticFileSegment,
+    StorageEntry, TransactionMeta, TransactionSigned, TransactionSignedEcRecovered,
+    TransactionSignedNoHash, TxHash, TxNumber, Withdrawal, Withdrawals, B256, U256,
 };
 use reth_trie::{
     prefix_set::{PrefixSet, PrefixSetMut, TriePrefixSets},
@@ -214,7 +215,7 @@ where
     while let Some((sharded_key, list)) = item {
         // If the shard does not belong to the key, break.
         if !shard_belongs_to_key(&sharded_key) {
-            break
+            break;
         }
         cursor.delete_current()?;
 
@@ -223,12 +224,12 @@ where
         let first = list.iter().next().expect("List can't be empty");
         if first >= block_number {
             item = cursor.prev()?;
-            continue
+            continue;
         } else if block_number <= sharded_key.as_ref().highest_block_number {
             // Filter out all elements greater than block number.
-            return Ok(list.iter().take_while(|i| *i < block_number).collect::<Vec<_>>())
+            return Ok(list.iter().take_while(|i| *i < block_number).collect::<Vec<_>>());
         } else {
-            return Ok(list.iter().collect::<Vec<_>>())
+            return Ok(list.iter().collect::<Vec<_>>());
         }
     }
 
@@ -337,7 +338,7 @@ impl<TX: DbTxMut + DbTx> DatabaseProvider<TX> {
         range: RangeInclusive<BlockNumber>,
     ) -> ProviderResult<BundleStateWithReceipts> {
         if range.is_empty() {
-            return Ok(BundleStateWithReceipts::default())
+            return Ok(BundleStateWithReceipts::default());
         }
         let start_block_number = *range.start();
 
@@ -515,7 +516,7 @@ impl<TX: DbTxMut + DbTx> DatabaseProvider<TX> {
         let block_bodies = self.get_or_take::<tables::BlockBodyIndices, false>(range)?;
 
         if block_bodies.is_empty() {
-            return Ok(Vec::new())
+            return Ok(Vec::new());
         }
 
         // Compute the first and last tx ID in the range
@@ -524,7 +525,7 @@ impl<TX: DbTxMut + DbTx> DatabaseProvider<TX> {
 
         // If this is the case then all of the blocks in the range are empty
         if last_transaction < first_transaction {
-            return Ok(block_bodies.into_iter().map(|(n, _)| (n, Vec::new())).collect())
+            return Ok(block_bodies.into_iter().map(|(n, _)| (n, Vec::new())).collect());
         }
 
         // Get transactions and senders
@@ -660,7 +661,7 @@ impl<TX: DbTxMut + DbTx> DatabaseProvider<TX> {
 
         let block_headers = self.get_or_take::<tables::Headers, TAKE>(range.clone())?;
         if block_headers.is_empty() {
-            return Ok(Vec::new())
+            return Ok(Vec::new());
         }
 
         let block_header_hashes =
@@ -765,7 +766,7 @@ impl<TX: DbTxMut + DbTx> DatabaseProvider<TX> {
 
         while let Some(Ok((entry_key, _))) = reverse_walker.next() {
             if selector(entry_key.clone()) <= key {
-                break
+                break;
             }
             reverse_walker.delete_current()?;
             deleted += 1;
@@ -812,7 +813,7 @@ impl<TX: DbTxMut + DbTx> DatabaseProvider<TX> {
                 }
 
                 if deleted == limit {
-                    break
+                    break;
                 }
             }
         }
@@ -843,7 +844,7 @@ impl<TX: DbTxMut + DbTx> DatabaseProvider<TX> {
                 }
 
                 if deleted == limit {
-                    break
+                    break;
                 }
             }
         }
@@ -863,7 +864,7 @@ impl<TX: DbTxMut + DbTx> DatabaseProvider<TX> {
             // delete old shard so new one can be inserted.
             self.tx.delete::<T>(shard_key, None)?;
             let list = list.iter().collect::<Vec<_>>();
-            return Ok(list)
+            return Ok(list);
         }
         Ok(Vec::new())
     }
@@ -1005,7 +1006,7 @@ impl<TX: DbTx> HeaderSyncGapProvider for DatabaseProvider<TX> {
             }
             Ordering::Less => {
                 // There's either missing or corrupted files.
-                return Err(ProviderError::HeaderNotFound(next_static_file_block_num.into()).into())
+                return Err(ProviderError::HeaderNotFound(next_static_file_block_num.into()).into());
             }
             Ordering::Equal => {}
         }
@@ -1053,7 +1054,7 @@ impl<TX: DbTx> HeaderProvider for DatabaseProvider<TX> {
         if let Some(td) = self.chain_spec.final_paris_total_difficulty(number) {
             // if this block is higher than the final paris(merge) block, return the final paris
             // difficulty
-            return Ok(Some(td))
+            return Ok(Some(td));
         }
 
         self.static_file_provider.get_with_static_file_or_database(
@@ -1110,7 +1111,7 @@ impl<TX: DbTx> HeaderProvider for DatabaseProvider<TX> {
                         .ok_or_else(|| ProviderError::HeaderNotFound(number.into()))?;
                     let sealed = header.seal(hash);
                     if !predicate(&sealed) {
-                        break
+                        break;
                     }
                     headers.push(sealed);
                 }
@@ -1199,7 +1200,7 @@ impl<TX: DbTx> BlockReader for DatabaseProvider<TX> {
                     None => return Ok(None),
                 };
 
-                return Ok(Some(Block { header, body: transactions, ommers, withdrawals }))
+                return Ok(Some(Block { header, body: transactions, ommers, withdrawals }));
             }
         }
 
@@ -1223,11 +1224,11 @@ impl<TX: DbTx> BlockReader for DatabaseProvider<TX> {
             // If the Paris (Merge) hardfork block is known and block is after it, return empty
             // ommers.
             if self.chain_spec.final_paris_total_difficulty(number).is_some() {
-                return Ok(Some(Vec::new()))
+                return Ok(Some(Vec::new()));
             }
 
             let ommers = self.tx.get::<tables::BlockOmmers>(number)?.map(|o| o.ommers);
-            return Ok(ommers)
+            return Ok(ommers);
         }
 
         Ok(None)
@@ -1295,7 +1296,7 @@ impl<TX: DbTx> BlockReader for DatabaseProvider<TX> {
 
     fn block_range(&self, range: RangeInclusive<BlockNumber>) -> ProviderResult<Vec<Block>> {
         if range.is_empty() {
-            return Ok(Vec::new())
+            return Ok(Vec::new());
         }
 
         let len = range.end().saturating_sub(*range.start()) as usize;
@@ -1493,7 +1494,7 @@ impl<TX: DbTx> TransactionsProvider for DatabaseProvider<TX> {
                                 excess_blob_gas: header.excess_blob_gas,
                             };
 
-                            return Ok(Some((transaction, meta)))
+                            return Ok(Some((transaction, meta)));
                         }
                     }
                 }
@@ -1526,7 +1527,7 @@ impl<TX: DbTx> TransactionsProvider for DatabaseProvider<TX> {
                             .map(Into::into)
                             .collect(),
                     ))
-                }
+                };
             }
         }
         Ok(None)
@@ -1604,7 +1605,7 @@ impl<TX: DbTx> ReceiptProvider for DatabaseProvider<TX> {
                     Ok(Some(Vec::new()))
                 } else {
                     self.receipts_by_tx_range(tx_range).map(Some)
-                }
+                };
             }
         }
         Ok(None)
@@ -1639,7 +1640,7 @@ impl<TX: DbTx> WithdrawalsProvider for DatabaseProvider<TX> {
                     .get::<tables::BlockWithdrawals>(number)
                     .map(|w| w.map(|w| w.withdrawals))?
                     .unwrap_or_default();
-                return Ok(Some(withdrawals))
+                return Ok(Some(withdrawals));
             }
         }
         Ok(None)
@@ -2065,7 +2066,7 @@ impl<TX: DbTxMut + DbTx> HashingWriter for DatabaseProvider<TX> {
                     root: GotExpected { got: state_root, expected: expected_state_root },
                     block_number: *range.end(),
                     block_hash: end_block_hash,
-                })))
+                })));
             }
             trie_updates.flush(&self.tx)?;
         }
@@ -2137,8 +2138,8 @@ impl<TX: DbTxMut + DbTx> HistoryWriter for DatabaseProvider<TX> {
                 StorageShardedKey::last(address, storage_key),
                 rem_index,
                 |storage_sharded_key| {
-                    storage_sharded_key.address == address &&
-                        storage_sharded_key.sharded_key.key == storage_key
+                    storage_sharded_key.address == address
+                        && storage_sharded_key.sharded_key.key == storage_key
                 },
             )?;
 
@@ -2262,7 +2263,7 @@ impl<TX: DbTxMut + DbTx> BlockExecutionWriter for DatabaseProvider<TX> {
                     root: GotExpected { got: new_state_root, expected: parent_state_root },
                     block_number: parent_number,
                     block_hash: parent_hash,
-                })))
+                })));
             }
             trie_updates.flush(&self.tx)?;
         }
@@ -2434,7 +2435,7 @@ impl<TX: DbTxMut + DbTx> BlockWriter for DatabaseProvider<TX> {
     ) -> ProviderResult<()> {
         if blocks.is_empty() {
             debug!(target: "providers::db", "Attempted to append empty block range");
-            return Ok(())
+            return Ok(());
         }
 
         let first_number = blocks.first().unwrap().number;
@@ -2519,4 +2520,24 @@ fn range_size_hint(range: &impl RangeBounds<TxNumber>) -> Option<usize> {
         Bound::Unbounded => return None,
     };
     end.checked_sub(start).map(|x| x as _)
+}
+
+impl<TX: DbTx> L1OriginReader for DatabaseProvider<TX> {
+    fn read_l1_origin(&self, block_id: u64) -> ProviderResult<Option<L1Origin>> {
+        self.tx.get::<tables::L1Origins>(L1Origin::key(block_id))
+    }
+
+    fn read_head_l1_origin(&self) -> ProviderResult<Option<u64>> {
+        self.tx.get::<tables::HeadL1Origin>(L1Origin::head_key())
+    }
+}
+
+impl<TX: DbTxMut> L1OriginWriter for DatabaseProvider<TX> {
+    fn insert_l1_origin(&self, block_id: u64, l1_origin: L1Origin) -> ProviderResult<()> {
+        self.tx.put::<tables::L1Origins>(L1Origin::key(block_id), l1_origin)
+    }
+
+    fn insert_head_l1_origin(&self, block_id: u64) -> ProviderResult<()> {
+        self.tx.put::<tables::HeadL1Origin>(L1Origin::head_key(), block_id)
+    }
 }

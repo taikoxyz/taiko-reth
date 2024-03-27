@@ -2,9 +2,10 @@ use crate::{
     AccountReader, BlockHashReader, BlockIdReader, BlockNumReader, BlockReader, BlockReaderIdExt,
     BlockSource, BlockchainTreePendingStateProvider, BundleStateDataProvider, CanonChainTracker,
     CanonStateNotifications, CanonStateSubscriptions, ChainSpecProvider, ChangeSetReader,
-    DatabaseProviderFactory, EvmEnvProvider, HeaderProvider, ProviderError, PruneCheckpointReader,
-    ReceiptProvider, ReceiptProviderIdExt, StageCheckpointReader, StateProviderBox,
-    StateProviderFactory, TransactionVariant, TransactionsProvider, WithdrawalsProvider,
+    DatabaseProviderFactory, EvmEnvProvider, HeaderProvider, L1OriginReader, L1OriginWriter,
+    ProviderError, PruneCheckpointReader, ReceiptProvider, ReceiptProviderIdExt,
+    StageCheckpointReader, StateProviderBox, StateProviderFactory, TransactionVariant,
+    TransactionsProvider, WithdrawalsProvider,
 };
 use reth_db::{
     database::Database,
@@ -23,7 +24,7 @@ use reth_node_api::ConfigureEvmEnv;
 use reth_primitives::{
     stage::{StageCheckpoint, StageId},
     Account, Address, Block, BlockHash, BlockHashOrNumber, BlockId, BlockNumHash, BlockNumber,
-    BlockNumberOrTag, BlockWithSenders, ChainInfo, ChainSpec, Header, PruneCheckpoint,
+    BlockNumberOrTag, BlockWithSenders, ChainInfo, ChainSpec, Header, L1Origin, PruneCheckpoint,
     PruneSegment, Receipt, SealedBlock, SealedBlockWithSenders, SealedHeader, TransactionMeta,
     TransactionSigned, TransactionSignedNoHash, TxHash, TxNumber, Withdrawal, Withdrawals, B256,
     U256,
@@ -608,7 +609,7 @@ where
 
         if let Some(block) = self.tree.pending_block_num_hash() {
             if let Ok(pending) = self.tree.pending_state_provider(block.hash) {
-                return self.pending_with_provider(pending)
+                return self.pending_with_provider(pending);
             }
         }
 
@@ -618,7 +619,7 @@ where
 
     fn pending_state_by_hash(&self, block_hash: B256) -> ProviderResult<Option<StateProviderBox>> {
         if let Some(state) = self.tree.find_pending_state_provider(block_hash) {
-            return Ok(Some(self.pending_with_provider(state)?))
+            return Ok(Some(self.pending_with_provider(state)?));
         }
         Ok(None)
     }
@@ -903,5 +904,33 @@ where
     /// Get basic account information.
     fn basic_account(&self, address: Address) -> ProviderResult<Option<Account>> {
         self.database.provider()?.basic_account(address)
+    }
+}
+
+impl<DB, Tree> L1OriginReader for BlockchainProvider<DB, Tree>
+where
+    DB: Database,
+    Tree: Send + Sync,
+{
+    fn read_l1_origin(&self, block_id: u64) -> ProviderResult<Option<L1Origin>> {
+        self.database.provider()?.read_l1_origin(block_id)
+    }
+
+    fn read_head_l1_origin(&self) -> ProviderResult<Option<u64>> {
+        self.database.provider()?.read_head_l1_origin()
+    }
+}
+
+impl<DB, Tree> L1OriginWriter for BlockchainProvider<DB, Tree>
+where
+    DB: Database,
+    Tree: Send + Sync,
+{
+    fn insert_l1_origin(&self, block_id: u64, l1_origin: L1Origin) -> ProviderResult<()> {
+        self.database.provider_rw()?.insert_l1_origin(block_id, l1_origin)
+    }
+
+    fn insert_head_l1_origin(&self, block_id: u64) -> ProviderResult<()> {
+        self.database.provider_rw()?.insert_head_l1_origin(block_id)
     }
 }

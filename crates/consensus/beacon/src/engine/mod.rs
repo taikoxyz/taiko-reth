@@ -21,16 +21,16 @@ use reth_interfaces::{
     RethError, RethResult,
 };
 use reth_node_api::{EngineTypes, PayloadAttributes, PayloadBuilderAttributes};
-use reth_payload_builder::PayloadBuilderHandle;
 #[cfg(feature = "taiko")]
 use reth_payload_builder::TaikoExecutionPayload;
+use reth_payload_builder::{PayloadBuilderHandle, TaikoPayloadAttributes};
 use reth_primitives::{
     constants::EPOCH_SLOTS, stage::StageId, BlockNumHash, BlockNumber, BufMut, Head, Header,
     SealedBlock, SealedHeader, B256,
 };
 use reth_provider::{
-    BlockIdReader, BlockReader, BlockSource, CanonChainTracker, ChainSpecProvider, ProviderError,
-    StageCheckpointReader,
+    BlockIdReader, BlockReader, BlockSource, CanonChainTracker, ChainSpecProvider, L1OriginWriter,
+    ProviderError, StageCheckpointReader,
 };
 use reth_rpc_types::engine::{
     CancunPayloadFields, ExecutionPayload, PayloadStatus, PayloadStatusEnum, PayloadValidationError,
@@ -173,7 +173,8 @@ where
         + BlockReader
         + BlockIdReader
         + CanonChainTracker
-        + StageCheckpointReader,
+        + StageCheckpointReader
+        + L1OriginWriter,
     EngineT: EngineTypes,
 {
     /// Controls syncing triggered by engine updates.
@@ -223,6 +224,7 @@ where
         + CanonChainTracker
         + StageCheckpointReader
         + ChainSpecProvider
+        + L1OriginWriter
         + 'static,
     Client: HeadersClient + BodiesClient + Clone + Unpin + 'static,
     EngineT: EngineTypes + Unpin + 'static,
@@ -1236,19 +1238,6 @@ where
             attrs,
         ) {
             Ok(attributes) => {
-                // TODO:(petar) write the l1 Origin to db
-
-                // // L1Origin **MUST NOT** be nil, it's a required field in PayloadAttributesV1.
-                // l1Origin := payloadAttributes.L1Origin
-                //
-                // // Set the block hash before inserting the L1Origin into database.
-                // l1Origin.L2BlockHash = block.Hash()
-                //
-                // // Write L1Origin.
-                // rawdb.WriteL1Origin(api.eth.ChainDb(), l1Origin.BlockID, l1Origin)
-                // // Write the head L1Origin.
-                // rawdb.WriteHeadL1Origin(api.eth.ChainDb(), l1Origin.BlockID)
-
                 // send the payload to the builder and return the receiver for the pending payload
                 // id, initiating payload job is handled asynchronously
                 let pending_payload_id = self.payload_builder.send_new_payload(attributes);
@@ -1795,6 +1784,7 @@ where
         + CanonChainTracker
         + StageCheckpointReader
         + ChainSpecProvider
+        + L1OriginWriter
         + Unpin
         + 'static,
     EngineT: EngineTypes + Unpin + 'static,

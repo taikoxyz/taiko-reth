@@ -4,6 +4,7 @@ use reth_basic_payload_builder::*;
 use reth_payload_builder::{
     error::PayloadBuilderError, TaikoBuiltPayload, TaikoPayloadBuilderAttributes,
 };
+use reth_primitives::L1Origin;
 use reth_primitives::{
     constants::{BEACON_NONCE, EMPTY_RECEIPTS, EMPTY_TRANSACTIONS},
     eip4844::calculate_excess_blob_gas,
@@ -389,6 +390,18 @@ where
     let block = Block { header, body: executed_txs, ommers: vec![], withdrawals };
 
     let sealed_block = block.seal_slow();
+
+    // L1Origin **MUST NOT** be nil, it's a required field in PayloadAttributesV1.
+    let l1_origin = L1Origin {
+        // Set the block hash before inserting the L1Origin into database.
+        l2_block_hash: sealed_block.hash(),
+        ..attributes.l1_origin.clone()
+    };
+    // Write L1Origin.
+    client.insert_l1_origin(sealed_block.number, l1_origin)?;
+    // Write the head L1Origin.
+    client.insert_head_l1_origin(sealed_block.number)?;
+
     debug!(target: "payload_builder", ?sealed_block, "sealed built block");
 
     let mut payload =
