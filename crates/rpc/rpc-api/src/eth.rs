@@ -311,12 +311,12 @@ pub trait EthApi {
     /// HeadL1Origin returns the latest L2 block's corresponding L1 origin.
     #[cfg(feature = "taiko")]
     #[method(name = "headL1Origin")]
-    async fn head_l1_origin(&self) -> RpcResult<reth_primitives::L1Origin>;
+    async fn head_l1_origin(&self) -> RpcResult<Option<u64>>;
 
     /// L1OriginByID returns the L2 block's corresponding L1 origin.
     #[cfg(feature = "taiko")]
     #[method(name = "l1OriginByID")]
-    async fn l1_origin_by_id(&self, block_id: u64) -> RpcResult<reth_primitives::L1Origin>;
+    async fn l1_origin_by_id(&self, block_id: u64) -> RpcResult<Option<reth_primitives::L1Origin>>;
 
     /// GetL2ParentHeaders
     #[cfg(feature = "taiko")]
@@ -335,5 +335,5 @@ pub trait EthApi {
         max_bytes_per_tx_list: u64,
         locals: Vec<String>,
         max_transactions_lists: u64,
-    ) -> RpcResult<Vec<Transaction>>;
+    ) -> RpcResult<Vec<Vec<Transaction>>>;
 }

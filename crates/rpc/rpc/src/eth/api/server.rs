@@ -14,6 +14,7 @@ use jsonrpsee::core::RpcResult as Result;
 use reth_network_api::NetworkInfo;
 use reth_node_api::ConfigureEvmEnv;
 use reth_primitives::{
+    hex::FromHex,
     serde_helper::{num::U64HexOrNumber, JsonStorageKey},
     Address, BlockId, BlockNumberOrTag, Bytes, B256, B64, U256, U64,
 };
@@ -431,23 +432,24 @@ where
 
     /// HeadL1Origin returns the latest L2 block's corresponding L1 origin.
     // #[cfg(feature = "taiko")]
-    async fn head_l1_origin(&self) -> Result<reth_primitives::L1Origin> {
-        // TODO:(petar) add fetching from db
-        todo!();
+    async fn head_l1_origin(&self) -> Result<Option<u64>> {
+        self.provider().read_head_l1_origin()
     }
 
     /// L1OriginByID returns the L2 block's corresponding L1 origin.
     // #[cfg(feature = "taiko")]
-    async fn l1_origin_by_id(&self, block_id: u64) -> Result<reth_primitives::L1Origin> {
-        // TODO:(petar) add fetching from db
-        todo!();
+    async fn l1_origin_by_id(&self, block_id: u64) -> Result<Option<reth_primitives::L1Origin>> {
+        self.provider().read_l1_origin(block_id)
     }
 
     /// GetL2ParentHeaders
     // #[cfg(feature = "taiko")]
     async fn get_l2_parent_headers(&self, block_id: u64) -> Result<Vec<reth_primitives::Header>> {
-        // TODO:(petar) add fetching from db
-        todo!();
+        let start = if block_id > 256 { block_id - 255 } else { 0 };
+
+        (start..=block_id)
+            .map(|id| self.provider().header_by_number(id))
+            .collect::<Result<Vec<reth_primitives::Header>>>()
     }
 
     /// TxPoolContent retrieves the transaction pool content with the given upper limits.
@@ -460,9 +462,9 @@ where
         max_bytes_per_tx_list: u64,
         locals: Vec<String>,
         max_transactions_lists: u64,
-    ) -> Result<Vec<Transaction>> {
         // TODO:(petar) add fetching from db
         todo!();
+    ) -> Result<Vec<Vec<Transaction>>> {
     }
 }
 
