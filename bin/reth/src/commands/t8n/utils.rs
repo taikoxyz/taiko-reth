@@ -118,7 +118,6 @@ pub(crate) fn try_into_primitive_transaction_and_sign(
                 .map(|v| AccessList(v).into())
                 .context("missing access_list")?,
             input: tx.input,
-            #[cfg(feature = "taiko")]
             is_anchor: false,
         }),
         TxType::Eip4844 => PrimitiveTransaction::Eip4844(TxEip4844 {

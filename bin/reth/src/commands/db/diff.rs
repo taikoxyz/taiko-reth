@@ -8,10 +8,10 @@ use reth_db::{
     cursor::DbCursorRO, database::Database, mdbx::DatabaseArguments, open_db_read_only,
     table::Table, transaction::DbTx, AccountChangeSets, AccountsHistory, AccountsTrie,
     BlockBodyIndices, BlockOmmers, BlockWithdrawals, Bytecodes, CanonicalHeaders, DatabaseEnv,
-    HashedAccounts, HashedStorages, HeaderNumbers, HeaderTerminalDifficulties, Headers,
-    PlainAccountState, PlainStorageState, PruneCheckpoints, Receipts, StageCheckpointProgresses,
-    StageCheckpoints, StorageChangeSets, StoragesHistory, StoragesTrie, Tables, TransactionBlocks,
-    TransactionHashNumbers, TransactionSenders, Transactions,
+    HashedAccounts, HashedStorages, HeadL1Origin, HeaderNumbers, HeaderTerminalDifficulties,
+    Headers, L1Origins, PlainAccountState, PlainStorageState, PruneCheckpoints, Receipts,
+    StageCheckpointProgresses, StageCheckpoints, StorageChangeSets, StoragesHistory, StoragesTrie,
+    Tables, TransactionBlocks, TransactionHashNumbers, TransactionSenders, Transactions,
 };
 use std::{
     collections::HashMap,
@@ -147,6 +147,10 @@ impl Command {
                 }
                 Tables::PruneCheckpoints => {
                     find_diffs::<PruneCheckpoints>(primary_tx, secondary_tx, output_dir)?
+                }
+                Tables::L1Origins => find_diffs::<L1Origins>(primary_tx, secondary_tx, output_dir)?,
+                Tables::HeadL1Origin => {
+                    find_diffs::<HeadL1Origin>(primary_tx, secondary_tx, output_dir)?
                 }
             };
         }
@@ -370,12 +374,12 @@ where
     ) {
         // do not bother comparing if the key is already in the discrepancies map
         if self.discrepancies.contains_key(&key) {
-            return
+            return;
         }
 
         // do not bother comparing if the key is already in the extra elements map
         if self.extra_elements.contains_key(&key) {
-            return
+            return;
         }
 
         match (first, second) {
