@@ -2524,20 +2524,29 @@ fn range_size_hint(range: &impl RangeBounds<TxNumber>) -> Option<usize> {
 
 impl<TX: DbTx> L1OriginReader for DatabaseProvider<TX> {
     fn read_l1_origin(&self, block_id: u64) -> ProviderResult<Option<L1Origin>> {
-        self.tx.get::<tables::L1Origins>(L1Origin::key(block_id))
+        let result = self.tx.get::<tables::L1Origins>(L1Origin::key(block_id))?;
+        if let Some(bytes) = result {
+            Ok(Some(
+                serde_json::from_slice(&bytes).map_err(|e| ProviderError::Serde(e.to_string()))?,
+            ))
+        } else {
+            Ok(None)
+        }
     }
 
     fn read_head_l1_origin(&self) -> ProviderResult<Option<u64>> {
-        self.tx.get::<tables::HeadL1Origin>(L1Origin::head_key())
+        Ok(self.tx.get::<tables::HeadL1Origin>(L1Origin::head_key())?)
     }
 }
 
 impl<TX: DbTxMut> L1OriginWriter for DatabaseProvider<TX> {
     fn insert_l1_origin(&self, block_id: u64, l1_origin: L1Origin) -> ProviderResult<()> {
-        self.tx.put::<tables::L1Origins>(L1Origin::key(block_id), l1_origin)
+        let bytes =
+            serde_json::to_vec(&l1_origin).map_err(|e| ProviderError::Serde(e.to_string()))?;
+        Ok(self.tx.put::<tables::L1Origins>(L1Origin::key(block_id), bytes)?)
     }
 
     fn insert_head_l1_origin(&self, block_id: u64) -> ProviderResult<()> {
-        self.tx.put::<tables::HeadL1Origin>(L1Origin::head_key(), block_id)
+        Ok(self.tx.put::<tables::HeadL1Origin>(L1Origin::head_key(), block_id)?)
     }
 }

@@ -39,9 +39,8 @@ use crate::{
 use reth_primitives::{
     stage::StageCheckpoint,
     trie::{StorageTrieEntry, StoredBranchNode, StoredNibbles, StoredNibblesSubKey},
-    Account, Address, BlockHash, BlockNumber, Bytecode, Header, IntegerList, L1Origin,
-    PruneCheckpoint, PruneSegment, Receipt, StorageEntry, TransactionSignedNoHash, TxHash,
-    TxNumber, B256,
+    Account, Address, BlockHash, BlockNumber, Bytecode, Header, IntegerList, PruneCheckpoint,
+    PruneSegment, Receipt, StorageEntry, TransactionSignedNoHash, TxHash, TxNumber, B256,
 };
 use std::fmt;
 
@@ -374,8 +373,8 @@ tables! {
     /// Stores the highest pruned block number and prune mode of each prune segment.
     table PruneCheckpoints<Key = PruneSegment, Value = PruneCheckpoint>;
 
-    /// CHANGE(taiko): Stores L1 rigin information.
-    table L1Origins<Key = String, Value = L1Origin>;
+    /// CHANGE(taiko): Stores L1 origin information.
+    table L1Origins<Key = String, Value = Vec<u8>>;
 
     /// CHANGE(taiko): Stores latest L1 origin.
     table HeadL1Origin<Key = String, Value = u64>;
