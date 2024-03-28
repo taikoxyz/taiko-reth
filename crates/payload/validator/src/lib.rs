@@ -10,9 +10,7 @@
 
 #[cfg(feature = "taiko")]
 use reth_payload_builder::TaikoExecutionPayload;
-use reth_primitives::{
-    revm_primitives::FixedBytes, Block, ChainSpec, Header, SealedBlock, EMPTY_OMMER_ROOT_HASH,
-};
+use reth_primitives::{ChainSpec, SealedBlock};
 use reth_rpc_types::{engine::MaybeCancunPayloadFields, ExecutionPayload, PayloadError};
 use reth_rpc_types_compat::engine::payload::{try_into_block, validate_block_hash};
 use std::sync::Arc;

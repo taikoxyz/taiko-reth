@@ -21,12 +21,12 @@ use reth_interfaces::{
     RethError, RethResult,
 };
 use reth_node_api::{EngineTypes, PayloadAttributes, PayloadBuilderAttributes};
+use reth_payload_builder::PayloadBuilderHandle;
 #[cfg(feature = "taiko")]
-use reth_payload_builder::TaikoExecutionPayload;
-use reth_payload_builder::{PayloadBuilderHandle, TaikoPayloadAttributes};
+use reth_payload_builder::{TaikoExecutionPayload, TaikoPayloadAttributes};
 use reth_primitives::{
-    constants::EPOCH_SLOTS, stage::StageId, BlockNumHash, BlockNumber, BufMut, Head, Header,
-    SealedBlock, SealedHeader, B256,
+    constants::EPOCH_SLOTS, stage::StageId, BlockNumHash, BlockNumber, Head, Header, SealedBlock,
+    SealedHeader, B256,
 };
 use reth_provider::{
     BlockIdReader, BlockReader, BlockSource, CanonChainTracker, ChainSpecProvider, L1OriginWriter,

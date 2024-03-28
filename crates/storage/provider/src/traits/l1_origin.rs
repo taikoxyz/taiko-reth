@@ -1,16 +1,6 @@
-use crate::{
-    BlockIdReader, BlockNumReader, BundleStateWithReceipts, Chain, HeaderProvider, ReceiptProvider,
-    ReceiptProviderIdExt, TransactionsProvider, WithdrawalsProvider,
-};
 use auto_impl::auto_impl;
-use reth_db::models::StoredBlockBodyIndices;
 use reth_interfaces::provider::ProviderResult;
-use reth_primitives::{
-    Block, BlockHashOrNumber, BlockId, BlockNumber, BlockNumberOrTag, BlockWithSenders, ChainSpec,
-    Header, L1Origin, PruneModes, Receipt, SealedBlock, SealedBlockWithSenders, SealedHeader, B256,
-};
-use reth_trie::{updates::TrieUpdates, HashedPostState};
-use std::ops::RangeInclusive;
+use reth_primitives::L1Origin;
 
 /// Api trait for fetching `L1Origin` related data.
 #[auto_impl::auto_impl(&, Arc)]
