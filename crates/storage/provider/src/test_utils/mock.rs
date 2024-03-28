@@ -3,8 +3,9 @@ use crate::{
     traits::{BlockSource, ReceiptProvider},
     AccountReader, BlockHashReader, BlockIdReader, BlockNumReader, BlockReader, BlockReaderIdExt,
     BundleStateDataProvider, ChainSpecProvider, ChangeSetReader, EvmEnvProvider, HeaderProvider,
-    ReceiptProviderIdExt, StateProvider, StateProviderBox, StateProviderFactory, StateRootProvider,
-    TransactionVariant, TransactionsProvider, WithdrawalsProvider,
+    L1OriginReader, L1OriginWriter, ReceiptProviderIdExt, StateProvider, StateProviderBox,
+    StateProviderFactory, StateRootProvider, TransactionVariant, TransactionsProvider,
+    WithdrawalsProvider,
 };
 use parking_lot::Mutex;
 use reth_db::models::{AccountBeforeTx, StoredBlockBodyIndices};
@@ -12,10 +13,10 @@ use reth_interfaces::provider::{ProviderError, ProviderResult};
 use reth_node_api::ConfigureEvmEnv;
 use reth_primitives::{
     keccak256, trie::AccountProof, Account, Address, Block, BlockHash, BlockHashOrNumber, BlockId,
-    BlockNumber, BlockWithSenders, Bytecode, Bytes, ChainInfo, ChainSpec, Header, Receipt,
-    SealedBlock, SealedBlockWithSenders, SealedHeader, StorageKey, StorageValue, TransactionMeta,
-    TransactionSigned, TransactionSignedNoHash, TxHash, TxNumber, Withdrawal, Withdrawals, B256,
-    U256,
+    BlockNumber, BlockWithSenders, Bytecode, Bytes, ChainInfo, ChainSpec, Header, L1Origin,
+    Receipt, SealedBlock, SealedBlockWithSenders, SealedHeader, StorageKey, StorageValue,
+    TransactionMeta, TransactionSigned, TransactionSignedNoHash, TxHash, TxNumber, Withdrawal,
+    Withdrawals, B256, U256,
 };
 use reth_trie::updates::TrieUpdates;
 use revm::primitives::{BlockEnv, CfgEnvWithHandlerCfg};
@@ -246,7 +247,7 @@ impl TransactionsProvider for MockEthProvider {
                         base_fee: block.header.base_fee_per_gas,
                         excess_blob_gas: block.header.excess_blob_gas,
                     };
-                    return Ok(Some((tx.clone(), meta)))
+                    return Ok(Some((tx.clone(), meta)));
                 }
             }
         }
@@ -258,7 +259,7 @@ impl TransactionsProvider for MockEthProvider {
         let mut current_tx_number: TxNumber = 0;
         for block in lock.values() {
             if current_tx_number + (block.body.len() as TxNumber) > id {
-                return Ok(Some(block.header.number))
+                return Ok(Some(block.header.number));
             }
             current_tx_number += block.body.len() as TxNumber;
         }
@@ -708,5 +709,25 @@ impl ChangeSetReader for MockEthProvider {
         _block_number: BlockNumber,
     ) -> ProviderResult<Vec<AccountBeforeTx>> {
         Ok(Vec::default())
+    }
+}
+
+impl L1OriginReader for MockEthProvider {
+    fn read_l1_origin(&self, _block_id: u64) -> ProviderResult<Option<L1Origin>> {
+        Ok(None)
+    }
+
+    fn read_head_l1_origin(&self) -> ProviderResult<Option<u64>> {
+        Ok(None)
+    }
+}
+
+impl L1OriginWriter for MockEthProvider {
+    fn insert_l1_origin(&self, _block_id: u64, _origin: L1Origin) -> ProviderResult<()> {
+        Ok(())
+    }
+
+    fn insert_head_l1_origin(&self, _block_id: u64) -> ProviderResult<()> {
+        Ok(())
     }
 }

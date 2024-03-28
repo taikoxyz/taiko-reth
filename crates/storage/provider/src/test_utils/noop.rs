@@ -2,10 +2,10 @@ use crate::{
     bundle_state::BundleStateWithReceipts,
     traits::{BlockSource, ReceiptProvider},
     AccountReader, BlockHashReader, BlockIdReader, BlockNumReader, BlockReader, BlockReaderIdExt,
-    ChainSpecProvider, ChangeSetReader, EvmEnvProvider, HeaderProvider, PruneCheckpointReader,
-    ReceiptProviderIdExt, StageCheckpointReader, StateProvider, StateProviderBox,
-    StateProviderFactory, StateRootProvider, TransactionVariant, TransactionsProvider,
-    WithdrawalsProvider,
+    ChainSpecProvider, ChangeSetReader, EvmEnvProvider, HeaderProvider, L1OriginReader,
+    L1OriginWriter, PruneCheckpointReader, ReceiptProviderIdExt, StageCheckpointReader,
+    StateProvider, StateProviderBox, StateProviderFactory, StateRootProvider, TransactionVariant,
+    TransactionsProvider, WithdrawalsProvider,
 };
 use reth_db::models::{AccountBeforeTx, StoredBlockBodyIndices};
 use reth_interfaces::provider::ProviderResult;
@@ -14,7 +14,7 @@ use reth_primitives::{
     stage::{StageCheckpoint, StageId},
     trie::AccountProof,
     Account, Address, Block, BlockHash, BlockHashOrNumber, BlockId, BlockNumber, Bytecode,
-    ChainInfo, ChainSpec, Header, PruneCheckpoint, PruneSegment, Receipt, SealedBlock,
+    ChainInfo, ChainSpec, Header, L1Origin, PruneCheckpoint, PruneSegment, Receipt, SealedBlock,
     SealedBlockWithSenders, SealedHeader, StorageKey, StorageValue, TransactionMeta,
     TransactionSigned, TransactionSignedNoHash, TxHash, TxNumber, Withdrawal, Withdrawals, B256,
     MAINNET, U256,
@@ -445,5 +445,25 @@ impl PruneCheckpointReader for NoopProvider {
         _segment: PruneSegment,
     ) -> ProviderResult<Option<PruneCheckpoint>> {
         Ok(None)
+    }
+}
+
+impl L1OriginReader for NoopProvider {
+    fn read_l1_origin(&self, _block_id: u64) -> ProviderResult<Option<L1Origin>> {
+        Ok(None)
+    }
+
+    fn read_head_l1_origin(&self) -> ProviderResult<Option<u64>> {
+        Ok(None)
+    }
+}
+
+impl L1OriginWriter for NoopProvider {
+    fn insert_l1_origin(&self, _block_id: u64, _origin: L1Origin) -> ProviderResult<()> {
+        Ok(())
+    }
+
+    fn insert_head_l1_origin(&self, _block_id: u64) -> ProviderResult<()> {
+        Ok(())
     }
 }
