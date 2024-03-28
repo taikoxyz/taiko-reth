@@ -14,7 +14,6 @@ use jsonrpsee::core::RpcResult as Result;
 use reth_network_api::NetworkInfo;
 use reth_node_api::ConfigureEvmEnv;
 use reth_primitives::{
-    hex::FromHex,
     serde_helper::{num::U64HexOrNumber, JsonStorageKey},
     Address, BlockId, BlockNumberOrTag, Bytes, B256, B64, U256, U64,
 };
@@ -433,23 +432,38 @@ where
     /// HeadL1Origin returns the latest L2 block's corresponding L1 origin.
     // #[cfg(feature = "taiko")]
     async fn head_l1_origin(&self) -> Result<Option<u64>> {
-        self.provider().read_head_l1_origin()
+        self.provider().read_head_l1_origin().map_err(|_| {
+            internal_rpc_err("taiko_headL1Origin failed to read latest l2 block's L1 origin")
+        })
     }
 
     /// L1OriginByID returns the L2 block's corresponding L1 origin.
     // #[cfg(feature = "taiko")]
     async fn l1_origin_by_id(&self, block_id: u64) -> Result<Option<reth_primitives::L1Origin>> {
-        self.provider().read_l1_origin(block_id)
+        self.provider().read_l1_origin(block_id).map_err(|_| {
+            internal_rpc_err("taiko_l1OriginByID failed to read L1 origin by block id")
+        })
     }
 
     /// GetL2ParentHeaders
     // #[cfg(feature = "taiko")]
     async fn get_l2_parent_headers(&self, block_id: u64) -> Result<Vec<reth_primitives::Header>> {
         let start = if block_id > 256 { block_id - 255 } else { 0 };
+        let mut headers = Vec::with_capacity(256);
 
-        (start..=block_id)
-            .map(|id| self.provider().header_by_number(id))
-            .collect::<Result<Vec<reth_primitives::Header>>>()
+        for id in start..=block_id {
+            let option = self.provider().header_by_number(id).map_err(|_| {
+                internal_rpc_err("taiko_getL2ParentHeaders failed to read header by number")
+            })?;
+            let Some(header) = option else {
+                return Err(internal_rpc_err(
+                    "taiko_getL2ParentHeaders failed to find parent header by number",
+                ));
+            };
+            headers.push(header);
+        }
+
+        Ok(headers)
     }
 
     /// TxPoolContent retrieves the transaction pool content with the given upper limits.
@@ -462,9 +476,22 @@ where
         max_bytes_per_tx_list: u64,
         locals: Vec<String>,
         max_transactions_lists: u64,
-        // TODO:(petar) add fetching from db
-        todo!();
     ) -> Result<Vec<Vec<Transaction>>> {
+        // let chain_info = self.chain_info()?;
+        // let (local_txs, remote_txs) =
+        //     self.pool().pending_transactions().into_iter().filter(|tx| !tx.is_eip4844()).fold(
+        //         (vec![], vec![]),
+        //         |(l, r), curr| {
+        //             if curr.is_local() {
+        //                 l.push(curr);
+        //             } else {
+        //                 r.push(curr);
+        //             }
+        //
+        //             (l, r)
+        //         },
+        //     );
+        todo!()
     }
 }
 
