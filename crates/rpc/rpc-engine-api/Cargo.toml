@@ -50,3 +50,4 @@ assert_matches.workspace = true
 
 [features]
 optimism = ["reth-primitives/optimism", "reth-rpc-types/optimism"]
+taiko = ["reth-primitives/taiko"]

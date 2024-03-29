@@ -16,6 +16,6 @@ pub use engine::TaikoEngineTypes;
 /// Exports commonly used concrete instances of the
 /// [ConfigureEvmEnv](reth_node_api::ConfigureEvmEnv) trait.
 pub mod evm;
-pub use evm::EthEvmConfig;
+pub use evm::TaikoEvmConfig;
 pub mod node;
 pub use node::TaikoNode;

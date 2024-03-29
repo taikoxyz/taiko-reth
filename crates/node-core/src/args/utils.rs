@@ -12,15 +12,21 @@ use std::{
 #[cfg(feature = "optimism")]
 use reth_primitives::{BASE_MAINNET, BASE_SEPOLIA};
 
-#[cfg(not(feature = "optimism"))]
+#[cfg(not(any(feature = "optimism", feature = "taiko")))]
 use reth_primitives::{DEV, GOERLI, HOLESKY, MAINNET, SEPOLIA};
+
+#[cfg(feature = "taiko")]
+use reth_primitives::{TAIKO_INTERNAL_L2_A, TAIKO_TESTNET};
 
 #[cfg(feature = "optimism")]
 /// Chains supported by op-reth. First value should be used as the default.
 pub const SUPPORTED_CHAINS: &[&str] = &["base", "base-sepolia"];
-#[cfg(not(feature = "optimism"))]
+#[cfg(not(any(feature = "optimism", feature = "taiko")))]
 /// Chains supported by reth. First value should be used as the default.
 pub const SUPPORTED_CHAINS: &[&str] = &["mainnet", "sepolia", "goerli", "holesky", "dev"];
+#[cfg(feature = "taiko")]
+/// Chains supported by taiko-reth. First value should be used as default.
+pub const SUPPORTED_CHAINS: &[&str] = &["testnet", "internal_devnet_a"];
 
 /// Helper to parse a [Duration] from seconds
 pub fn parse_duration_from_secs(arg: &str) -> eyre::Result<Duration, std::num::ParseIntError> {
@@ -32,20 +38,24 @@ pub fn parse_duration_from_secs(arg: &str) -> eyre::Result<Duration, std::num::P
 /// to a custom one.
 pub fn chain_spec_value_parser(s: &str) -> eyre::Result<Arc<ChainSpec>, eyre::Error> {
     Ok(match s {
-        #[cfg(not(feature = "optimism"))]
+        #[cfg(not(any(feature = "optimism", feature = "taiko")))]
         "mainnet" => MAINNET.clone(),
-        #[cfg(not(feature = "optimism"))]
+        #[cfg(not(any(feature = "optimism", feature = "taiko")))]
         "goerli" => GOERLI.clone(),
-        #[cfg(not(feature = "optimism"))]
+        #[cfg(not(any(feature = "optimism", feature = "taiko")))]
         "sepolia" => SEPOLIA.clone(),
-        #[cfg(not(feature = "optimism"))]
+        #[cfg(not(any(feature = "optimism", feature = "taiko")))]
         "holesky" => HOLESKY.clone(),
-        #[cfg(not(feature = "optimism"))]
+        #[cfg(not(any(feature = "optimism", feature = "taiko")))]
         "dev" => DEV.clone(),
         #[cfg(feature = "optimism")]
         "base_sepolia" | "base-sepolia" => BASE_SEPOLIA.clone(),
         #[cfg(feature = "optimism")]
         "base" => BASE_MAINNET.clone(),
+        #[cfg(feature = "taiko")]
+        "testnet" => TAIKO_TESTNET.clone(),
+        #[cfg(feature = "taiko")]
+        "internal_devnet_a" => TAIKO_INTERNAL_L2_A.clone(),
         _ => {
             let raw = fs::read_to_string(PathBuf::from(shellexpand::full(s)?.into_owned()))?;
             serde_json::from_str(&raw)?
@@ -65,20 +75,24 @@ pub fn chain_help() -> String {
 /// a serialized [ChainSpec] or Genesis struct.
 pub fn genesis_value_parser(s: &str) -> eyre::Result<Arc<ChainSpec>, eyre::Error> {
     Ok(match s {
-        #[cfg(not(feature = "optimism"))]
+        #[cfg(not(any(feature = "optimism", feature = "taiko")))]
         "mainnet" => MAINNET.clone(),
-        #[cfg(not(feature = "optimism"))]
+        #[cfg(not(any(feature = "optimism", feature = "taiko")))]
         "goerli" => GOERLI.clone(),
-        #[cfg(not(feature = "optimism"))]
+        #[cfg(not(any(feature = "optimism", feature = "taiko")))]
         "sepolia" => SEPOLIA.clone(),
-        #[cfg(not(feature = "optimism"))]
+        #[cfg(not(any(feature = "optimism", feature = "taiko")))]
         "holesky" => HOLESKY.clone(),
-        #[cfg(not(feature = "optimism"))]
+        #[cfg(not(any(feature = "optimism", feature = "taiko")))]
         "dev" => DEV.clone(),
         #[cfg(feature = "optimism")]
         "base_sepolia" | "base-sepolia" => BASE_SEPOLIA.clone(),
         #[cfg(feature = "optimism")]
         "base" => BASE_MAINNET.clone(),
+        #[cfg(feature = "taiko")]
+        "testnet" => TAIKO_TESTNET.clone(),
+        #[cfg(feature = "taiko")]
+        "internal_devnet_a" => TAIKO_INTERNAL_L2_A.clone(),
         _ => {
             // try to read json from path first
             let raw = match fs::read_to_string(PathBuf::from(shellexpand::full(s)?.into_owned())) {
@@ -88,7 +102,7 @@ pub fn genesis_value_parser(s: &str) -> eyre::Result<Arc<ChainSpec>, eyre::Error
                     if s.contains('{') {
                         s.to_string()
                     } else {
-                        return Err(io_err.into()) // assume invalid path
+                        return Err(io_err.into()); // assume invalid path
                     }
                 }
             };
@@ -138,15 +152,15 @@ pub enum SocketAddressParsingError {
 /// An error is returned if the value is empty.
 pub fn parse_socket_address(value: &str) -> eyre::Result<SocketAddr, SocketAddressParsingError> {
     if value.is_empty() {
-        return Err(SocketAddressParsingError::Empty)
+        return Err(SocketAddressParsingError::Empty);
     }
 
     if let Some(port) = value.strip_prefix(':').or_else(|| value.strip_prefix("localhost:")) {
         let port: u16 = port.parse()?;
-        return Ok(SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), port))
+        return Ok(SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), port));
     }
     if let Ok(port) = value.parse::<u16>() {
-        return Ok(SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), port))
+        return Ok(SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), port));
     }
     value
         .to_socket_addrs()?

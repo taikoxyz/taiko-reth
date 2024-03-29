@@ -39,7 +39,7 @@ reth-tracing.workspace = true
 reth-tasks.workspace = true
 reth-optimism-payload-builder = { workspace = true, optional = true }
 reth-ethereum-payload-builder.workspace = true
-reth-taiko-payload-builder.workspace = true
+reth-taiko-payload-builder = { workspace = true, optional = true }
 reth-payload-builder.workspace = true
 reth-payload-validator.workspace = true
 reth-basic-payload-builder.workspace = true
@@ -53,6 +53,7 @@ reth-node-ethereum.workspace = true
 reth-node-optimism = { workspace = true, optional = true, features = [
     "optimism",
 ] }
+reth-node-taiko = { workspace = true, optional = true }
 reth-node-core.workspace = true
 reth-node-builder.workspace = true
 
@@ -153,6 +154,10 @@ taiko = [
     "reth-primitives/taiko",
     "reth-beacon-consensus/taiko",
     "reth-payload-builder/taiko",
+    "reth-rpc-engine-api/taiko",
+    "reth-node-core/taiko",
+    "dep:reth-taiko-payload-builder",
+    "dep:reth-node-taiko",
 ]
 
 # no-op feature flag for switching between the `optimism` and default functionality in CI matrices
@@ -166,3 +171,8 @@ path = "src/main.rs"
 name = "op-reth"
 path = "src/optimism.rs"
 required-features = ["optimism"]
+
+[[bin]]
+name = "taiko-reth"
+path = "src/taiko.rs"
+required-features = ["taiko"]

@@ -2,6 +2,7 @@
 
 use reth_beacon_consensus::BeaconEngineMessage;
 use reth_node_api::EngineTypes;
+use reth_payload_builder::TaikoExecutionPayload;
 use reth_primitives::fs::{self};
 use reth_rpc_types::{
     engine::{CancunPayloadFields, ForkchoiceState},
@@ -26,7 +27,10 @@ pub enum StoredEngineApiMessage<Attributes> {
     /// The on-disk representation of an `engine_newPayload` method call.
     NewPayload {
         /// The [ExecutionPayload] sent in the persisted call.
+        #[cfg(not(feature = "taiko"))]
         payload: ExecutionPayload,
+        #[cfg(feature = "taiko")]
+        payload: TaikoExecutionPayload,
         /// The Cancun-specific fields sent in the persisted call, if any.
         cancun_fields: Option<CancunPayloadFields>,
     },
@@ -83,8 +87,8 @@ impl EngineApiStore {
                 )?;
             }
             // noop
-            BeaconEngineMessage::TransitionConfigurationExchanged |
-            BeaconEngineMessage::EventListener(_) => (),
+            BeaconEngineMessage::TransitionConfigurationExchanged
+            | BeaconEngineMessage::EventListener(_) => (),
         };
         Ok(())
     }

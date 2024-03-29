@@ -5,7 +5,7 @@ use crate::{
 use futures::{future::Either, FutureExt};
 use reth_interfaces::{consensus::ForkchoiceState, RethResult};
 use reth_node_api::EngineTypes;
-use reth_payload_builder::error::PayloadBuilderError;
+use reth_payload_builder::{error::PayloadBuilderError, TaikoExecutionPayload};
 use reth_rpc_types::engine::{
     CancunPayloadFields, ExecutionPayload, ForkChoiceUpdateResult, ForkchoiceUpdateError,
     ForkchoiceUpdated, PayloadId, PayloadStatus, PayloadStatusEnum,
@@ -145,7 +145,10 @@ pub enum BeaconEngineMessage<Engine: EngineTypes> {
     /// Message with new payload.
     NewPayload {
         /// The execution payload received by Engine API.
+        #[cfg(not(feature = "taiko"))]
         payload: ExecutionPayload,
+        #[cfg(feature = "taiko")]
+        payload: TaikoExecutionPayload,
         /// The cancun-related newPayload fields, if any.
         cancun_fields: Option<CancunPayloadFields>,
         /// The sender for returning payload status result.

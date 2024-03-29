@@ -22,6 +22,11 @@ use reth_transaction_pool::{
 pub struct TaikoNode;
 
 impl TaikoNode {
+    /// Creates a new instance of the Optimism node type.
+    pub const fn new() -> Self {
+        Self
+    }
+
     /// Returns a [ComponentsBuilder] configured for a Taiko node.
     pub fn components<Node>(
     ) -> ComponentsBuilder<Node, TaikoPoolBuilder, TaikoPayloadBuilder, TaikoNetworkBuilder>
@@ -151,7 +156,7 @@ where
         ctx: &BuilderContext<Node>,
         pool: Pool,
     ) -> eyre::Result<PayloadBuilderHandle<Node::Engine>> {
-        let payload_builder = reth_taiko_payload_builder::TaikoPayloadBuilder::default();
+        let payload_builder = reth_taiko_payload_builder::TaikoPayloadBuilder;
         let conf = ctx.payload_builder_config();
 
         let payload_job_config = BasicPayloadJobGeneratorConfig::default()

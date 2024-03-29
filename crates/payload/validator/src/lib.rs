@@ -10,6 +10,8 @@
 
 #[cfg(feature = "taiko")]
 use reth_payload_builder::TaikoExecutionPayload;
+#[cfg(feature = "taiko")]
+use reth_primitives::{Block, Header, B256, EMPTY_OMMER_ROOT_HASH};
 use reth_primitives::{ChainSpec, SealedBlock};
 use reth_rpc_types::{engine::MaybeCancunPayloadFields, ExecutionPayload, PayloadError};
 use reth_rpc_types_compat::engine::payload::{try_into_block, validate_block_hash};
@@ -109,8 +111,9 @@ impl ExecutionPayloadValidator {
         #[cfg(not(feature = "taiko"))]
         let block = try_into_block(payload, cancun_fields.parent_beacon_block_root())?;
         #[cfg(feature = "taiko")]
-        let block = if payload.payload_inner.payload_inner.payload_inner.transactions.is_empty()
-            && payload.payload_inner.payload_inner.withdrawals.is_empty()
+        let block = if payload.payload_inner.as_v1().transactions.is_empty()
+            && (payload.payload_inner.withdrawals().is_none()
+                || payload.payload_inner.withdrawals().is_some_and(|w| w.is_empty()))
         {
             create_taiko_block(payload, cancun_fields.parent_beacon_block_root())?
         } else {
@@ -137,39 +140,31 @@ impl ExecutionPayloadValidator {
 #[cfg(feature = "taiko")]
 fn create_taiko_block(
     payload: TaikoExecutionPayload,
-    parent_beacon_block_root: Option<FixedBytes<32>>,
+    parent_beacon_block_root: Option<B256>,
 ) -> Result<Block, PayloadError> {
     Ok(Block {
         header: Header {
-            parent_hash: payload.payload_inner.payload_inner.payload_inner.parent_hash,
-            beneficiary: payload.payload_inner.payload_inner.payload_inner.fee_recipient,
-            state_root: payload.payload_inner.payload_inner.payload_inner.state_root,
+            parent_hash: payload.payload_inner.parent_hash(),
+            beneficiary: payload.payload_inner.as_v1().fee_recipient,
+            state_root: payload.payload_inner.as_v1().state_root,
             transactions_root: payload.tx_hash,
-            receipts_root: payload.payload_inner.payload_inner.payload_inner.receipts_root,
+            receipts_root: payload.payload_inner.as_v1().receipts_root,
             withdrawals_root: Some(payload.withdrawals_hash),
-            logs_bloom: payload.payload_inner.payload_inner.payload_inner.logs_bloom,
-            number: payload.payload_inner.payload_inner.payload_inner.block_number,
-            gas_limit: payload.payload_inner.payload_inner.payload_inner.gas_limit,
-            gas_used: payload.payload_inner.payload_inner.payload_inner.gas_used,
-            timestamp: payload.payload_inner.payload_inner.payload_inner.timestamp,
-            mix_hash: payload.payload_inner.payload_inner.payload_inner.prev_randao,
+            logs_bloom: payload.payload_inner.as_v1().logs_bloom,
+            number: payload.payload_inner.block_number(),
+            gas_limit: payload.payload_inner.as_v1().gas_limit,
+            gas_used: payload.payload_inner.as_v1().gas_used,
+            timestamp: payload.payload_inner.timestamp(),
+            mix_hash: payload.payload_inner.prev_randao(),
             base_fee_per_gas: Some(
-                payload
-                    .payload_inner
-                    .payload_inner
-                    .payload_inner
-                    .base_fee_per_gas
-                    .try_into()
-                    .map_err(|_| {
-                        PayloadError::BaseFee(
-                            payload.payload_inner.payload_inner.payload_inner.base_fee_per_gas,
-                        )
-                    })?,
+                payload.payload_inner.as_v1().base_fee_per_gas.try_into().map_err(|_| {
+                    PayloadError::BaseFee(payload.payload_inner.as_v1().base_fee_per_gas)
+                })?,
             ),
             blob_gas_used: None,
             excess_blob_gas: None,
             parent_beacon_block_root,
-            extra_data: payload.payload_inner.payload_inner.payload_inner.extra_data,
+            extra_data: payload.payload_inner.as_v1().extra_data.clone(),
             // Defaults
             ommers_hash: EMPTY_OMMER_ROOT_HASH,
             difficulty: Default::default(),

@@ -12,7 +12,7 @@ use reth_rpc_types::{
         BlobsBundleV1, ExecutionPayloadEnvelopeV2, ExecutionPayloadEnvelopeV3, ExecutionPayloadV1,
         PayloadAttributes, PayloadId,
     },
-    ExecutionPayloadV2, ExecutionPayloadV3,
+    ExecutionPayload, ExecutionPayloadV2, ExecutionPayloadV3,
 };
 use reth_rpc_types_compat::engine::{
     convert_withdrawal_to_standalone_withdraw,
@@ -32,8 +32,29 @@ pub struct TaikoPayloadAttributes {
     pub base_fee_per_gas: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub block_metadata: Option<TaikoBlockMetadata>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub l1_origin: L1Origin,
+}
+
+impl reth_node_api::PayloadAttributes for TaikoPayloadAttributes {
+    fn timestamp(&self) -> u64 {
+        self.payload_attributes.timestamp()
+    }
+
+    fn withdrawals(&self) -> Option<&Vec<reth_rpc_types::Withdrawal>> {
+        self.payload_attributes.withdrawals()
+    }
+
+    fn parent_beacon_block_root(&self) -> Option<B256> {
+        self.payload_attributes.parent_beacon_block_root()
+    }
+
+    fn ensure_well_formed_attributes(
+        &self,
+        chain_spec: &ChainSpec,
+        version: reth_node_api::EngineApiMessageVersion,
+    ) -> Result<(), reth_node_api::AttributesValidationError> {
+        self.payload_attributes.ensure_well_formed_attributes(chain_spec, version)
+    }
 }
 
 /// Taiko Payload Builder Attributes
@@ -269,7 +290,7 @@ impl From<TaikoBuiltPayload> for ExecutionPayloadEnvelopeV3 {
 pub struct TaikoExecutionPayload {
     /// Inner V3 payload
     #[serde(flatten)]
-    pub payload_inner: ExecutionPayloadV3,
+    pub payload_inner: ExecutionPayload,
 
     /// Allow passing txHash directly instead of transactions list
     pub tx_hash: B256,
@@ -277,6 +298,31 @@ pub struct TaikoExecutionPayload {
     pub withdrawals_hash: B256,
     /// Whether this is a Taiko L2 block, only used by ExecutableDataToBlock
     pub taiko_block: bool,
+}
+
+impl TaikoExecutionPayload {
+    pub fn block_hash(&self) -> B256 {
+        self.payload_inner.block_hash()
+    }
+
+    pub fn block_number(&self) -> u64 {
+        self.payload_inner.block_number()
+    }
+
+    pub fn parent_hash(&self) -> B256 {
+        self.payload_inner.parent_hash()
+    }
+}
+
+impl From<ExecutionPayload> for TaikoExecutionPayload {
+    fn from(value: ExecutionPayload) -> Self {
+        Self {
+            payload_inner: value,
+            tx_hash: B256::default(),
+            withdrawals_hash: B256::default(),
+            taiko_block: false,
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -307,39 +353,28 @@ impl From<TaikoBuiltPayload> for TaikoExecutionPayloadEnvelope {
 
         TaikoExecutionPayloadEnvelope {
             execution_payload: TaikoExecutionPayload {
-                payload_inner: ExecutionPayloadV3 {
-                    payload_inner: ExecutionPayloadV2 {
-                        payload_inner: ExecutionPayloadV1 {
-                            parent_hash: block.parent_hash,
-                            fee_recipient: block.beneficiary,
-                            state_root: block.state_root,
-                            receipts_root: block.receipts_root,
-                            logs_bloom: block.logs_bloom,
-                            prev_randao: block.mix_hash,
-                            block_number: block.number,
-                            gas_limit: block.gas_limit,
-                            gas_used: block.gas_used,
-                            timestamp: block.timestamp,
-                            extra_data: block.extra_data.clone(),
-                            base_fee_per_gas: U256::from(
-                                block.header.base_fee_per_gas.unwrap_or_default(),
-                            ),
-                            block_hash: block.hash(),
-                            transactions: vec![],
-                        },
-                        withdrawals,
-                    },
-
-                    blob_gas_used: block.header.blob_gas_used.unwrap_or_default(),
-                    excess_blob_gas: block.header.excess_blob_gas.unwrap_or_default(),
-                },
                 tx_hash: block.header.transactions_root,
                 withdrawals_hash: block.header.withdrawals_root.unwrap_or_default(),
                 taiko_block: true,
+
+                payload_inner: ExecutionPayload::V3(block_to_payload_v3(block)),
             },
             block_value: fees,
             blobs_bundle: sidecars.into_iter().map(Into::into).collect::<Vec<_>>().into(),
             should_override_builder: false,
+        }
+    }
+}
+
+impl From<TaikoBuiltPayload> for TaikoExecutionPayload {
+    fn from(value: TaikoBuiltPayload) -> Self {
+        let TaikoBuiltPayload { block, .. } = value;
+
+        TaikoExecutionPayload {
+            tx_hash: block.header.transactions_root,
+            withdrawals_hash: block.header.withdrawals_root.unwrap_or_default(),
+            taiko_block: true,
+            payload_inner: ExecutionPayload::V3(block_to_payload_v3(block)),
         }
     }
 }

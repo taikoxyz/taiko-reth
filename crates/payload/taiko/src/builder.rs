@@ -24,7 +24,7 @@ use revm::{
 use tracing::{debug, trace, warn};
 
 /// Taiko's payload builder
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct TaikoPayloadBuilder;
 
 /// Implementation of the [PayloadBuilder] trait for [TaikoPayloadBuilder].
