@@ -150,3 +150,7 @@ mod optimism {
 
 #[cfg(feature = "optimism")]
 pub use optimism::*;
+
+/// Taiko specific re-exports
+#[cfg(feature = "taiko")]
+pub use crate::chain::{TAIKO_INTERNAL_L2_A, TAIKO_TESTNET};

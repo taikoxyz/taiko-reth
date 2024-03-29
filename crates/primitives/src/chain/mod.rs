@@ -11,6 +11,9 @@ pub use spec::{BASE_MAINNET, BASE_SEPOLIA};
 #[cfg(feature = "taiko")]
 mod taiko;
 
+#[cfg(feature = "taiko")]
+pub use spec::{TAIKO_INTERNAL_L2_A, TAIKO_TESTNET};
+
 // The chain spec module.
 mod spec;
 // The chain info module.
