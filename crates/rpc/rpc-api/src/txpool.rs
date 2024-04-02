@@ -33,4 +33,16 @@ pub trait TxPoolApi {
     /// See [here](https://geth.ethereum.org/docs/rpc/ns-txpool#txpool_content) for more details
     #[method(name = "content")]
     async fn txpool_content(&self) -> RpcResult<TxpoolContent>;
+    // TODO:(petar) implement this method
+    // #[method(name = "content")]
+    // #[cfg(feature = "taiko")]
+    // async fn txpool_content(
+    //     &self,
+    //     beneficiary: Address,
+    //     base_fee: u64,
+    //     block_max_gas_limit: u64,
+    //     max_bytes_per_tx_list: u64,
+    //     locals: Vec<String>,
+    //     max_transactions_lists: u64,
+    // ) -> Result<Vec<Vec<Transaction>>>;
 }

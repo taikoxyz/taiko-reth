@@ -323,17 +323,4 @@ pub trait EthApi {
     #[method(name = "getL2ParentHeaders")]
     async fn get_l2_parent_headers(&self, block_id: u64)
         -> RpcResult<Vec<reth_primitives::Header>>;
-
-    /// TxPoolContent retrieves the transaction pool content with the given upper limits.
-    #[cfg(feature = "taiko")]
-    #[method(name = "txPoolContent")]
-    async fn tx_pool_content(
-        &self,
-        beneficiary: Address,
-        base_fee: u64,
-        block_max_gas_limit: u64,
-        max_bytes_per_tx_list: u64,
-        locals: Vec<String>,
-        max_transactions_lists: u64,
-    ) -> RpcResult<Vec<Vec<Transaction>>>;
 }

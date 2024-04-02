@@ -465,34 +465,6 @@ where
 
         Ok(headers)
     }
-
-    /// TxPoolContent retrieves the transaction pool content with the given upper limits.
-    // #[cfg(feature = "taiko")]
-    async fn tx_pool_content(
-        &self,
-        beneficiary: Address,
-        base_fee: u64,
-        block_max_gas_limit: u64,
-        max_bytes_per_tx_list: u64,
-        locals: Vec<String>,
-        max_transactions_lists: u64,
-    ) -> Result<Vec<Vec<Transaction>>> {
-        // let chain_info = self.chain_info()?;
-        // let (local_txs, remote_txs) =
-        //     self.pool().pending_transactions().into_iter().filter(|tx| !tx.is_eip4844()).fold(
-        //         (vec![], vec![]),
-        //         |(l, r), curr| {
-        //             if curr.is_local() {
-        //                 l.push(curr);
-        //             } else {
-        //                 r.push(curr);
-        //             }
-        //
-        //             (l, r)
-        //         },
-        //     );
-        todo!()
-    }
 }
 
 #[cfg(test)]

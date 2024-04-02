@@ -135,6 +135,58 @@ where
         trace!(target: "rpc::eth", "Serving txpool_inspect");
         Ok(self.content())
     }
+    // TODO:(petar) implement this function
+    // /// TxPoolContent retrieves the transaction pool content with the given upper limits.
+    // #[cfg(feature = "taiko")]
+    // async fn txpool_content(
+    //     &self,
+    //     beneficiary: Address,
+    //     base_fee: u64,
+    //     block_max_gas_limit: u64,
+    //     max_bytes_per_tx_list: u64,
+    //     locals: Vec<String>,
+    //     max_transactions_lists: u64,
+    // ) -> Result<Vec<Vec<Transaction>>> {
+    //     let (locals, remotes) = self
+    //         .content()
+    //         .pending
+    //         .into_iter()
+    //         .map(|(address, txs)| (address, txs, locals.contains(&address.to_string())))
+    //         .fold(
+    //             (
+    //                 BTreeMap::<Address, BTreeMap<String, Transaction>>::new(),
+    //                 BTreeMap::<Address, BTreeMap<String, Transaction>>::new(),
+    //             ),
+    //             |(l, r), (address, txs, is_local)| {
+    //                 if is_local {
+    //                     l.insert(address, txs);
+    //                 } else {
+    //                     r.insert(address, txs);
+    //                 }
+    //
+    //                 (l, r)
+    //             },
+    //         );
+    //
+    //     let commit_txs = || -> Result<Vec<Transaction>> {
+    //         todo!();
+    //         vec![]
+    //     };
+    //
+    //     let mut tx_lists = Vec::with_capacity(max_transactions_lists);
+    //
+    //     for _ in 0..max_transactions_lists {
+    //         let tx_list = commit_txs()?;
+    //
+    //         if tx_list.is_empty() {
+    //             break;
+    //         }
+    //
+    //         tx_lists.push(tx_list);
+    //     }
+    //
+    //     Ok(tx_lists)
+    // }
 }
 
 impl<Pool> std::fmt::Debug for TxPoolApi<Pool> {
