@@ -136,7 +136,7 @@ where
         Ok(self.content())
     }
     // TODO:(petar) implement this function
-    // /// TxPoolContent retrieves the transaction pool content with the given upper limits.
+    /// TxPoolContent retrieves the transaction pool content with the given upper limits.
     // #[cfg(feature = "taiko")]
     // async fn txpool_content(
     //     &self,
@@ -147,28 +147,31 @@ where
     //     locals: Vec<String>,
     //     max_transactions_lists: u64,
     // ) -> Result<Vec<Vec<Transaction>>> {
-    //     let (locals, remotes) = self
-    //         .content()
-    //         .pending
-    //         .into_iter()
-    //         .map(|(address, txs)| (address, txs, locals.contains(&address.to_string())))
-    //         .fold(
-    //             (
-    //                 BTreeMap::<Address, BTreeMap<String, Transaction>>::new(),
-    //                 BTreeMap::<Address, BTreeMap<String, Transaction>>::new(),
-    //             ),
-    //             |(l, r), (address, txs, is_local)| {
-    //                 if is_local {
-    //                     l.insert(address, txs);
-    //                 } else {
-    //                     r.insert(address, txs);
-    //                 }
+    //     let get_txs = || -> (BTreeMap::<Address, BTreeMap<String, Transaction>>, BTreeMap::<Address, BTreeMap<String, Transaction>>) {
+    //         self
+    //             .content()
+    //             .pending
+    //             .into_iter()
+    //             .map(|(address, txs)| (address, txs, locals.contains(&address.to_string())))
+    //             .fold(
+    //                 (
+    //                     BTreeMap::<Address, BTreeMap<String, Transaction>>::new(),
+    //                     BTreeMap::<Address, BTreeMap<String, Transaction>>::new(),
+    //                 ),
+    //                 |(l, r), (address, txs, is_local)| {
+    //                     if is_local {
+    //                         l.insert(address, txs);
+    //                     } else {
+    //                         r.insert(address, txs);
+    //                     }
     //
-    //                 (l, r)
-    //             },
-    //         );
+    //                     (l, r)
+    //                 },
+    //             )
+    //     };
     //
     //     let commit_txs = || -> Result<Vec<Transaction>> {
+    //         let (local_txs, remote_txs) = get_txs();
     //         todo!();
     //         vec![]
     //     };
