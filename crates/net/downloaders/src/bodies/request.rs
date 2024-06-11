@@ -1,16 +1,13 @@
 use crate::metrics::{BodyDownloaderMetrics, ResponseMetrics};
 use futures::{Future, FutureExt};
-use reth_interfaces::{
-    consensus::{Consensus as ConsensusTrait, Consensus},
-    p2p::{
-        bodies::{client::BodiesClient, response::BlockResponse},
-        error::{DownloadError, DownloadResult},
-        priority::Priority,
-    },
+use reth_consensus::Consensus;
+use reth_interfaces::p2p::{
+    bodies::{client::BodiesClient, response::BlockResponse},
+    error::{DownloadError, DownloadResult},
+    priority::Priority,
 };
-use reth_primitives::{
-    BlockBody, GotExpected, PeerId, SealedBlock, SealedHeader, WithPeerId, B256,
-};
+use reth_network_types::{PeerId, WithPeerId};
+use reth_primitives::{BlockBody, GotExpected, SealedBlock, SealedHeader, B256};
 use std::{
     collections::VecDeque,
     mem,
@@ -127,7 +124,7 @@ where
         self.metrics.total_downloaded.increment(response_len as u64);
 
         // TODO: Malicious peers often return a single block even if it does not exceed the soft
-        // response limit (2MB).  this could be penalized by checking if this block and the
+        // response limit (2MB). This could be penalized by checking if this block and the
         // next one exceed the soft response limit, if not then peer either does not have the next
         // block or deliberately sent a single block.
         if bodies.is_empty() {
@@ -186,8 +183,13 @@ where
                 if let Err(error) = self.consensus.validate_block(&block) {
                     // Body is invalid, put the header back and return an error
                     let hash = block.hash();
+                    let number = block.number;
                     self.pending_headers.push_front(block.header);
-                    return Err(DownloadError::BodyValidation { hash, error: Box::new(error) })
+                    return Err(DownloadError::BodyValidation {
+                        hash,
+                        number,
+                        error: Box::new(error),
+                    })
                 }
 
                 self.buffer.push(BlockResponse::Full(block));
@@ -252,7 +254,8 @@ mod tests {
         bodies::test_utils::zip_blocks,
         test_utils::{generate_bodies, TestBodiesClient},
     };
-    use reth_interfaces::test_utils::{generators, generators::random_header_range, TestConsensus};
+    use reth_consensus::test_utils::TestConsensus;
+    use reth_interfaces::test_utils::{generators, generators::random_header_range};
 
     /// Check if future returns empty bodies without dispatching any requests.
     #[tokio::test]

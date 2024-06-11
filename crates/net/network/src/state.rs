@@ -18,7 +18,8 @@ use reth_eth_wire::{
     capability::Capabilities, BlockHashNumber, DisconnectReason, NewBlockHashes, Status,
 };
 use reth_network_api::PeerKind;
-use reth_primitives::{ForkId, PeerId, B256};
+use reth_network_types::PeerId;
+use reth_primitives::{ForkId, B256};
 use reth_provider::BlockNumReader;
 use std::{
     collections::{HashMap, VecDeque},
@@ -267,6 +268,11 @@ where
         self.discovery.ban(peer_id, ip)
     }
 
+    /// Marks the given peer as trusted.
+    pub(crate) fn add_trusted_peer_id(&mut self, peer_id: PeerId) {
+        self.peers_manager.add_trusted_peer_id(peer_id)
+    }
+
     /// Adds a peer and its address with the given kind to the peerset.
     pub(crate) fn add_peer_kind(&mut self, peer_id: PeerId, kind: PeerKind, addr: SocketAddr) {
         self.peers_manager.add_peer_kind(peer_id, kind, addr, None)
@@ -311,6 +317,10 @@ where
                 self.queued_messages.push_back(StateAction::Disconnect { peer_id, reason });
             }
             PeerAction::DisconnectBannedIncoming { peer_id } => {
+                self.state_fetcher.on_pending_disconnect(&peer_id);
+                self.queued_messages.push_back(StateAction::Disconnect { peer_id, reason: None });
+            }
+            PeerAction::DisconnectUntrustedIncoming { peer_id } => {
                 self.state_fetcher.on_pending_disconnect(&peer_id);
                 self.queued_messages.push_back(StateAction::Disconnect { peer_id, reason: None });
             }
@@ -528,7 +538,8 @@ mod tests {
         BlockBodies, EthVersion,
     };
     use reth_interfaces::p2p::{bodies::client::BodiesClient, error::RequestError};
-    use reth_primitives::{BlockBody, Header, PeerId, B256};
+    use reth_network_types::PeerId;
+    use reth_primitives::{BlockBody, Header, B256};
     use reth_provider::test_utils::NoopProvider;
     use std::{
         future::poll_fn,

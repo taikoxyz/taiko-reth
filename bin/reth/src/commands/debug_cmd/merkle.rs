@@ -6,18 +6,18 @@ use crate::{
         utils::{chain_help, genesis_value_parser, SUPPORTED_CHAINS},
         DatabaseArgs, NetworkArgs,
     },
-    core::cli::runner::CliContext,
     dirs::{DataDirPath, MaybePlatformPath},
     utils::get_single_header,
 };
 use backon::{ConstantBuilder, Retryable};
 use clap::Parser;
 use reth_beacon_consensus::BeaconConsensus;
+use reth_cli_runner::CliContext;
 use reth_config::Config;
-use reth_db::{
-    cursor::DbCursorRO, init_db, mdbx::DatabaseArguments, tables, transaction::DbTx, DatabaseEnv,
-};
-use reth_interfaces::{consensus::Consensus, p2p::full_block::FullBlockClient};
+use reth_consensus::Consensus;
+use reth_db::{cursor::DbCursorRO, init_db, tables, transaction::DbTx, DatabaseEnv};
+use reth_exex::ExExManagerHandle;
+use reth_interfaces::p2p::full_block::FullBlockClient;
 use reth_network::NetworkHandle;
 use reth_network_api::NetworkInfo;
 use reth_node_ethereum::EthEvmConfig;
@@ -35,11 +35,7 @@ use reth_stages::{
     ExecInput, Stage,
 };
 use reth_tasks::TaskExecutor;
-use std::{
-    net::{SocketAddr, SocketAddrV4},
-    path::PathBuf,
-    sync::Arc,
-};
+use std::{net::SocketAddr, path::PathBuf, sync::Arc};
 use tracing::{debug, info, warn};
 
 /// `reth merkle-debug` command
@@ -100,11 +96,11 @@ impl Command {
             .network
             .network_config(config, self.chain.clone(), secret_key, default_peers_path)
             .with_task_executor(Box::new(task_executor))
-            .listener_addr(SocketAddr::V4(SocketAddrV4::new(self.network.addr, self.network.port)))
-            .discovery_addr(SocketAddr::V4(SocketAddrV4::new(
+            .listener_addr(SocketAddr::new(self.network.addr, self.network.port))
+            .discovery_addr(SocketAddr::new(
                 self.network.discovery.addr,
                 self.network.discovery.port,
-            )))
+            ))
             .build(ProviderFactory::new(
                 db,
                 self.chain.clone(),
@@ -127,8 +123,7 @@ impl Command {
         fs::create_dir_all(&db_path)?;
 
         // initialize the database
-        let db =
-            Arc::new(init_db(db_path, DatabaseArguments::default().log_level(self.db.log_level))?);
+        let db = Arc::new(init_db(db_path, self.db.database_args())?);
         let factory = ProviderFactory::new(&db, self.chain.clone(), data_dir.static_files_path())?;
         let provider_rw = factory.provider_rw()?;
 
@@ -218,6 +213,7 @@ impl Command {
             },
             MERKLE_STAGE_DEFAULT_CLEAN_THRESHOLD,
             PruneModes::all(),
+            ExExManagerHandle::empty(),
         );
 
         let mut account_hashing_stage = AccountHashingStage::default();

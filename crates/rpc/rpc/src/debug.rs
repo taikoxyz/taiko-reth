@@ -1,10 +1,7 @@
 use crate::{
     eth::{
         error::{EthApiError, EthResult},
-        revm_utils::{
-            inspect, inspect_and_return_db, prepare_call_env, replay_transactions_until, transact,
-            EvmOverrides,
-        },
+        revm_utils::{prepare_call_env, EvmOverrides},
         EthTransactions,
     },
     result::{internal_rpc_err, ToRpcResult},
@@ -56,6 +53,11 @@ impl<Provider, Eth> DebugApi<Provider, Eth> {
         let inner = Arc::new(DebugApiInner { provider, eth_api: eth, blocking_task_guard });
         Self { inner }
     }
+
+    /// Access the underlying `Eth` API.
+    pub fn eth_api(&self) -> &Eth {
+        &self.inner.eth_api
+    }
 }
 
 // === impl DebugApi ===
@@ -79,10 +81,14 @@ where
         block_env: BlockEnv,
         opts: GethDebugTracingOptions,
     ) -> EthResult<Vec<TraceResult>> {
+        if transactions.is_empty() {
+            // nothing to trace
+            return Ok(Vec::new())
+        }
+
         // replay all transactions of the block
         let this = self.clone();
-        self.inner
-            .eth_api
+        self.eth_api()
             .spawn_with_state_at_block(at, move |state| {
                 let block_hash = at.as_block_hash();
                 let mut results = Vec::with_capacity(transactions.len());
@@ -95,24 +101,16 @@ where
                         env: Env::boxed(cfg.cfg_env.clone(), block_env.clone(), tx),
                         handler_cfg: cfg.handler_cfg,
                     };
-                    let (result, state_changes) = this
-                        .trace_transaction(
-                            opts.clone(),
-                            env,
-                            &mut db,
-                            Some(TransactionContext {
-                                block_hash,
-                                tx_hash: Some(tx_hash),
-                                tx_index: Some(index),
-                            }),
-                        )
-                        .map_err(|err| {
-                            results.push(TraceResult::Error {
-                                error: err.to_string(),
-                                tx_hash: Some(tx_hash),
-                            });
-                            err
-                        })?;
+                    let (result, state_changes) = this.trace_transaction(
+                        opts.clone(),
+                        env,
+                        &mut db,
+                        Some(TransactionContext {
+                            block_hash,
+                            tx_hash: Some(tx_hash),
+                            tx_index: Some(index),
+                        }),
+                    )?;
 
                     results.push(TraceResult::Success { result, tx_hash: Some(tx_hash) });
                     if transactions.peek().is_some() {
@@ -140,7 +138,7 @@ where
         let block =
             Block::decode(&mut rlp_block.as_ref()).map_err(BlockError::RlpDecodeRawBlock)?;
 
-        let (cfg, block_env) = self.inner.eth_api.evm_env_for_raw_block(&block.header).await?;
+        let (cfg, block_env) = self.eth_api().evm_env_for_raw_block(&block.header).await?;
         // we trace on top the block's parent block
         let parent = block.parent_hash;
 
@@ -230,7 +228,7 @@ where
 
                 let mut db = CacheDB::new(StateProviderDatabase::new(state));
                 // replay all transactions prior to the targeted transaction
-                let index = replay_transactions_until(
+                let index = this.eth_api().replay_transactions_until(
                     &mut db,
                     cfg.clone(),
                     block_env.clone(),
@@ -269,12 +267,13 @@ where
         block_id: Option<BlockId>,
         opts: GethDebugTracingCallOptions,
     ) -> EthResult<GethTrace> {
-        let at = block_id.unwrap_or(BlockId::Number(BlockNumberOrTag::Latest));
+        let at = block_id.unwrap_or_default();
         let GethDebugTracingCallOptions { tracing_options, state_overrides, block_overrides } =
             opts;
         let overrides = EvmOverrides::new(state_overrides, block_overrides.map(Box::new));
         let GethDebugTracingOptions { config, tracer, tracer_config, .. } = tracing_options;
 
+        let this = self.clone();
         if let Some(tracer) = tracer {
             return match tracer {
                 GethDebugTracerType::BuiltInTracer(tracer) => match tracer {
@@ -284,7 +283,7 @@ where
                             .inner
                             .eth_api
                             .spawn_with_call_at(call, at, overrides, move |db, env| {
-                                inspect(db, env, &mut inspector)?;
+                                this.eth_api().inspect(db, env, &mut inspector)?;
                                 Ok(inspector)
                             })
                             .await?;
@@ -303,7 +302,7 @@ where
                             .inner
                             .eth_api
                             .spawn_with_call_at(call, at, overrides, move |db, env| {
-                                let (res, _) = inspect(db, env, &mut inspector)?;
+                                let (res, _) = this.eth_api().inspect(db, env, &mut inspector)?;
                                 let frame = inspector
                                     .into_geth_builder()
                                     .geth_call_traces(call_config, res.result.gas_used());
@@ -324,8 +323,11 @@ where
                             self.inner
                                 .eth_api
                                 .spawn_with_call_at(call, at, overrides, move |db, env| {
-                                    let (res, _, db) =
-                                        inspect_and_return_db(db, env, &mut inspector)?;
+                                    let (res, _, db) = this.eth_api().inspect_and_return_db(
+                                        db,
+                                        env,
+                                        &mut inspector,
+                                    )?;
                                     let frame = inspector
                                         .into_geth_builder()
                                         .geth_prestate_traces(&res, prestate_config, &db)?;
@@ -346,7 +348,11 @@ where
                             .inner
                             .eth_api
                             .spawn_with_call_at(call, at, overrides, move |db, env| {
-                                let (res, _, db) = inspect_and_return_db(db, env, &mut inspector)?;
+                                let (res, _, db) = this.eth_api().inspect_and_return_db(
+                                    db,
+                                    env,
+                                    &mut inspector,
+                                )?;
                                 let frame = inspector.try_into_mux_frame(&res, &db)?;
                                 Ok(frame.into())
                             })
@@ -364,8 +370,11 @@ where
                         .eth_api
                         .spawn_with_call_at(call, at, overrides, move |db, env| {
                             let mut inspector = JsInspector::new(code, config)?;
-                            let (res, _, db) =
-                                inspect_and_return_db(db, env.clone(), &mut inspector)?;
+                            let (res, _, db) = this.eth_api().inspect_and_return_db(
+                                db,
+                                env.clone(),
+                                &mut inspector,
+                            )?;
                             Ok(inspector.json_result(res, &env, &db)?)
                         })
                         .await?;
@@ -384,7 +393,7 @@ where
             .inner
             .eth_api
             .spawn_with_call_at(call, at, overrides, move |db, env| {
-                let (res, _) = inspect(db, env, &mut inspector)?;
+                let (res, _) = this.eth_api().inspect(db, env, &mut inspector)?;
                 Ok((res, inspector))
             })
             .await?;
@@ -411,7 +420,7 @@ where
         let StateContext { transaction_index, block_number } = state_context.unwrap_or_default();
         let transaction_index = transaction_index.unwrap_or_default();
 
-        let target_block = block_number.unwrap_or(BlockId::Number(BlockNumberOrTag::Latest));
+        let target_block = block_number.unwrap_or_default();
         let ((cfg, mut block_env, _), block) = futures::try_join!(
             self.inner.eth_api.evm_env_at(target_block),
             self.inner.eth_api.block_by_id_with_senders(target_block),
@@ -457,7 +466,7 @@ where
                             env: Env::boxed(cfg.cfg_env.clone(), block_env.clone(), tx),
                             handler_cfg: cfg.handler_cfg,
                         };
-                        let (res, _) = transact(&mut db, env)?;
+                        let (res, _) = this.inner.eth_api.transact(&mut db, env)?;
                         db.commit(res.state);
                     }
                 }
@@ -527,7 +536,7 @@ where
                 GethDebugTracerType::BuiltInTracer(tracer) => match tracer {
                     GethDebugBuiltInTracerType::FourByteTracer => {
                         let mut inspector = FourByteInspector::default();
-                        let (res, _) = inspect(db, env, &mut inspector)?;
+                        let (res, _) = self.eth_api().inspect(db, env, &mut inspector)?;
                         return Ok((FourByteFrame::from(inspector).into(), res.state))
                     }
                     GethDebugBuiltInTracerType::CallTracer => {
@@ -539,7 +548,7 @@ where
                             TracingInspectorConfig::from_geth_call_config(&call_config),
                         );
 
-                        let (res, _) = inspect(db, env, &mut inspector)?;
+                        let (res, _) = self.eth_api().inspect(db, env, &mut inspector)?;
 
                         let frame = inspector
                             .into_geth_builder()
@@ -555,7 +564,8 @@ where
                         let mut inspector = TracingInspector::new(
                             TracingInspectorConfig::from_geth_prestate_config(&prestate_config),
                         );
-                        let (res, _, db) = inspect_and_return_db(db, env, &mut inspector)?;
+                        let (res, _, db) =
+                            self.eth_api().inspect_and_return_db(db, env, &mut inspector)?;
 
                         let frame = inspector.into_geth_builder().geth_prestate_traces(
                             &res,
@@ -575,7 +585,8 @@ where
 
                         let mut inspector = MuxInspector::try_from_config(mux_config)?;
 
-                        let (res, _, db) = inspect_and_return_db(db, env, &mut inspector)?;
+                        let (res, _, db) =
+                            self.eth_api().inspect_and_return_db(db, env, &mut inspector)?;
                         let frame = inspector.try_into_mux_frame(&res, db)?;
                         return Ok((frame.into(), res.state))
                     }
@@ -587,7 +598,8 @@ where
                         config,
                         transaction_context.unwrap_or_default(),
                     )?;
-                    let (res, env, db) = inspect_and_return_db(db, env, &mut inspector)?;
+                    let (res, env, db) =
+                        self.eth_api().inspect_and_return_db(db, env, &mut inspector)?;
 
                     let state = res.state.clone();
                     let result = inspector.json_result(res, &env, db)?;
@@ -601,7 +613,7 @@ where
 
         let mut inspector = TracingInspector::new(inspector_config);
 
-        let (res, _) = inspect(db, env, &mut inspector)?;
+        let (res, _) = self.eth_api().inspect(db, env, &mut inspector)?;
         let gas_used = res.result.gas_used();
         let return_value = res.result.into_output().unwrap_or_default();
         let frame = inspector.into_geth_builder().geth_traces(gas_used, return_value, config);
@@ -685,11 +697,7 @@ where
             .to_rpc_result()?
             .unwrap_or_default()
             .into_iter()
-            .map(|receipt| {
-                let mut buf = Vec::new();
-                receipt.with_bloom().encode(&mut buf);
-                Bytes::from(buf)
-            })
+            .map(|receipt| receipt.with_bloom().envelope_encoded())
             .collect())
     }
 

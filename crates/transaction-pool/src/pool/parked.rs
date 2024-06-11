@@ -3,7 +3,7 @@ use crate::{
     pool::size::SizeTracker,
     PoolTransaction, SubPoolLimit, ValidPoolTransaction, TXPOOL_MAX_ACCOUNT_SLOTS_PER_SENDER,
 };
-use fnv::FnvHashMap;
+use rustc_hash::FxHashMap;
 use smallvec::SmallVec;
 use std::{
     cmp::Ordering,
@@ -40,7 +40,7 @@ pub struct ParkedPool<T: ParkedOrd> {
     last_sender_submission: BTreeSet<SubmissionSenderId>,
     /// Keeps track of the number of transactions in the pool by the sender and the last submission
     /// id.
-    sender_transaction_count: FnvHashMap<SenderId, SenderTransactionCount>,
+    sender_transaction_count: FxHashMap<SenderId, SenderTransactionCount>,
     /// Keeps track of the size of this pool.
     ///
     /// See also [`PoolTransaction::size`].
@@ -124,8 +124,7 @@ impl<T: ParkedOrd> ParkedPool<T> {
         assert!(
             self.last_sender_submission
                 .remove(&SubmissionSenderId::new(sender_id, removed_sender.last_submission_id)),
-            "last sender transaction not found {:?}",
-            sender_id
+            "last sender transaction not found {sender_id:?}"
         );
     }
 

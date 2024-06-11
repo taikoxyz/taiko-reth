@@ -20,8 +20,7 @@ use reth_eth_wire::{
 };
 use reth_interfaces::p2p::error::RequestError;
 use reth_metrics::common::mpsc::MeteredPollSender;
-
-use reth_primitives::PeerId;
+use reth_network_types::PeerId;
 use std::{
     collections::VecDeque,
     future::Future,
@@ -764,12 +763,13 @@ mod tests {
         config::PROTOCOL_BREACH_REQUEST_TIMEOUT, handle::PendingSessionEvent,
         start_pending_incoming_session,
     };
-    use reth_ecies::{stream::ECIESStream, util::pk2id};
+    use reth_ecies::stream::ECIESStream;
     use reth_eth_wire::{
         EthStream, GetBlockBodies, HelloMessageWithProtocols, P2PStream, Status, StatusBuilder,
         UnauthedEthStream, UnauthedP2PStream,
     };
     use reth_net_common::bandwidth_meter::{BandwidthMeter, MeteredStream};
+    use reth_network_types::pk2id;
     use reth_primitives::{ForkFilter, Hardfork, MAINNET};
     use secp256k1::{SecretKey, SECP256K1};
     use tokio::{

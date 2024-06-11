@@ -9,11 +9,10 @@
 #![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
 
 use crate::metrics::PayloadBuilderMetrics;
-use alloy_rlp::Encodable;
 use futures_core::ready;
 use futures_util::FutureExt;
+use reth_engine_primitives::{BuiltPayload, PayloadBuilderAttributes};
 use reth_interfaces::RethResult;
-use reth_node_api::{BuiltPayload, PayloadBuilderAttributes};
 use reth_payload_builder::{
     database::CachedReads, error::PayloadBuilderError, KeepPayloadJobAlive, PayloadId, PayloadJob,
     PayloadJobGenerator,
@@ -195,23 +194,22 @@ where
     }
 
     fn on_new_state(&mut self, new_state: CanonStateNotification) {
-        if let Some(committed) = new_state.committed() {
-            let mut cached = CachedReads::default();
+        let mut cached = CachedReads::default();
 
-            // extract the state from the notification and put it into the cache
-            let new_state = committed.state();
-            for (addr, acc) in new_state.bundle_accounts_iter() {
-                if let Some(info) = acc.info.clone() {
-                    // we want pre cache existing accounts and their storage
-                    // this only includes changed accounts and storage but is better than nothing
-                    let storage =
-                        acc.storage.iter().map(|(key, slot)| (*key, slot.present_value)).collect();
-                    cached.insert_account(addr, info, storage);
-                }
+        // extract the state from the notification and put it into the cache
+        let committed = new_state.committed();
+        let new_state = committed.state();
+        for (addr, acc) in new_state.bundle_accounts_iter() {
+            if let Some(info) = acc.info.clone() {
+                // we want pre cache existing accounts and their storage
+                // this only includes changed accounts and storage but is better than nothing
+                let storage =
+                    acc.storage.iter().map(|(key, slot)| (*key, slot.present_value)).collect();
+                cached.insert_account(addr, info, storage);
             }
-
-            self.pre_cached = Some(PrecachedState { block: committed.tip().hash(), cached });
         }
+
+        self.pre_cached = Some(PrecachedState { block: committed.tip().hash(), cached });
     }
 }
 
@@ -228,12 +226,13 @@ pub struct PrecachedState {
 
 /// Restricts how many generator tasks can be executed at once.
 #[derive(Debug, Clone)]
-struct PayloadTaskGuard(Arc<Semaphore>);
+pub struct PayloadTaskGuard(Arc<Semaphore>);
 
 // === impl PayloadTaskGuard ===
 
 impl PayloadTaskGuard {
-    fn new(max_payload_tasks: usize) -> Self {
+    /// Constructs `Self` with a maximum task count of `max_payload_tasks`.
+    pub fn new(max_payload_tasks: usize) -> Self {
         Self(Arc::new(Semaphore::new(max_payload_tasks)))
     }
 }
@@ -300,10 +299,8 @@ impl BasicPayloadJobGeneratorConfig {
 
 impl Default for BasicPayloadJobGeneratorConfig {
     fn default() -> Self {
-        let mut extradata = Vec::with_capacity(RETH_CLIENT_VERSION.as_bytes().len() + 1);
-        RETH_CLIENT_VERSION.as_bytes().encode(&mut extradata);
         Self {
-            extradata: extradata.into(),
+            extradata: alloy_rlp::encode(RETH_CLIENT_VERSION.as_bytes()).into(),
             max_gas_limit: ETHEREUM_BLOCK_GAS_LIMIT,
             interval: Duration::from_secs(1),
             // 12s slot time
@@ -414,7 +411,6 @@ where
                         BuildOutcome::Better { payload, cached_reads } => {
                             this.cached_reads = Some(cached_reads);
                             debug!(target: "payload_builder", value = %payload.fees(), "built better payload");
-                            let payload = payload;
                             this.best_payload = Some(payload);
                         }
                         BuildOutcome::Aborted { fees, cached_reads } => {
@@ -532,11 +528,11 @@ where
 #[derive(Debug)]
 pub struct ResolveBestPayload<Payload> {
     /// Best payload so far.
-    best_payload: Option<Payload>,
+    pub best_payload: Option<Payload>,
     /// Regular payload job that's currently running that might produce a better payload.
-    maybe_better: Option<PendingPayload<Payload>>,
+    pub maybe_better: Option<PendingPayload<Payload>>,
     /// The empty payload building job in progress.
-    empty_payload: Option<oneshot::Receiver<Result<Payload, PayloadBuilderError>>>,
+    pub empty_payload: Option<oneshot::Receiver<Result<Payload, PayloadBuilderError>>>,
 }
 
 impl<Payload> Future for ResolveBestPayload<Payload>
@@ -585,11 +581,21 @@ where
 
 /// A future that resolves to the result of the block building job.
 #[derive(Debug)]
-struct PendingPayload<P> {
+pub struct PendingPayload<P> {
     /// The marker to cancel the job on drop
     _cancel: Cancelled,
     /// The channel to send the result to.
     payload: oneshot::Receiver<Result<BuildOutcome<P>, PayloadBuilderError>>,
+}
+
+impl<P> PendingPayload<P> {
+    /// Constructs a `PendingPayload` future.
+    pub fn new(
+        cancel: Cancelled,
+        payload: oneshot::Receiver<Result<BuildOutcome<P>, PayloadBuilderError>>,
+    ) -> Self {
+        Self { _cancel: cancel, payload }
+    }
 }
 
 impl<P> Future for PendingPayload<P> {

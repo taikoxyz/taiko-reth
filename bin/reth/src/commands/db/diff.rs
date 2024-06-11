@@ -11,7 +11,7 @@ use reth_db::{
     HashedAccounts, HashedStorages, HeadL1Origin, HeaderNumbers, HeaderTerminalDifficulties,
     Headers, L1Origins, PlainAccountState, PlainStorageState, PruneCheckpoints, Receipts,
     StageCheckpointProgresses, StageCheckpoints, StorageChangeSets, StoragesHistory, StoragesTrie,
-    Tables, TransactionBlocks, TransactionHashNumbers, TransactionSenders, Transactions,
+    Tables, TransactionBlocks, TransactionHashNumbers, TransactionSenders, Transactions, VersionHistory,
 };
 use std::{
     collections::HashMap,
@@ -21,7 +21,7 @@ use std::{
     io::Write,
     path::{Path, PathBuf},
 };
-use tracing::info;
+use tracing::{info, warn};
 
 #[derive(Parser, Debug)]
 /// The arguments for the `reth db diff` command
@@ -58,12 +58,10 @@ impl Command {
     /// The discrepancies and extra elements, along with a brief summary of the diff results are
     /// then written to a file in the output directory.
     pub fn execute(self, tool: &DbTool<DatabaseEnv>) -> eyre::Result<()> {
+        warn!("Make sure the node is not running when running `reth db diff`!");
         // open second db
         let second_db_path: PathBuf = self.secondary_datadir.join("db").into();
-        let second_db = open_db_read_only(
-            &second_db_path,
-            DatabaseArguments::default().log_level(self.second_db.log_level),
-        )?;
+        let second_db = open_db_read_only(&second_db_path, self.second_db.database_args())?;
 
         let tables = match &self.table {
             Some(table) => std::slice::from_ref(table),
@@ -71,8 +69,13 @@ impl Command {
         };
 
         for table in tables {
-            let primary_tx = tool.provider_factory.db_ref().tx()?;
-            let secondary_tx = second_db.tx()?;
+            let mut primary_tx = tool.provider_factory.db_ref().tx()?;
+            let mut secondary_tx = second_db.tx()?;
+
+            // disable long read transaction safety, since this will run for a while and it's
+            // expected that the node is not running
+            primary_tx.disable_long_read_transaction_safety();
+            secondary_tx.disable_long_read_transaction_safety();
 
             let output_dir = self.output.clone();
             match table {
@@ -147,6 +150,9 @@ impl Command {
                 }
                 Tables::PruneCheckpoints => {
                     find_diffs::<PruneCheckpoints>(primary_tx, secondary_tx, output_dir)?
+                }
+                Tables::VersionHistory => {
+                    find_diffs::<VersionHistory>(primary_tx, secondary_tx, output_dir)?
                 }
                 Tables::L1Origins => find_diffs::<L1Origins>(primary_tx, secondary_tx, output_dir)?,
                 Tables::HeadL1Origin => {

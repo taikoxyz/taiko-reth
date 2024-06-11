@@ -1,7 +1,7 @@
 #[cfg(any(test, feature = "arbitrary"))]
 use crate::block::{generate_valid_header, valid_header_strategy};
 use crate::{
-    basefee::calculate_next_block_base_fee,
+    basefee::calc_next_block_base_fee,
     constants,
     constants::{
         ALLOWED_FUTURE_BLOCK_TIME_SECONDS, EMPTY_OMMER_ROOT_HASH, EMPTY_ROOT_HASH,
@@ -16,11 +16,12 @@ use bytes::BufMut;
 #[cfg(any(test, feature = "arbitrary"))]
 use proptest::prelude::*;
 use reth_codecs::{add_arbitrary_tests, derive_arbitrary, main_codec, Compact};
+use reth_rpc_types::ConversionError;
 use serde::{Deserialize, Serialize};
 use std::{mem, ops::Deref};
 
 /// Errors that can occur during header sanity checks.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum HeaderError {
     /// Represents an error when the block difficulty is too large.
     LargeDifficulty,
@@ -210,9 +211,7 @@ impl Header {
     /// Heavy function that will calculate hash of data and will *not* save the change to metadata.
     /// Use [`Header::seal`], [`SealedHeader`] and unlock if you need hash to be persistent.
     pub fn hash_slow(&self) -> B256 {
-        let mut out = Vec::new();
-        self.encode(&mut out);
-        keccak256(&out)
+        keccak256(alloy_rlp::encode(self))
     }
 
     /// Checks if the header is empty - has no transactions and no ommers
@@ -252,12 +251,12 @@ impl Header {
     ///
     /// Returns a `None` if no base fee is set, no EIP-1559 support
     pub fn next_block_base_fee(&self, base_fee_params: BaseFeeParams) -> Option<u64> {
-        Some(calculate_next_block_base_fee(
-            self.gas_used,
-            self.gas_limit,
-            self.base_fee_per_gas?,
+        Some(calc_next_block_base_fee(
+            self.gas_used as u128,
+            self.gas_limit as u128,
+            self.base_fee_per_gas? as u128,
             base_fee_params,
-        ))
+        ) as u64)
     }
 
     /// Calculate excess blob gas for the next block according to the EIP-4844 spec.
@@ -491,6 +490,50 @@ impl Decodable for Header {
     }
 }
 
+impl TryFrom<reth_rpc_types::Header> for Header {
+    type Error = ConversionError;
+
+    fn try_from(header: reth_rpc_types::Header) -> Result<Self, Self::Error> {
+        Ok(Self {
+            base_fee_per_gas: header
+                .base_fee_per_gas
+                .map(|base_fee_per_gas| {
+                    base_fee_per_gas.try_into().map_err(ConversionError::BaseFeePerGasConversion)
+                })
+                .transpose()?,
+            beneficiary: header.miner,
+            blob_gas_used: header
+                .blob_gas_used
+                .map(|blob_gas_used| {
+                    blob_gas_used.try_into().map_err(ConversionError::BlobGasUsedConversion)
+                })
+                .transpose()?,
+            difficulty: header.difficulty,
+            excess_blob_gas: header
+                .excess_blob_gas
+                .map(|excess_blob_gas| {
+                    excess_blob_gas.try_into().map_err(ConversionError::ExcessBlobGasConversion)
+                })
+                .transpose()?,
+            extra_data: header.extra_data,
+            gas_limit: header.gas_limit.try_into().map_err(ConversionError::GasLimitConversion)?,
+            gas_used: header.gas_used.try_into().map_err(ConversionError::GasUsedConversion)?,
+            logs_bloom: header.logs_bloom,
+            mix_hash: header.mix_hash.unwrap_or_default(),
+            nonce: u64::from_be_bytes(header.nonce.unwrap_or_default().0),
+            number: header.number.ok_or(ConversionError::MissingBlockNumber)?,
+            ommers_hash: header.uncles_hash,
+            parent_beacon_block_root: header.parent_beacon_block_root,
+            parent_hash: header.parent_hash,
+            receipts_root: header.receipts_root,
+            state_root: header.state_root,
+            timestamp: header.timestamp,
+            transactions_root: header.transactions_root,
+            withdrawals_root: header.withdrawals_root,
+        })
+    }
+}
+
 /// Errors that can occur during header sanity checks.
 #[derive(thiserror::Error, Debug, PartialEq, Eq, Clone)]
 pub enum HeaderValidationError {
@@ -658,11 +701,14 @@ impl SealedHeader {
         chain_spec: &ChainSpec,
     ) -> Result<(), HeaderValidationError> {
         // Determine the parent gas limit, considering elasticity multiplier on the London fork.
-        let mut parent_gas_limit = parent.gas_limit;
-        if chain_spec.fork(Hardfork::London).transitions_at_block(self.number) {
-            parent_gas_limit =
-                parent.gas_limit * chain_spec.base_fee_params(self.timestamp).elasticity_multiplier;
-        }
+        let parent_gas_limit =
+            if chain_spec.fork(Hardfork::London).transitions_at_block(self.number) {
+                parent.gas_limit *
+                    chain_spec.base_fee_params_at_timestamp(self.timestamp).elasticity_multiplier
+                        as u64
+            } else {
+                parent.gas_limit
+            };
 
         // Check for an increase in gas limit beyond the allowed threshold.
         if self.gas_limit > parent_gas_limit {
@@ -734,6 +780,17 @@ impl SealedHeader {
         }
 
         // timestamp in past check
+        #[cfg(feature = "optimism")]
+        if chain_spec.is_bedrock_active_at_block(self.header.number) &&
+            self.header.is_timestamp_in_past(parent.timestamp)
+        {
+            return Err(HeaderValidationError::TimestampIsInPast {
+                parent_timestamp: parent.timestamp,
+                timestamp: self.timestamp,
+            })
+        }
+
+        #[cfg(not(feature = "optimism"))]
         if self.header.is_timestamp_in_past(parent.timestamp) {
             return Err(HeaderValidationError::TimestampIsInPast {
                 parent_timestamp: parent.timestamp,
@@ -744,32 +801,32 @@ impl SealedHeader {
         // TODO Check difficulty increment between parent and self
         // Ace age did increment it by some formula that we need to follow.
 
-        cfg_if::cfg_if! {
-            if #[cfg(feature = "optimism")] {
-                // On Optimism, the gas limit can adjust instantly, so we skip this check
-                // if the optimism feature is enabled in the chain spec.
-                if !chain_spec.is_optimism() {
-                    self.validate_gas_limit(parent, chain_spec)?;
-                }
-            } else {
+        if cfg!(feature = "optimism") {
+            // On Optimism, the gas limit can adjust instantly, so we skip this check
+            // if the optimism feature is enabled in the chain spec.
+            if !chain_spec.is_optimism() {
                 self.validate_gas_limit(parent, chain_spec)?;
             }
+        } else {
+            self.validate_gas_limit(parent, chain_spec)?;
         }
 
         // EIP-1559 check base fee
         if chain_spec.fork(Hardfork::London).active_at_block(self.number) {
             let base_fee = self.base_fee_per_gas.ok_or(HeaderValidationError::BaseFeeMissing)?;
 
-            let expected_base_fee =
-                if chain_spec.fork(Hardfork::London).transitions_at_block(self.number) {
-                    constants::EIP1559_INITIAL_BASE_FEE
-                } else {
-                    // This BaseFeeMissing will not happen as previous blocks are checked to have
-                    // them.
-                    parent
-                        .next_block_base_fee(chain_spec.base_fee_params(self.timestamp))
-                        .ok_or(HeaderValidationError::BaseFeeMissing)?
-                };
+            let expected_base_fee = if chain_spec
+                .fork(Hardfork::London)
+                .transitions_at_block(self.number)
+            {
+                constants::EIP1559_INITIAL_BASE_FEE
+            } else {
+                // This BaseFeeMissing will not happen as previous blocks are checked to have
+                // them.
+                parent
+                    .next_block_base_fee(chain_spec.base_fee_params_at_timestamp(self.timestamp))
+                    .ok_or(HeaderValidationError::BaseFeeMissing)?
+            };
             if expected_base_fee != base_fee {
                 return Err(HeaderValidationError::BaseFeeDiff(GotExpected {
                     expected: expected_base_fee,

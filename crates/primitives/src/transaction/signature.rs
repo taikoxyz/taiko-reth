@@ -32,8 +32,8 @@ impl Signature {
     /// Returns the signature for the optimism deposit transactions, which don't include a
     /// signature.
     #[cfg(feature = "optimism")]
-    pub(crate) const fn optimism_deposit_tx_signature() -> Self {
-        Signature { r: U256::ZERO, s: U256::ZERO, odd_y_parity: false }
+    pub const fn optimism_deposit_tx_signature() -> Self {
+        Self { r: U256::ZERO, s: U256::ZERO, odd_y_parity: false }
     }
 }
 
@@ -52,7 +52,7 @@ impl Compact for Signature {
         let r = U256::from_le_slice(&buf[0..32]);
         let s = U256::from_le_slice(&buf[32..64]);
         buf.advance(64);
-        (Signature { r, s, odd_y_parity: identifier != 0 }, buf)
+        (Self { r, s, odd_y_parity: identifier != 0 }, buf)
     }
 }
 
@@ -82,6 +82,14 @@ impl Signature {
             // EIP-155: v = {0, 1} + CHAIN_ID * 2 + 35
             self.odd_y_parity as u64 + chain_id * 2 + 35
         } else {
+            #[cfg(feature = "optimism")]
+            // pre bedrock system transactions were sent from the zero address as legacy
+            // transactions with an empty signature
+            //
+            // NOTE: this is very hacky and only relevant for op-mainnet pre bedrock
+            if *self == Self::optimism_deposit_tx_signature() {
+                return 0
+            }
             self.odd_y_parity as u64 + 27
         }
     }
@@ -92,21 +100,25 @@ impl Signature {
         buf: &mut &[u8],
     ) -> alloy_rlp::Result<(Self, Option<u64>)> {
         let v = u64::decode(buf)?;
-        let r = Decodable::decode(buf)?;
-        let s = Decodable::decode(buf)?;
+        let r: U256 = Decodable::decode(buf)?;
+        let s: U256 = Decodable::decode(buf)?;
+
         if v < 35 {
             // non-EIP-155 legacy scheme, v = 27 for even y-parity, v = 28 for odd y-parity
             if v != 27 && v != 28 {
-                return Err(RlpError::Custom("invalid Ethereum signature (V is not 27 or 28)"))
+                #[cfg(feature = "optimism")]
+                // pre bedrock system transactions were sent from the zero address as legacy
+                // transactions with an empty signature
+                //
+                // NOTE: this is very hacky and only relevant for op-mainnet pre bedrock
+                if v == 0 && r.is_zero() && s.is_zero() {
+                    return Ok((Self { r, s, odd_y_parity: false }, None))
+                }
             }
-            let odd_y_parity = v == 28;
-            Ok((Signature { r, s, odd_y_parity }, None))
-        } else {
-            // EIP-155: v = {0, 1} + CHAIN_ID * 2 + 35
-            let odd_y_parity = ((v - 35) % 2) != 0;
-            let chain_id = (v - 35) >> 1;
-            Ok((Signature { r, s, odd_y_parity }, Some(chain_id)))
         }
+
+        let (odd_y_parity, chain_id) = extract_chain_id(v)?;
+        Ok((Self { r, s, odd_y_parity }, chain_id))
     }
 
     /// Output the length of the signature without the length of the RLP header
@@ -123,7 +135,7 @@ impl Signature {
 
     /// Decodes the `odd_y_parity`, `r`, `s` values without a RLP header.
     pub fn decode(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
-        Ok(Signature {
+        Ok(Self {
             odd_y_parity: Decodable::decode(buf)?,
             r: Decodable::decode(buf)?,
             s: Decodable::decode(buf)?,
@@ -184,11 +196,28 @@ impl Signature {
     }
 }
 
+/// Outputs (odd_y_parity, chain_id) from the `v` value.
+/// This doesn't check validity of the `v` value for optimism.
+#[inline]
+pub fn extract_chain_id(v: u64) -> alloy_rlp::Result<(bool, Option<u64>)> {
+    if v < 35 {
+        // non-EIP-155 legacy scheme, v = 27 for even y-parity, v = 28 for odd y-parity
+        if v != 27 && v != 28 {
+            return Err(RlpError::Custom("invalid Ethereum signature (V is not 27 or 28)"))
+        }
+        Ok((v == 28, None))
+    } else {
+        // EIP-155: v = {0, 1} + CHAIN_ID * 2 + 35
+        let odd_y_parity = ((v - 35) % 2) != 0;
+        let chain_id = (v - 35) >> 1;
+        Ok((odd_y_parity, Some(chain_id)))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::{transaction::signature::SECP256K1N_HALF, Address, Signature, B256, U256};
     use alloy_primitives::{hex, hex::FromHex, Bytes};
-    use bytes::BytesMut;
     use std::str::FromStr;
 
     #[test]
@@ -218,14 +247,14 @@ mod tests {
         // Select 1 as an arbitrary nonzero value for R and S, as v() always returns 0 for (0, 0).
         let signature = Signature { r: U256::from(1), s: U256::from(1), odd_y_parity: false };
 
-        let mut encoded = BytesMut::new();
+        let mut encoded = Vec::new();
         signature.encode_with_eip155_chain_id(&mut encoded, None);
         assert_eq!(encoded.len(), signature.payload_len_with_eip155_chain_id(None));
         let (decoded, chain_id) = Signature::decode_with_eip155_chain_id(&mut &*encoded).unwrap();
         assert_eq!(signature, decoded);
         assert_eq!(None, chain_id);
 
-        let mut encoded = BytesMut::new();
+        let mut encoded = Vec::new();
         signature.encode_with_eip155_chain_id(&mut encoded, Some(1));
         assert_eq!(encoded.len(), signature.payload_len_with_eip155_chain_id(Some(1)));
         let (decoded, chain_id) = Signature::decode_with_eip155_chain_id(&mut &*encoded).unwrap();
@@ -243,7 +272,7 @@ mod tests {
     fn test_encode_and_decode() {
         let signature = Signature { r: U256::default(), s: U256::default(), odd_y_parity: false };
 
-        let mut encoded = BytesMut::new();
+        let mut encoded = Vec::new();
         signature.encode(&mut encoded);
         assert_eq!(encoded.len(), signature.payload_len());
         let decoded = Signature::decode(&mut &*encoded).unwrap();

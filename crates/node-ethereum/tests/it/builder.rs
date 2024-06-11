@@ -1,7 +1,8 @@
 //! Node builder setup tests.
 
 use reth_db::test_utils::create_test_rw_db;
-use reth_node_builder::{components::FullNodeComponents, NodeBuilder, NodeConfig};
+use reth_node_api::FullNodeComponents;
+use reth_node_builder::{NodeBuilder, NodeConfig};
 use reth_node_ethereum::node::EthereumNode;
 
 #[test]
@@ -31,4 +32,12 @@ fn test_basic_setup() {
             Ok(())
         })
         .check_launch();
+}
+
+#[test]
+fn test_node_setup() {
+    let config = NodeConfig::test();
+    let db = create_test_rw_db();
+    let _builder =
+        NodeBuilder::new(config).with_database(db).node(EthereumNode::default()).check_launch();
 }

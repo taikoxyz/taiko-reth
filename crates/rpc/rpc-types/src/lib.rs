@@ -9,12 +9,10 @@
 )]
 #![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
 
-mod admin;
 pub mod beacon;
 mod eth;
 mod mev;
 mod net;
-mod otterscan;
 mod peer;
 pub mod relay;
 mod rpc;
@@ -24,22 +22,26 @@ pub use alloy_rpc_types::serde_helpers;
 
 // Ethereum specific rpc types coming from alloy.
 pub use alloy_rpc_types::*;
+
 pub mod trace {
     //! RPC types for trace endpoints and inspectors.
-    pub use alloy_rpc_trace_types::*;
+    pub use alloy_rpc_types_trace::*;
 }
+
+// Anvil specific rpc types coming from alloy.
+pub use alloy_rpc_types_anvil as anvil;
+
 // Ethereum specific rpc types related to typed transaction requests and the engine API.
 pub use eth::{
     engine,
     engine::{
         ExecutionPayload, ExecutionPayloadV1, ExecutionPayloadV2, ExecutionPayloadV3, PayloadError,
     },
-    transaction::{self, TransactionKind, TransactionRequest, TypedTransactionRequest},
+    error::ToRpcError,
+    transaction::{self, TransactionRequest, TypedTransactionRequest},
 };
 
-pub use admin::*;
 pub use mev::*;
 pub use net::*;
-pub use otterscan::*;
 pub use peer::*;
 pub use rpc::*;

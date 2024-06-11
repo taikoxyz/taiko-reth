@@ -1,6 +1,7 @@
 use super::AccountReader;
 use crate::{
     BlockHashReader, BlockIdReader, BundleStateWithReceipts, L1OriginReader, L1OriginWriter,
+    StateRootProvider
 };
 use auto_impl::auto_impl;
 use reth_interfaces::provider::{ProviderError, ProviderResult};
@@ -8,7 +9,6 @@ use reth_primitives::{
     trie::AccountProof, Address, BlockHash, BlockId, BlockNumHash, BlockNumber, BlockNumberOrTag,
     Bytecode, StorageKey, StorageValue, B256, KECCAK_EMPTY, U256,
 };
-use reth_trie::updates::TrieUpdates;
 
 /// Type alias of boxed [StateProvider].
 pub type StateProviderBox = Box<dyn StateProvider>;
@@ -100,9 +100,8 @@ pub trait StateProvider: BlockHashReader + AccountReader + StateRootProvider + S
 /// This affects tracing, or replaying blocks, which will need to be executed on top of the state of
 /// the parent block. For example, in order to trace block `n`, the state after block `n - 1` needs
 /// to be used, since block `n` was executed on its parent block's state.
-pub trait StateProviderFactory:
-    BlockIdReader + L1OriginWriter + L1OriginReader + Send + Sync
-{
+#[auto_impl(&, Arc, Box)]
+pub trait StateProviderFactory: BlockIdReader + L1OriginWriter + L1OriginReader + Send + Sync {
     /// Storage provider for latest block.
     fn latest(&self) -> ProviderResult<StateProviderBox>;
 
@@ -219,7 +218,7 @@ pub trait BlockchainTreePendingStateProvider: Send + Sync {
 /// * [`BundleStateWithReceipts`] contains all changed of accounts and storage of pending chain
 /// * block hashes of pending chain and canonical blocks.
 /// * canonical fork, the block on what pending chain was forked from.
-#[auto_impl[Box,&]]
+#[auto_impl(&, Box)]
 pub trait BundleStateDataProvider: Send + Sync {
     /// Return post state
     fn state(&self) -> &BundleStateWithReceipts;

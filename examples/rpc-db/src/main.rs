@@ -17,6 +17,7 @@ use reth::{
     providers::{providers::BlockchainProvider, ProviderFactory},
     utils::db::open_db_read_only,
 };
+use reth_db::{mdbx::DatabaseArguments, models::client_version::ClientVersion};
 // Bringing up the RPC
 use reth::rpc::builder::{
     RethRpcModule, RpcModuleBuilder, RpcServerConfig, TransportRpcModuleConfig,
@@ -38,14 +39,17 @@ async fn main() -> eyre::Result<()> {
     // 1. Setup the DB
     let db_path = std::env::var("RETH_DB_PATH")?;
     let db_path = Path::new(&db_path);
-    let db = Arc::new(open_db_read_only(db_path.join("db").as_path(), Default::default())?);
+    let db = Arc::new(open_db_read_only(
+        db_path.join("db").as_path(),
+        DatabaseArguments::new(ClientVersion::default()),
+    )?);
     let spec = Arc::new(ChainSpecBuilder::mainnet().build());
     let factory = ProviderFactory::new(db.clone(), spec.clone(), db_path.join("static_files"))?;
 
     // 2. Setup the blockchain provider using only the database provider and a noop for the tree to
     //    satisfy trait bounds. Tree is not used in this example since we are only operating on the
     //    disk and don't handle new blocks/live sync etc, which is done by the blockchain tree.
-    let provider = BlockchainProvider::new(factory, NoopBlockchainTree::default())?;
+    let provider = BlockchainProvider::new(factory, Arc::new(NoopBlockchainTree::default()))?;
 
     let rpc_builder = RpcModuleBuilder::default()
         .with_provider(provider.clone())

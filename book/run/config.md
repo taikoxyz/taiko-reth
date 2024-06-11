@@ -179,7 +179,7 @@ The merkle stage uses the indexes built in the hashing stages (storage and accou
 # The threshold in number of blocks before the stage starts from scratch
 # and re-computes the state root, discarding the trie that has already been built,
 # as opposed to incrementally updating the trie.
-clean_threshold = 50000
+clean_threshold = 5000
 ```
 
 ### `transaction_lookup`
@@ -219,6 +219,19 @@ The storage history indexing stage builds an index of what blocks a particular s
 # Lower thresholds correspond to more frequent disk I/O (writes),
 # but lowers memory usage
 commit_threshold = 100000
+```
+
+### `etl`
+
+An ETL (extract, transform, load) data collector. Used mainly to insert data into `MDBX` in a sorted manner.
+
+```toml
+[stages.etl]
+# The maximum size in bytes of data held in memory before being flushed to disk as a file.
+#
+# Lower threshold corresponds to more frequent flushes,
+# but lowers temporary storage usage
+file_size = 524_288_000 # 500 * 1024 * 1024
 ```
 
 ## The `[peers]` section

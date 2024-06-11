@@ -112,7 +112,7 @@ impl Environment {
                 sender: tx,
             });
             let res = rx.recv().unwrap();
-            if let Err(Error::Busy) = &res {
+            if matches!(&res, Err(Error::Busy)) {
                 if !warned {
                     warned = true;
                     warn!(target: "libmdbx", "Process stalled, awaiting read-write transaction lock.");
@@ -146,7 +146,7 @@ impl Environment {
     where
         F: FnOnce(*mut ffi::MDBX_env) -> T,
     {
-        (f)(self.env_ptr())
+        f(self.env_ptr())
     }
 
     /// Flush the environment data buffers to disk.
@@ -501,7 +501,7 @@ impl<R> Default for Geometry<R> {
 ///
 /// # Arguments
 ///
-/// * `process_id` – A proceess id of the reader process.
+/// * `process_id` – A process id of the reader process.
 /// * `thread_id` – A thread id of the reader thread.
 /// * `read_txn_id` – An oldest read transaction number on which stalled.
 /// * `gap` – A lag from the last committed txn.
@@ -911,6 +911,7 @@ unsafe fn handle_slow_readers_callback(callback: HandleSlowReadersCallback) -> f
     std::mem::forget(closure);
 
     // Cast the closure to FFI `extern fn` type.
+    #[allow(clippy::missing_transmute_annotations)]
     Some(std::mem::transmute(closure_ptr))
 }
 

@@ -9,18 +9,20 @@ use std::{
     time::Duration,
 };
 
+use reth_primitives::DEV;
+
 #[cfg(feature = "optimism")]
-use reth_primitives::{BASE_MAINNET, BASE_SEPOLIA};
+use reth_primitives::{BASE_MAINNET, BASE_SEPOLIA, OP_MAINNET, OP_SEPOLIA};
 
 #[cfg(not(any(feature = "optimism", feature = "taiko")))]
-use reth_primitives::{DEV, GOERLI, HOLESKY, MAINNET, SEPOLIA};
+use reth_primitives::{GOERLI, HOLESKY, MAINNET, SEPOLIA};
 
 #[cfg(feature = "taiko")]
 use reth_primitives::{TAIKO_INTERNAL_L2_A, TAIKO_TESTNET};
 
 #[cfg(feature = "optimism")]
 /// Chains supported by op-reth. First value should be used as the default.
-pub const SUPPORTED_CHAINS: &[&str] = &["base", "base-sepolia"];
+pub const SUPPORTED_CHAINS: &[&str] = &["base", "base-sepolia", "optimism", "optimism-sepolia"];
 #[cfg(not(any(feature = "optimism", feature = "taiko")))]
 /// Chains supported by reth. First value should be used as the default.
 pub const SUPPORTED_CHAINS: &[&str] = &["mainnet", "sepolia", "goerli", "holesky", "dev"];
@@ -49,9 +51,13 @@ pub fn chain_spec_value_parser(s: &str) -> eyre::Result<Arc<ChainSpec>, eyre::Er
         #[cfg(not(any(feature = "optimism", feature = "taiko")))]
         "dev" => DEV.clone(),
         #[cfg(feature = "optimism")]
-        "base_sepolia" | "base-sepolia" => BASE_SEPOLIA.clone(),
+        "optimism" => OP_MAINNET.clone(),
+        #[cfg(feature = "optimism")]
+        "optimism_sepolia" | "optimism-sepolia" => OP_SEPOLIA.clone(),
         #[cfg(feature = "optimism")]
         "base" => BASE_MAINNET.clone(),
+        #[cfg(feature = "optimism")]
+        "base_sepolia" | "base-sepolia" => BASE_SEPOLIA.clone(),
         #[cfg(feature = "taiko")]
         "testnet" => TAIKO_TESTNET.clone(),
         #[cfg(feature = "taiko")]
@@ -83,12 +89,15 @@ pub fn genesis_value_parser(s: &str) -> eyre::Result<Arc<ChainSpec>, eyre::Error
         "sepolia" => SEPOLIA.clone(),
         #[cfg(not(any(feature = "optimism", feature = "taiko")))]
         "holesky" => HOLESKY.clone(),
-        #[cfg(not(any(feature = "optimism", feature = "taiko")))]
         "dev" => DEV.clone(),
         #[cfg(feature = "optimism")]
-        "base_sepolia" | "base-sepolia" => BASE_SEPOLIA.clone(),
+        "optimism" => OP_MAINNET.clone(),
+        #[cfg(feature = "optimism")]
+        "optimism_sepolia" | "optimism-sepolia" => OP_SEPOLIA.clone(),
         #[cfg(feature = "optimism")]
         "base" => BASE_MAINNET.clone(),
+        #[cfg(feature = "optimism")]
+        "base_sepolia" | "base-sepolia" => BASE_SEPOLIA.clone(),
         #[cfg(feature = "taiko")]
         "testnet" => TAIKO_TESTNET.clone(),
         #[cfg(feature = "taiko")]

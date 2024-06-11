@@ -17,8 +17,8 @@
 //! Configure only an http server with a selection of [RethRpcModule]s
 //!
 //! ```
+//! use reth_evm::ConfigureEvm;
 //! use reth_network_api::{NetworkInfo, Peers};
-//! use reth_node_api::ConfigureEvmEnv;
 //! use reth_provider::{
 //!     AccountReader, BlockReaderIdExt, CanonStateSubscriptions, ChainSpecProvider,
 //!     ChangeSetReader, EvmEnvProvider, StateProviderFactory,
@@ -47,7 +47,7 @@
 //!     Pool: TransactionPool + Clone + 'static,
 //!     Network: NetworkInfo + Peers + Clone + 'static,
 //!     Events: CanonStateSubscriptions + Clone + 'static,
-//!     EvmConfig: ConfigureEvmEnv + 'static,
+//!     EvmConfig: ConfigureEvm + 'static,
 //! {
 //!     // configure the rpc module per transport
 //!     let transports = TransportRpcModuleConfig::default().with_http(vec![
@@ -77,8 +77,9 @@
 //!
 //!
 //! ```
+//! use reth_engine_primitives::EngineTypes;
+//! use reth_evm::ConfigureEvm;
 //! use reth_network_api::{NetworkInfo, Peers};
-//! use reth_node_api::{ConfigureEvmEnv, EngineTypes};
 //! use reth_provider::{
 //!     AccountReader, BlockReaderIdExt, CanonStateSubscriptions, ChainSpecProvider,
 //!     ChangeSetReader, EvmEnvProvider, StateProviderFactory,
@@ -114,7 +115,7 @@
 //!     Events: CanonStateSubscriptions + Clone + 'static,
 //!     EngineApi: EngineApiServer<EngineT>,
 //!     EngineT: EngineTypes + 'static,
-//!     EvmConfig: ConfigureEvmEnv + 'static,
+//!     EvmConfig: ConfigureEvm + 'static,
 //! {
 //!     // configure the rpc module per transport
 //!     let transports = TransportRpcModuleConfig::default().with_http(vec![
@@ -154,35 +155,25 @@
 #![cfg_attr(not(test), warn(unused_crate_dependencies))]
 #![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
 
-use std::{
-    collections::{HashMap, HashSet},
-    fmt,
-    net::{Ipv4Addr, SocketAddr, SocketAddrV4},
-    str::FromStr,
-    time::{Duration, SystemTime, UNIX_EPOCH},
-};
-
-use hyper::{header::AUTHORIZATION, HeaderMap};
-pub use jsonrpsee::server::ServerBuilder;
-use jsonrpsee::{
-    server::{IdProvider, Server, ServerHandle},
-    Methods, RpcModule,
-};
-use reth_node_api::{ConfigureEvmEnv, EngineTypes};
-use serde::{Deserialize, Serialize, Serializer};
-use strum::{AsRefStr, EnumIter, IntoStaticStr, ParseError, VariantArray, VariantNames};
-use tower::layer::util::{Identity, Stack};
-use tower_http::cors::CorsLayer;
-use tracing::{instrument, trace};
-
 use crate::{
-    auth::AuthRpcModule, error::WsHttpSamePortError, metrics::RpcServerMetrics,
-    RpcModuleSelection::Selection,
+    auth::AuthRpcModule, cors::CorsDomainError, error::WsHttpSamePortError,
+    metrics::RpcRequestMetrics, RpcModuleSelection::Selection,
 };
 use constants::*;
 use error::{RpcError, ServerKind};
+use hyper::{header::AUTHORIZATION, HeaderMap};
+pub use jsonrpsee::server::ServerBuilder;
+use jsonrpsee::{
+    core::RegisterMethodError,
+    server::{AlreadyStoppedError, IdProvider, RpcServiceBuilder, Server, ServerHandle},
+    Methods, RpcModule,
+};
+use reth_engine_primitives::EngineTypes;
+use reth_evm::ConfigureEvm;
 use reth_ipc::server::IpcServer;
-pub use reth_ipc::server::{Builder as IpcServerBuilder, Endpoint};
+pub use reth_ipc::server::{
+    Builder as IpcServerBuilder, RpcServiceBuilder as IpcRpcServiceBuilder,
+};
 use reth_network_api::{noop::NoopNetwork, NetworkInfo, Peers};
 use reth_provider::{
     AccountReader, BlockReader, BlockReaderIdExt, CanonStateSubscriptions, ChainSpecProvider,
@@ -193,6 +184,7 @@ use reth_rpc::{
         cache::{cache_new_blocks_task, EthStateCache},
         fee_history_cache_new_blocks_task,
         gas_oracle::GasPriceOracle,
+        traits::RawTransactionForwarder,
         EthBundle, FeeHistoryCache,
     },
     AdminApi, AuthLayer, Claims, DebugApi, EngineEthApi, EthApi, EthFilter, EthPubSub,
@@ -205,6 +197,20 @@ use reth_tasks::{
     TaskSpawner, TokioTaskExecutor,
 };
 use reth_transaction_pool::{noop::NoopTransactionPool, TransactionPool};
+use serde::{Deserialize, Serialize, Serializer};
+use std::{
+    collections::{HashMap, HashSet},
+    fmt,
+    net::{Ipv4Addr, SocketAddr, SocketAddrV4},
+    str::FromStr,
+    sync::Arc,
+    time::{Duration, SystemTime, UNIX_EPOCH},
+};
+use strum::{AsRefStr, EnumIter, IntoStaticStr, ParseError, VariantArray, VariantNames};
+pub use tower::layer::util::{Identity, Stack};
+use tower_http::cors::CorsLayer;
+use tracing::{instrument, trace};
+
 // re-export for convenience
 pub use crate::eth::{EthConfig, EthHandlers};
 
@@ -252,7 +258,7 @@ where
     Network: NetworkInfo + Peers + Clone + 'static,
     Tasks: TaskSpawner + Clone + 'static,
     Events: CanonStateSubscriptions + Clone + 'static,
-    EvmConfig: ConfigureEvmEnv + 'static,
+    EvmConfig: ConfigureEvm + 'static,
 {
     let module_config = module_config.into();
     let server_config = server_config.into();
@@ -420,7 +426,7 @@ impl<Provider, Pool, Network, Tasks, Events, EvmConfig>
         evm_config: E,
     ) -> RpcModuleBuilder<Provider, Pool, Network, Tasks, Events, E>
     where
-        E: ConfigureEvmEnv + 'static,
+        E: ConfigureEvm + 'static,
     {
         let Self { provider, pool, executor, network, events, .. } = self;
         RpcModuleBuilder { provider, network, pool, executor, events, evm_config }
@@ -443,7 +449,7 @@ where
     Network: NetworkInfo + Peers + Clone + 'static,
     Tasks: TaskSpawner + Clone + 'static,
     Events: CanonStateSubscriptions + Clone + 'static,
-    EvmConfig: ConfigureEvmEnv + 'static,
+    EvmConfig: ConfigureEvm + 'static,
 {
     /// Configures all [RpcModule]s specific to the given [TransportRpcModuleConfig] which can be
     /// used to start the transport server(s).
@@ -496,14 +502,14 @@ where
     /// # Example
     ///
     /// ```no_run
+    /// use reth_evm::ConfigureEvm;
     /// use reth_network_api::noop::NoopNetwork;
-    /// use reth_node_api::ConfigureEvmEnv;
     /// use reth_provider::test_utils::{NoopProvider, TestCanonStateSubscriptions};
     /// use reth_rpc_builder::RpcModuleBuilder;
     /// use reth_tasks::TokioTaskExecutor;
     /// use reth_transaction_pool::noop::NoopTransactionPool;
     ///
-    /// fn init<Evm: ConfigureEvmEnv + 'static>(evm: Evm) {
+    /// fn init<Evm: ConfigureEvm + 'static>(evm: Evm) {
     ///     let mut registry = RpcModuleBuilder::default()
     ///         .with_provider(NoopProvider::default())
     ///         .with_pool(NoopTransactionPool::default())
@@ -711,7 +717,7 @@ impl RpcModuleSelection {
 
     /// Creates a new [RpcModule] based on the configured reth modules.
     ///
-    /// Note: This will always create new instance of the module handlers and is therefor only
+    /// Note: This will always create new instance of the module handlers and is therefore only
     /// recommended for launching standalone transports. If multiple transports need to be
     /// configured it's recommended to use the [RpcModuleBuilder].
     #[allow(clippy::too_many_arguments)]
@@ -739,7 +745,7 @@ impl RpcModuleSelection {
         Network: NetworkInfo + Peers + Clone + 'static,
         Tasks: TaskSpawner + Clone + 'static,
         Events: CanonStateSubscriptions + Clone + 'static,
-        EvmConfig: ConfigureEvmEnv + 'static,
+        EvmConfig: ConfigureEvm + 'static,
     {
         let mut registry =
             RethModuleRegistry::new(provider, pool, network, executor, events, config, evm_config);
@@ -949,6 +955,9 @@ pub struct RethModuleRegistry<Provider, Pool, Network, Tasks, Events, EvmConfig>
     blocking_pool_guard: BlockingTaskGuard,
     /// Contains the [Methods] of a module
     modules: HashMap<RethRpcModule, Methods>,
+    /// Optional forwarder for `eth_sendRawTransaction`
+    // TODO(mattsse): find a more ergonomic way to configure eth/rpc customizations
+    eth_raw_transaction_forwarder: Option<Arc<dyn RawTransactionForwarder>>,
 }
 
 // === impl RethModuleRegistry ===
@@ -977,7 +986,18 @@ impl<Provider, Pool, Network, Tasks, Events, EvmConfig>
             blocking_pool_guard: BlockingTaskGuard::new(config.eth.max_tracing_requests),
             config,
             events,
+            eth_raw_transaction_forwarder: None,
         }
+    }
+
+    /// Sets a forwarder for `eth_sendRawTransaction`
+    ///
+    /// Note: this might be removed in the future in favor of a more generic approach.
+    pub fn set_eth_raw_transaction_forwarder(
+        &mut self,
+        forwarder: Arc<dyn RawTransactionForwarder>,
+    ) {
+        self.eth_raw_transaction_forwarder = Some(forwarder);
     }
 
     /// Returns a reference to the pool
@@ -1015,14 +1035,14 @@ impl<Provider, Pool, Network, Tasks, Events, EvmConfig>
     }
 }
 
-impl<Provider, Pool, Network, Tasks, Events, EvmConfig>
+impl<Provider: ChainSpecProvider, Pool, Network, Tasks, Events, EvmConfig>
     RethModuleRegistry<Provider, Pool, Network, Tasks, Events, EvmConfig>
 where
     Network: NetworkInfo + Peers + Clone + 'static,
 {
     /// Instantiates AdminApi
     pub fn admin_api(&mut self) -> AdminApi<Network> {
-        AdminApi::new(self.network.clone())
+        AdminApi::new(self.network.clone(), self.provider.chain_spec())
     }
 
     /// Instantiates Web3Api
@@ -1061,7 +1081,7 @@ where
     Network: NetworkInfo + Peers + Clone + 'static,
     Tasks: TaskSpawner + Clone + 'static,
     Events: CanonStateSubscriptions + Clone + 'static,
-    EvmConfig: ConfigureEvmEnv + 'static,
+    EvmConfig: ConfigureEvm + 'static,
 {
     /// Register Eth Namespace
     ///
@@ -1203,7 +1223,9 @@ where
                     .entry(namespace)
                     .or_insert_with(|| match namespace {
                         RethRpcModule::Admin => {
-                            AdminApi::new(self.network.clone()).into_rpc().into()
+                            AdminApi::new(self.network.clone(), self.provider.chain_spec())
+                                .into_rpc()
+                                .into()
                         }
                         RethRpcModule::Debug => DebugApi::new(
                             self.provider.clone(),
@@ -1329,6 +1351,7 @@ where
             blocking_task_pool.clone(),
             fee_history_cache,
             self.evm_config.clone(),
+            self.eth_raw_transaction_forwarder.clone(),
         );
         let filter = EthFilter::new(
             self.provider.clone(),
@@ -1436,58 +1459,43 @@ where
 ///
 /// Once the [RpcModule] is built via [RpcModuleBuilder] the servers can be started, See also
 /// [ServerBuilder::build] and [Server::start](jsonrpsee::server::Server::start).
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct RpcServerConfig {
     /// Configs for JSON-RPC Http.
-    http_server_config: Option<ServerBuilder>,
+    http_server_config: Option<ServerBuilder<Identity, Identity>>,
     /// Allowed CORS Domains for http
     http_cors_domains: Option<String>,
     /// Address where to bind the http server to
     http_addr: Option<SocketAddr>,
     /// Configs for WS server
-    ws_server_config: Option<ServerBuilder>,
+    ws_server_config: Option<ServerBuilder<Identity, Identity>>,
     /// Allowed CORS Domains for ws.
     ws_cors_domains: Option<String>,
     /// Address where to bind the ws server to
     ws_addr: Option<SocketAddr>,
     /// Configs for JSON-RPC IPC server
-    ipc_server_config: Option<IpcServerBuilder>,
+    ipc_server_config: Option<IpcServerBuilder<Identity, Identity>>,
     /// The Endpoint where to launch the ipc server
-    ipc_endpoint: Option<Endpoint>,
+    ipc_endpoint: Option<String>,
     /// JWT secret for authentication
     jwt_secret: Option<JwtSecret>,
-}
-
-impl fmt::Debug for RpcServerConfig {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("RpcServerConfig")
-            .field("http_server_config", &self.http_server_config)
-            .field("http_cors_domains", &self.http_cors_domains)
-            .field("http_addr", &self.http_addr)
-            .field("ws_server_config", &self.ws_server_config)
-            .field("ws_addr", &self.ws_addr)
-            .field("ipc_server_config", &self.ipc_server_config)
-            .field("ipc_endpoint", &self.ipc_endpoint.as_ref().map(|endpoint| endpoint.path()))
-            .field("jwt_secret", &self.jwt_secret)
-            .finish()
-    }
 }
 
 /// === impl RpcServerConfig ===
 
 impl RpcServerConfig {
     /// Creates a new config with only http set
-    pub fn http(config: ServerBuilder) -> Self {
+    pub fn http(config: ServerBuilder<Identity, Identity>) -> Self {
         Self::default().with_http(config)
     }
 
     /// Creates a new config with only ws set
-    pub fn ws(config: ServerBuilder) -> Self {
+    pub fn ws(config: ServerBuilder<Identity, Identity>) -> Self {
         Self::default().with_ws(config)
     }
 
     /// Creates a new config with only ipc set
-    pub fn ipc(config: IpcServerBuilder) -> Self {
+    pub fn ipc(config: IpcServerBuilder<Identity, Identity>) -> Self {
         Self::default().with_ipc(config)
     }
 
@@ -1495,7 +1503,7 @@ impl RpcServerConfig {
     ///
     /// Note: this always configures an [EthSubscriptionIdProvider] [IdProvider] for convenience.
     /// To set a custom [IdProvider], please use [Self::with_id_provider].
-    pub fn with_http(mut self, config: ServerBuilder) -> Self {
+    pub fn with_http(mut self, config: ServerBuilder<Identity, Identity>) -> Self {
         self.http_server_config =
             Some(config.set_id_provider(EthSubscriptionIdProvider::default()));
         self
@@ -1522,7 +1530,7 @@ impl RpcServerConfig {
     ///
     /// Note: this always configures an [EthSubscriptionIdProvider] [IdProvider] for convenience.
     /// To set a custom [IdProvider], please use [Self::with_id_provider].
-    pub fn with_ws(mut self, config: ServerBuilder) -> Self {
+    pub fn with_ws(mut self, config: ServerBuilder<Identity, Identity>) -> Self {
         self.ws_server_config = Some(config.set_id_provider(EthSubscriptionIdProvider::default()));
         self
     }
@@ -1547,7 +1555,7 @@ impl RpcServerConfig {
     ///
     /// Note: this always configures an [EthSubscriptionIdProvider] [IdProvider] for convenience.
     /// To set a custom [IdProvider], please use [Self::with_id_provider].
-    pub fn with_ipc(mut self, config: IpcServerBuilder) -> Self {
+    pub fn with_ipc(mut self, config: IpcServerBuilder<Identity, Identity>) -> Self {
         self.ipc_server_config = Some(config.set_id_provider(EthSubscriptionIdProvider::default()));
         self
     }
@@ -1576,7 +1584,7 @@ impl RpcServerConfig {
     ///
     /// Default is [DEFAULT_IPC_ENDPOINT]
     pub fn with_ipc_endpoint(mut self, path: impl Into<String>) -> Self {
-        self.ipc_endpoint = Some(Endpoint::new(path.into()));
+        self.ipc_endpoint = Some(path.into());
         self
     }
 
@@ -1605,14 +1613,24 @@ impl RpcServerConfig {
         self.ws_addr
     }
 
-    /// Returns the [Endpoint] of the ipc server
-    pub fn ipc_endpoint(&self) -> Option<&Endpoint> {
-        self.ipc_endpoint.as_ref()
+    /// Returns the endpoint of the ipc server
+    pub fn ipc_endpoint(&self) -> Option<String> {
+        self.ipc_endpoint.clone()
     }
 
     /// Convenience function to do [RpcServerConfig::build] and [RpcServer::start] in one step
     pub async fn start(self, modules: TransportRpcModules) -> Result<RpcServerHandle, RpcError> {
         self.build(&modules).await?.start(modules).await
+    }
+
+    /// Creates the [CorsLayer] if any
+    fn maybe_cors_layer(cors: Option<String>) -> Result<Option<CorsLayer>, CorsDomainError> {
+        cors.as_deref().map(cors::create_cors_layer).transpose()
+    }
+
+    /// Creates the [AuthLayer] if any
+    fn maybe_jwt_layer(&self) -> Option<AuthLayer<JwtAuthValidator>> {
+        self.jwt_secret.clone().map(|secret| AuthLayer::new(JwtAuthValidator::new(secret)))
     }
 
     /// Builds the ws and http server(s).
@@ -1626,7 +1644,6 @@ impl RpcServerConfig {
             Ipv4Addr::LOCALHOST,
             DEFAULT_HTTP_RPC_PORT,
         )));
-        let jwt_secret = self.jwt_secret.clone();
 
         let ws_socket_addr = self
             .ws_addr
@@ -1652,33 +1669,39 @@ impl RpcServerConfig {
             }
             .cloned();
 
-            let secret = self.jwt_secret.clone();
-
             // we merge this into one server using the http setup
             self.ws_server_config.take();
 
             modules.config.ensure_ws_http_identical()?;
 
             let builder = self.http_server_config.take().expect("http_server_config is Some");
-            let (server, addr) = WsHttpServerKind::build(
-                builder,
-                http_socket_addr,
-                cors,
-                secret,
-                ServerKind::WsHttp(http_socket_addr),
-                modules
-                    .http
-                    .as_ref()
-                    .or(modules.ws.as_ref())
-                    .map(RpcServerMetrics::new)
-                    .unwrap_or_default(),
-            )
-            .await?;
+            let server = builder
+                .set_http_middleware(
+                    tower::ServiceBuilder::new()
+                        .option_layer(Self::maybe_cors_layer(cors)?)
+                        .option_layer(self.maybe_jwt_layer()),
+                )
+                .set_rpc_middleware(
+                    RpcServiceBuilder::new().layer(
+                        modules
+                            .http
+                            .as_ref()
+                            .or(modules.ws.as_ref())
+                            .map(RpcRequestMetrics::same_port)
+                            .unwrap_or_default(),
+                    ),
+                )
+                .build(http_socket_addr)
+                .await
+                .map_err(|err| RpcError::server_error(err, ServerKind::WsHttp(http_socket_addr)))?;
+            let addr = server
+                .local_addr()
+                .map_err(|err| RpcError::server_error(err, ServerKind::WsHttp(http_socket_addr)))?;
             return Ok(WsHttpServer {
                 http_local_addr: Some(addr),
                 ws_local_addr: Some(addr),
                 server: WsHttpServers::SamePort(server),
-                jwt_secret,
+                jwt_secret: self.jwt_secret.clone(),
             })
         }
 
@@ -1688,32 +1711,48 @@ impl RpcServerConfig {
         let mut ws_local_addr = None;
         let mut ws_server = None;
         if let Some(builder) = self.ws_server_config.take() {
-            let builder = builder.ws_only();
-            let (server, addr) = WsHttpServerKind::build(
-                builder,
-                ws_socket_addr,
-                self.ws_cors_domains.take(),
-                self.jwt_secret.clone(),
-                ServerKind::WS(ws_socket_addr),
-                modules.ws.as_ref().map(RpcServerMetrics::new).unwrap_or_default(),
-            )
-            .await?;
+            let server = builder
+                .ws_only()
+                .set_http_middleware(
+                    tower::ServiceBuilder::new()
+                        .option_layer(Self::maybe_cors_layer(self.ws_cors_domains.clone())?)
+                        .option_layer(self.maybe_jwt_layer()),
+                )
+                .set_rpc_middleware(
+                    RpcServiceBuilder::new()
+                        .layer(modules.ws.as_ref().map(RpcRequestMetrics::ws).unwrap_or_default()),
+                )
+                .build(ws_socket_addr)
+                .await
+                .map_err(|err| RpcError::server_error(err, ServerKind::WS(ws_socket_addr)))?;
+            let addr = server
+                .local_addr()
+                .map_err(|err| RpcError::server_error(err, ServerKind::WS(ws_socket_addr)))?;
+
             ws_local_addr = Some(addr);
             ws_server = Some(server);
         }
 
         if let Some(builder) = self.http_server_config.take() {
-            let builder = builder.http_only();
-            let (server, addr) = WsHttpServerKind::build(
-                builder,
-                http_socket_addr,
-                self.http_cors_domains.take(),
-                self.jwt_secret.clone(),
-                ServerKind::Http(http_socket_addr),
-                modules.http.as_ref().map(RpcServerMetrics::new).unwrap_or_default(),
-            )
-            .await?;
-            http_local_addr = Some(addr);
+            let server = builder
+                .http_only()
+                .set_http_middleware(
+                    tower::ServiceBuilder::new()
+                        .option_layer(Self::maybe_cors_layer(self.http_cors_domains.clone())?)
+                        .option_layer(self.maybe_jwt_layer()),
+                )
+                .set_rpc_middleware(
+                    RpcServiceBuilder::new().layer(
+                        modules.http.as_ref().map(RpcRequestMetrics::http).unwrap_or_default(),
+                    ),
+                )
+                .build(http_socket_addr)
+                .await
+                .map_err(|err| RpcError::server_error(err, ServerKind::Http(http_socket_addr)))?;
+            let local_addr = server
+                .local_addr()
+                .map_err(|err| RpcError::server_error(err, ServerKind::Http(http_socket_addr)))?;
+            http_local_addr = Some(local_addr);
             http_server = Some(server);
         }
 
@@ -1721,7 +1760,7 @@ impl RpcServerConfig {
             http_local_addr,
             ws_local_addr,
             server: WsHttpServers::DifferentPort { http: http_server, ws: ws_server },
-            jwt_secret,
+            jwt_secret: self.jwt_secret.clone(),
         })
     }
 
@@ -1735,11 +1774,11 @@ impl RpcServerConfig {
         server.ws_http = self.build_ws_http(modules).await?;
 
         if let Some(builder) = self.ipc_server_config {
-            let metrics = modules.ipc.as_ref().map(RpcServerMetrics::new).unwrap_or_default();
-            let ipc_path = self
-                .ipc_endpoint
-                .unwrap_or_else(|| Endpoint::new(DEFAULT_IPC_ENDPOINT.to_string()));
-            let ipc = builder.set_logger(metrics).build(ipc_path.path())?;
+            let metrics = modules.ipc.as_ref().map(RpcRequestMetrics::ipc).unwrap_or_default();
+            let ipc_path = self.ipc_endpoint.unwrap_or_else(|| DEFAULT_IPC_ENDPOINT.into());
+            let ipc = builder
+                .set_rpc_middleware(IpcRpcServiceBuilder::new().layer(metrics))
+                .build(ipc_path);
             server.ipc = Some(ipc);
         }
 
@@ -1873,10 +1912,7 @@ impl TransportRpcModules {
     /// Fails if any of the methods in other is present already.
     ///
     /// Returns [Ok(false)] if no http transport is configured.
-    pub fn merge_http(
-        &mut self,
-        other: impl Into<Methods>,
-    ) -> Result<bool, jsonrpsee::core::error::Error> {
+    pub fn merge_http(&mut self, other: impl Into<Methods>) -> Result<bool, RegisterMethodError> {
         if let Some(ref mut http) = self.http {
             return http.merge(other.into()).map(|_| true)
         }
@@ -1888,10 +1924,7 @@ impl TransportRpcModules {
     /// Fails if any of the methods in other is present already.
     ///
     /// Returns [Ok(false)] if no ws transport is configured.
-    pub fn merge_ws(
-        &mut self,
-        other: impl Into<Methods>,
-    ) -> Result<bool, jsonrpsee::core::error::Error> {
+    pub fn merge_ws(&mut self, other: impl Into<Methods>) -> Result<bool, RegisterMethodError> {
         if let Some(ref mut ws) = self.ws {
             return ws.merge(other.into()).map(|_| true)
         }
@@ -1903,10 +1936,7 @@ impl TransportRpcModules {
     /// Fails if any of the methods in other is present already.
     ///
     /// Returns [Ok(false)] if no ipc transport is configured.
-    pub fn merge_ipc(
-        &mut self,
-        other: impl Into<Methods>,
-    ) -> Result<bool, jsonrpsee::core::error::Error> {
+    pub fn merge_ipc(&mut self, other: impl Into<Methods>) -> Result<bool, RegisterMethodError> {
         if let Some(ref mut ipc) = self.ipc {
             return ipc.merge(other.into()).map(|_| true)
         }
@@ -1919,7 +1949,7 @@ impl TransportRpcModules {
     pub fn merge_configured(
         &mut self,
         other: impl Into<Methods>,
-    ) -> Result<(), jsonrpsee::core::error::Error> {
+    ) -> Result<(), RegisterMethodError> {
         let other = other.into();
         self.merge_http(other.clone())?;
         self.merge_ws(other.clone())?;
@@ -1946,6 +1976,15 @@ struct WsHttpServer {
     jwt_secret: Option<JwtSecret>,
 }
 
+// Define the type alias with detailed type complexity
+type WsHttpServerKind = Server<
+    Stack<
+        tower::util::Either<AuthLayer<JwtAuthValidator>, Identity>,
+        Stack<tower::util::Either<CorsLayer, Identity>, Identity>,
+    >,
+    Stack<RpcRequestMetrics, Identity>,
+>;
+
 /// Enum for holding the http and ws servers in all possible combinations.
 enum WsHttpServers {
     /// Both servers are on the same port
@@ -1967,13 +2006,13 @@ impl WsHttpServers {
         let mut http_handle = None;
         let mut ws_handle = None;
         match self {
-            WsHttpServers::SamePort(both) => {
+            WsHttpServers::SamePort(server) => {
                 // Make sure http and ws modules are identical, since we currently can't run
                 // different modules on same server
                 config.ensure_ws_http_identical()?;
 
                 if let Some(module) = http_module.or(ws_module) {
-                    let handle = both.start(module).await;
+                    let handle = server.start(module);
                     http_handle = Some(handle.clone());
                     ws_handle = Some(handle);
                 }
@@ -1982,12 +2021,12 @@ impl WsHttpServers {
                 if let Some((server, module)) =
                     http.and_then(|server| http_module.map(|module| (server, module)))
                 {
-                    http_handle = Some(server.start(module).await);
+                    http_handle = Some(server.start(module));
                 }
                 if let Some((server, module)) =
                     ws.and_then(|server| ws_module.map(|module| (server, module)))
                 {
-                    ws_handle = Some(server.start(module).await);
+                    ws_handle = Some(server.start(module));
                 }
             }
         }
@@ -2002,109 +2041,12 @@ impl Default for WsHttpServers {
     }
 }
 
-/// Http Servers Enum
-enum WsHttpServerKind {
-    /// Http server
-    Plain(Server<Identity, RpcServerMetrics>),
-    /// Http server with cors
-    WithCors(Server<Stack<CorsLayer, Identity>, RpcServerMetrics>),
-    /// Http server with auth
-    WithAuth(Server<Stack<AuthLayer<JwtAuthValidator>, Identity>, RpcServerMetrics>),
-    /// Http server with cors and auth
-    WithCorsAuth(
-        Server<Stack<AuthLayer<JwtAuthValidator>, Stack<CorsLayer, Identity>>, RpcServerMetrics>,
-    ),
-}
-
-// === impl WsHttpServerKind ===
-
-impl WsHttpServerKind {
-    /// Starts the server and returns the handle
-    async fn start(self, module: RpcModule<()>) -> ServerHandle {
-        match self {
-            WsHttpServerKind::Plain(server) => server.start(module),
-            WsHttpServerKind::WithCors(server) => server.start(module),
-            WsHttpServerKind::WithAuth(server) => server.start(module),
-            WsHttpServerKind::WithCorsAuth(server) => server.start(module),
-        }
-    }
-
-    /// Builds the server according to the given config parameters.
-    ///
-    /// Returns the address of the started server.
-    async fn build(
-        builder: ServerBuilder,
-        socket_addr: SocketAddr,
-        cors_domains: Option<String>,
-        jwt_secret: Option<JwtSecret>,
-        server_kind: ServerKind,
-        metrics: RpcServerMetrics,
-    ) -> Result<(Self, SocketAddr), RpcError> {
-        if let Some(cors) = cors_domains.as_deref().map(cors::create_cors_layer) {
-            let cors = cors.map_err(|err| RpcError::Custom(err.to_string()))?;
-
-            if let Some(secret) = jwt_secret {
-                // stack cors and auth layers
-                let middleware = tower::ServiceBuilder::new()
-                    .layer(cors)
-                    .layer(AuthLayer::new(JwtAuthValidator::new(secret.clone())));
-
-                let server = builder
-                    .set_middleware(middleware)
-                    .set_logger(metrics)
-                    .build(socket_addr)
-                    .await
-                    .map_err(|err| RpcError::from_jsonrpsee_error(err, server_kind))?;
-                let local_addr = server.local_addr()?;
-                let server = WsHttpServerKind::WithCorsAuth(server);
-                Ok((server, local_addr))
-            } else {
-                let middleware = tower::ServiceBuilder::new().layer(cors);
-                let server = builder
-                    .set_middleware(middleware)
-                    .set_logger(metrics)
-                    .build(socket_addr)
-                    .await
-                    .map_err(|err| RpcError::from_jsonrpsee_error(err, server_kind))?;
-                let local_addr = server.local_addr()?;
-                let server = WsHttpServerKind::WithCors(server);
-                Ok((server, local_addr))
-            }
-        } else if let Some(secret) = jwt_secret {
-            // jwt auth layered service
-            let middleware = tower::ServiceBuilder::new()
-                .layer(AuthLayer::new(JwtAuthValidator::new(secret.clone())));
-            let server = builder
-                .set_middleware(middleware)
-                .set_logger(metrics)
-                .build(socket_addr)
-                .await
-                .map_err(|err| {
-                    RpcError::from_jsonrpsee_error(err, ServerKind::Auth(socket_addr))
-                })?;
-            let local_addr = server.local_addr()?;
-            let server = WsHttpServerKind::WithAuth(server);
-            Ok((server, local_addr))
-        } else {
-            // plain server without any middleware
-            let server = builder
-                .set_logger(metrics)
-                .build(socket_addr)
-                .await
-                .map_err(|err| RpcError::from_jsonrpsee_error(err, server_kind))?;
-            let local_addr = server.local_addr()?;
-            let server = WsHttpServerKind::Plain(server);
-            Ok((server, local_addr))
-        }
-    }
-}
-
 /// Container type for each transport ie. http, ws, and ipc server
 pub struct RpcServer {
     /// Configured ws,http servers
     ws_http: WsHttpServer,
     /// ipc server
-    ipc: Option<IpcServer<Identity, RpcServerMetrics>>,
+    ipc: Option<IpcServer<Identity, Stack<RpcRequestMetrics, Identity>>>,
 }
 
 // === impl RpcServer ===
@@ -2128,8 +2070,8 @@ impl RpcServer {
         self.ws_http.ws_local_addr
     }
 
-    /// Returns the [`Endpoint`] of the ipc server if started.
-    pub fn ipc_endpoint(&self) -> Option<&Endpoint> {
+    /// Returns the endpoint of the ipc server if started.
+    pub fn ipc_endpoint(&self) -> Option<String> {
         self.ipc.as_ref().map(|ipc| ipc.endpoint())
     }
 
@@ -2137,7 +2079,7 @@ impl RpcServer {
     ///
     /// This returns an [RpcServerHandle] that's connected to the server task(s) until the server is
     /// stopped or the [RpcServerHandle] is dropped.
-    #[instrument(name = "start", skip_all, fields(http = ?self.http_local_addr(), ws = ?self.ws_local_addr(), ipc = ?self.ipc_endpoint().map(|ipc|ipc.path())), target = "rpc", level = "TRACE")]
+    #[instrument(name = "start", skip_all, fields(http = ?self.http_local_addr(), ws = ?self.ws_local_addr(), ipc = ?self.ipc_endpoint()), target = "rpc", level = "TRACE")]
     pub async fn start(self, modules: TransportRpcModules) -> Result<RpcServerHandle, RpcError> {
         trace!(target: "rpc", "staring RPC server");
         let Self { ws_http, ipc: ipc_server } = self;
@@ -2159,7 +2101,7 @@ impl RpcServer {
         if let Some((server, module)) =
             ipc_server.and_then(|server| ipc.map(|module| (server, module)))
         {
-            handle.ipc_endpoint = Some(server.endpoint().path().to_string());
+            handle.ipc_endpoint = Some(server.endpoint());
             handle.ipc = Some(server.start(module).await?);
         }
 
@@ -2189,7 +2131,7 @@ pub struct RpcServerHandle {
     http: Option<ServerHandle>,
     ws: Option<ServerHandle>,
     ipc_endpoint: Option<String>,
-    ipc: Option<ServerHandle>,
+    ipc: Option<reth_ipc::server::ServerHandle>,
     jwt_secret: Option<JwtSecret>,
 }
 
@@ -2223,7 +2165,7 @@ impl RpcServerHandle {
     }
 
     /// Tell the server to stop without waiting for the server to stop.
-    pub fn stop(self) -> Result<(), RpcError> {
+    pub fn stop(self) -> Result<(), AlreadyStoppedError> {
         if let Some(handle) = self.http {
             handle.stop()?
         }

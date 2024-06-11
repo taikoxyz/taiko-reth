@@ -1,10 +1,13 @@
 //! Module that interacts with MDBX.
 
 use crate::{
+    cursor::{DbCursorRO, DbCursorRW},
     database::Database,
     database_metrics::{DatabaseMetadata, DatabaseMetadataValue, DatabaseMetrics},
     metrics::DatabaseEnvMetrics,
-    tables::{TableType, Tables},
+    models::client_version::ClientVersion,
+    tables::{self, TableType, Tables},
+    transaction::{DbTx, DbTxMut},
     utils::default_page_size,
     DatabaseError,
 };
@@ -16,7 +19,12 @@ use reth_libmdbx::{
     PageSize, SyncMode, RO, RW,
 };
 use reth_tracing::tracing::error;
-use std::{ops::Deref, path::Path, sync::Arc};
+use std::{
+    ops::Deref,
+    path::Path,
+    sync::Arc,
+    time::{SystemTime, UNIX_EPOCH},
+};
 use tx::Tx;
 
 pub mod cursor;
@@ -42,9 +50,18 @@ pub enum DatabaseEnvKind {
     RW,
 }
 
+impl DatabaseEnvKind {
+    /// Returns `true` if the environment is read-write.
+    pub fn is_rw(&self) -> bool {
+        matches!(self, Self::RW)
+    }
+}
+
 /// Arguments for database initialization.
-#[derive(Debug, Default, Clone, Copy)]
+#[derive(Clone, Debug, Default)]
 pub struct DatabaseArguments {
+    /// Client version that accesses the database.
+    client_version: ClientVersion,
     /// Database log level. If [None], the default value is used.
     log_level: Option<LogLevel>,
     /// Maximum duration of a read transaction. If [None], the default value is used.
@@ -73,14 +90,24 @@ pub struct DatabaseArguments {
 }
 
 impl DatabaseArguments {
+    /// Create new database arguments with given client version.
+    pub fn new(client_version: ClientVersion) -> Self {
+        Self {
+            client_version,
+            log_level: None,
+            max_read_transaction_duration: None,
+            exclusive: None,
+        }
+    }
+
     /// Set the log level.
-    pub fn log_level(mut self, log_level: Option<LogLevel>) -> Self {
+    pub fn with_log_level(mut self, log_level: Option<LogLevel>) -> Self {
         self.log_level = log_level;
         self
     }
 
     /// Set the maximum duration of a read transaction.
-    pub fn max_read_transaction_duration(
+    pub fn with_max_read_transaction_duration(
         mut self,
         max_read_transaction_duration: Option<MaxReadTransactionDuration>,
     ) -> Self {
@@ -89,9 +116,14 @@ impl DatabaseArguments {
     }
 
     /// Set the mdbx exclusive flag.
-    pub fn exclusive(mut self, exclusive: Option<bool>) -> Self {
+    pub fn with_exclusive(mut self, exclusive: Option<bool>) -> Self {
         self.exclusive = exclusive;
         self
+    }
+
+    /// Returns the client version if any.
+    pub fn client_version(&self) -> &ClientVersion {
+        &self.client_version
     }
 }
 
@@ -188,6 +220,10 @@ impl DatabaseMetrics for DatabaseEnv {
             self.freelist().map_err(|error| error!(%error, "Failed to read db.freelist"))
         {
             metrics.push(("db.freelist", freelist as f64, vec![]));
+        }
+
+        if let Ok(stat) = self.stat().map_err(|error| error!(%error, "Failed to read db.stat")) {
+            metrics.push(("db.page_size", stat.page_size() as f64, vec![]));
         }
 
         metrics.push((
@@ -375,6 +411,27 @@ impl DatabaseEnv {
 
         Ok(())
     }
+
+    /// Records version that accesses the database with write privileges.
+    pub fn record_client_version(&self, version: ClientVersion) -> Result<(), DatabaseError> {
+        if version.is_empty() {
+            return Ok(())
+        }
+
+        let tx = self.tx_mut()?;
+        let mut version_cursor = tx.cursor_write::<tables::VersionHistory>()?;
+
+        let last_version = version_cursor.last()?.map(|(_, v)| v);
+        if Some(&version) != last_version.as_ref() {
+            version_cursor.upsert(
+                SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_secs(),
+                version,
+            )?;
+            tx.commit()?;
+        }
+
+        Ok(())
+    }
 }
 
 impl Deref for DatabaseEnv {
@@ -390,13 +447,12 @@ mod tests {
     use super::*;
     use crate::{
         abstraction::table::{Encode, Table},
-        cursor::{DbCursorRO, DbCursorRW, DbDupCursorRO, DbDupCursorRW, ReverseWalker, Walker},
+        cursor::{DbDupCursorRO, DbDupCursorRW, ReverseWalker, Walker},
         models::{AccountBeforeTx, ShardedKey},
         tables::{
             AccountsHistory, CanonicalHeaders, Headers, PlainAccountState, PlainStorageState,
         },
         test_utils::*,
-        transaction::{DbTx, DbTxMut},
         AccountChangeSets,
     };
     use reth_interfaces::db::{DatabaseWriteError, DatabaseWriteOperation};
@@ -415,8 +471,8 @@ mod tests {
 
     /// Create database for testing with specified path
     fn create_test_db_with_path(kind: DatabaseEnvKind, path: &Path) -> DatabaseEnv {
-        let env =
-            DatabaseEnv::open(path, kind, DatabaseArguments::default()).expect(ERROR_DB_CREATION);
+        let env = DatabaseEnv::open(path, kind, DatabaseArguments::new(ClientVersion::default()))
+            .expect(ERROR_DB_CREATION);
         env.create_tables().expect(ERROR_TABLE_CREATION);
         env
     }
@@ -426,6 +482,7 @@ mod tests {
     const ERROR_APPEND: &str = "Not able to append the value to the table.";
     const ERROR_UPSERT: &str = "Not able to upsert the value to the table.";
     const ERROR_GET: &str = "Not able to get value from table.";
+    const ERROR_DEL: &str = "Not able to delete from table.";
     const ERROR_COMMIT: &str = "Not able to commit transaction.";
     const ERROR_RETURN_VALUE: &str = "Mismatching result.";
     const ERROR_INIT_TX: &str = "Failed to create a MDBX transaction.";
@@ -451,8 +508,47 @@ mod tests {
         // GET
         let tx = env.tx().expect(ERROR_INIT_TX);
         let result = tx.get::<Headers>(key).expect(ERROR_GET);
-        assert!(result.expect(ERROR_RETURN_VALUE) == value);
+        assert_eq!(result.expect(ERROR_RETURN_VALUE), value);
         tx.commit().expect(ERROR_COMMIT);
+    }
+
+    #[test]
+    fn db_dup_cursor_delete_first() {
+        let db: Arc<DatabaseEnv> = create_test_db(DatabaseEnvKind::RW);
+        let tx = db.tx_mut().expect(ERROR_INIT_TX);
+
+        let mut dup_cursor = tx.cursor_dup_write::<PlainStorageState>().unwrap();
+
+        let entry_0 = StorageEntry { key: B256::with_last_byte(1), value: U256::from(0) };
+        let entry_1 = StorageEntry { key: B256::with_last_byte(1), value: U256::from(1) };
+
+        dup_cursor.upsert(Address::with_last_byte(1), entry_0).expect(ERROR_UPSERT);
+        dup_cursor.upsert(Address::with_last_byte(1), entry_1).expect(ERROR_UPSERT);
+
+        assert_eq!(
+            dup_cursor.walk(None).unwrap().collect::<Result<Vec<_>, _>>(),
+            Ok(vec![(Address::with_last_byte(1), entry_0), (Address::with_last_byte(1), entry_1),])
+        );
+
+        let mut walker = dup_cursor.walk(None).unwrap();
+        walker.delete_current().expect(ERROR_DEL);
+
+        assert_eq!(walker.next(), Some(Ok((Address::with_last_byte(1), entry_1))));
+
+        // Check the tx view - it correctly holds entry_1
+        assert_eq!(
+            tx.cursor_dup_read::<PlainStorageState>()
+                .unwrap()
+                .walk(None)
+                .unwrap()
+                .collect::<Result<Vec<_>, _>>(),
+            Ok(vec![
+                (Address::with_last_byte(1), entry_1), // This is ok - we removed entry_0
+            ])
+        );
+
+        // Check the remainder of walker
+        assert_eq!(walker.next(), None);
     }
 
     #[test]
@@ -1041,8 +1137,12 @@ mod tests {
             assert_eq!(result.expect(ERROR_RETURN_VALUE), 200);
         }
 
-        let env = DatabaseEnv::open(&path, DatabaseEnvKind::RO, Default::default())
-            .expect(ERROR_DB_CREATION);
+        let env = DatabaseEnv::open(
+            &path,
+            DatabaseEnvKind::RO,
+            DatabaseArguments::new(ClientVersion::default()),
+        )
+        .expect(ERROR_DB_CREATION);
 
         // GET
         let result =
@@ -1075,9 +1175,9 @@ mod tests {
             let mut cursor = tx.cursor_dup_read::<PlainStorageState>().unwrap();
 
             // Notice that value11 and value22 have been ordered in the DB.
-            assert!(Some(value00) == cursor.next_dup_val().unwrap());
-            assert!(Some(value11) == cursor.next_dup_val().unwrap());
-            assert!(Some(value22) == cursor.next_dup_val().unwrap());
+            assert_eq!(Some(value00), cursor.next_dup_val().unwrap());
+            assert_eq!(Some(value11), cursor.next_dup_val().unwrap());
+            assert_eq!(Some(value22), cursor.next_dup_val().unwrap());
         }
 
         // Seek value with exact subkey

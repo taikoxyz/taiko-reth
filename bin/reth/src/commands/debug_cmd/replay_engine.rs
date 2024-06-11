@@ -4,7 +4,6 @@ use crate::{
         utils::{chain_help, genesis_value_parser, SUPPORTED_CHAINS},
         DatabaseArgs, NetworkArgs,
     },
-    core::cli::runner::CliContext,
     dirs::{DataDirPath, MaybePlatformPath},
 };
 use clap::Parser;
@@ -14,16 +13,15 @@ use reth_beacon_consensus::{hooks::EngineHooks, BeaconConsensus, BeaconConsensus
 use reth_blockchain_tree::{
     BlockchainTree, BlockchainTreeConfig, ShareableBlockchainTree, TreeExternals,
 };
+use reth_cli_runner::CliContext;
 use reth_config::Config;
-use reth_db::{init_db, mdbx::DatabaseArguments, DatabaseEnv};
-use reth_interfaces::consensus::Consensus;
+use reth_consensus::Consensus;
+use reth_db::{init_db, DatabaseEnv};
 use reth_network::NetworkHandle;
 use reth_network_api::NetworkInfo;
 use reth_node_core::engine_api_store::{EngineApiStore, StoredEngineApiMessage};
 #[cfg(not(feature = "optimism"))]
 use reth_node_ethereum::{EthEngineTypes, EthEvmConfig};
-#[cfg(feature = "optimism")]
-use reth_node_optimism::{OptimismEngineTypes, OptimismEvmConfig};
 use reth_payload_builder::{PayloadBuilderHandle, PayloadBuilderService};
 use reth_primitives::{fs, ChainSpec, PruneModes};
 use reth_provider::{providers::BlockchainProvider, CanonStateSubscriptions, ProviderFactory};
@@ -32,12 +30,7 @@ use reth_stages::Pipeline;
 use reth_static_file::StaticFileProducer;
 use reth_tasks::TaskExecutor;
 use reth_transaction_pool::noop::NoopTransactionPool;
-use std::{
-    net::{SocketAddr, SocketAddrV4},
-    path::PathBuf,
-    sync::Arc,
-    time::Duration,
-};
+use std::{net::SocketAddr, path::PathBuf, sync::Arc, time::Duration};
 use tokio::sync::{mpsc, oneshot};
 use tracing::*;
 
@@ -97,11 +90,11 @@ impl Command {
             .network
             .network_config(config, self.chain.clone(), secret_key, default_peers_path)
             .with_task_executor(Box::new(task_executor))
-            .listener_addr(SocketAddr::V4(SocketAddrV4::new(self.network.addr, self.network.port)))
-            .discovery_addr(SocketAddr::V4(SocketAddrV4::new(
+            .listener_addr(SocketAddr::new(self.network.addr, self.network.port))
+            .discovery_addr(SocketAddr::new(
                 self.network.discovery.addr,
                 self.network.discovery.port,
-            )))
+            ))
             .build(ProviderFactory::new(
                 db,
                 self.chain.clone(),
@@ -124,8 +117,7 @@ impl Command {
         fs::create_dir_all(&db_path)?;
 
         // Initialize the database
-        let db =
-            Arc::new(init_db(db_path, DatabaseArguments::default().log_level(self.db.log_level))?);
+        let db = Arc::new(init_db(db_path, self.db.database_args())?);
         let provider_factory =
             ProviderFactory::new(db.clone(), self.chain.clone(), data_dir.static_files_path())?;
 
@@ -135,7 +127,7 @@ impl Command {
         let evm_config = EthEvmConfig::default();
 
         #[cfg(feature = "optimism")]
-        let evm_config = OptimismEvmConfig::default();
+        let evm_config = reth_node_optimism::OptimismEvmConfig::default();
 
         // Configure blockchain tree
         let tree_externals = TreeExternals::new(
@@ -144,11 +136,10 @@ impl Command {
             EvmProcessorFactory::new(self.chain.clone(), evm_config),
         );
         let tree = BlockchainTree::new(tree_externals, BlockchainTreeConfig::default(), None)?;
-        let blockchain_tree = ShareableBlockchainTree::new(tree);
+        let blockchain_tree = Arc::new(ShareableBlockchainTree::new(tree));
 
         // Set up the blockchain provider
-        let blockchain_db =
-            BlockchainProvider::new(provider_factory.clone(), blockchain_tree.clone())?;
+        let blockchain_db = BlockchainProvider::new(provider_factory.clone(), blockchain_tree)?;
 
         // Set up network
         let network_secret_path =
@@ -169,8 +160,10 @@ impl Command {
 
         // Optimism's payload builder is implemented on the OptimismPayloadBuilder type.
         #[cfg(feature = "optimism")]
-        let payload_builder =
-            reth_optimism_payload_builder::OptimismPayloadBuilder::new(self.chain.clone());
+        let payload_builder = reth_node_optimism::OptimismPayloadBuilder::new(
+            self.chain.clone(),
+            reth_node_optimism::OptimismEvmConfig::default(),
+        );
 
         let payload_generator = BasicPayloadJobGenerator::with_builder(
             blockchain_db.clone(),
@@ -184,7 +177,7 @@ impl Command {
         #[cfg(feature = "optimism")]
         let (payload_service, payload_builder): (
             _,
-            PayloadBuilderHandle<OptimismEngineTypes>,
+            PayloadBuilderHandle<reth_node_optimism::OptimismEngineTypes>,
         ) = PayloadBuilderService::new(payload_generator, blockchain_db.canonical_state_stream());
 
         #[cfg(not(feature = "optimism"))]

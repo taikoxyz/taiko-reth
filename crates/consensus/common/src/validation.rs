@@ -1,8 +1,12 @@
 //! Collection of methods for block validation.
 
-use reth_interfaces::{consensus::ConsensusError, RethResult};
+use reth_consensus::ConsensusError;
+use reth_interfaces::RethResult;
 use reth_primitives::{
-    constants::eip4844::{DATA_GAS_PER_BLOB, MAX_DATA_GAS_PER_BLOCK},
+    constants::{
+        eip4844::{DATA_GAS_PER_BLOB, MAX_DATA_GAS_PER_BLOCK},
+        MAXIMUM_EXTRA_DATA_SIZE,
+    },
     BlockNumber, ChainSpec, GotExpected, Hardfork, Header, InvalidTransactionError, SealedBlock,
     SealedHeader, Transaction, TransactionSignedEcRecovered, TxEip1559, TxEip2930, TxEip4844,
     TxLegacy,
@@ -15,7 +19,7 @@ pub fn validate_header_standalone(
     header: &SealedHeader,
     chain_spec: &ChainSpec,
 ) -> Result<(), ConsensusError> {
-    // Gas used needs to be less then gas limit. Gas used is going to be check after execution.
+    // Gas used needs to be less than gas limit. Gas used is going to be checked after execution.
     if header.gas_used > header.gas_limit {
         return Err(ConsensusError::HeaderGasUsedExceedsGasLimit {
             gas_used: header.gas_used,
@@ -55,7 +59,7 @@ pub fn validate_header_standalone(
     Ok(())
 }
 
-/// Validate a transaction in regards to a block header.
+/// Validate a transaction with regard to a block header.
 ///
 /// The only parameter from the header that affects the transaction is `base_fee`.
 pub fn validate_transaction_regarding_header(
@@ -65,6 +69,7 @@ pub fn validate_transaction_regarding_header(
     at_timestamp: u64,
     base_fee: Option<u64>,
 ) -> Result<(), ConsensusError> {
+    #[allow(unreachable_patterns)]
     let chain_id = match transaction {
         Transaction::Legacy(TxLegacy { chain_id, .. }) => {
             // EIP-155: Simple replay attack protection: https://eips.ethereum.org/EIPS/eip-155
@@ -120,8 +125,10 @@ pub fn validate_transaction_regarding_header(
 
             Some(*chain_id)
         }
-        #[cfg(feature = "optimism")]
-        Transaction::Deposit(_) => None,
+        _ => {
+            // Op Deposit
+            None
+        }
     };
     if let Some(chain_id) = chain_id {
         if chain_id != chain_spec.chain().id() {
@@ -248,7 +255,7 @@ pub fn validate_block_standalone(
     Ok(())
 }
 
-/// Validate block in regards to chain (parent)
+/// Validate block with regard to chain (parent)
 ///
 /// Checks:
 ///  If we already know the block.
@@ -282,12 +289,10 @@ pub fn validate_block_regarding_chain<PROV: HeaderProvider + WithdrawalsProvider
 ///  * `parent_beacon_block_root` exists as a header field
 ///  * `blob_gas_used` is less than or equal to `MAX_DATA_GAS_PER_BLOCK`
 ///  * `blob_gas_used` is a multiple of `DATA_GAS_PER_BLOB`
+///  * `excess_blob_gas` is a multiple of `DATA_GAS_PER_BLOB`
 pub fn validate_4844_header_standalone(header: &SealedHeader) -> Result<(), ConsensusError> {
     let blob_gas_used = header.blob_gas_used.ok_or(ConsensusError::BlobGasUsedMissing)?;
-
-    if header.excess_blob_gas.is_none() {
-        return Err(ConsensusError::ExcessBlobGasMissing)
-    }
+    let excess_blob_gas = header.excess_blob_gas.ok_or(ConsensusError::ExcessBlobGasMissing)?;
 
     if header.parent_beacon_block_root.is_none() {
         return Err(ConsensusError::ParentBeaconBlockRootMissing)
@@ -307,7 +312,28 @@ pub fn validate_4844_header_standalone(header: &SealedHeader) -> Result<(), Cons
         })
     }
 
+    // `excess_blob_gas` must also be a multiple of `DATA_GAS_PER_BLOB`. This will be checked later
+    // (via `calculate_excess_blob_gas`), but it doesn't hurt to catch the problem sooner.
+    if excess_blob_gas % DATA_GAS_PER_BLOB != 0 {
+        return Err(ConsensusError::ExcessBlobGasNotMultipleOfBlobGasPerBlob {
+            excess_blob_gas,
+            blob_gas_per_blob: DATA_GAS_PER_BLOB,
+        })
+    }
+
     Ok(())
+}
+
+/// Validates the header's extradata according to the beacon consensus rules.
+///
+/// From yellow paper: extraData: An arbitrary byte array containing data relevant to this block.
+/// This must be 32 bytes or fewer; formally Hx.
+pub fn validate_header_extradata(header: &Header) -> Result<(), ConsensusError> {
+    if header.extra_data.len() > MAXIMUM_EXTRA_DATA_SIZE {
+        Err(ConsensusError::ExtraDataExceedsMax { len: header.extra_data.len() })
+    } else {
+        Ok(())
+    }
 }
 
 #[cfg(test)]
@@ -320,8 +346,8 @@ mod tests {
     };
     use reth_primitives::{
         hex_literal::hex, proofs, Account, Address, BlockBody, BlockHash, BlockHashOrNumber, Bytes,
-        ChainSpecBuilder, Signature, TransactionKind, TransactionSigned, Withdrawal, Withdrawals,
-        MAINNET, U256,
+        ChainSpecBuilder, Signature, TransactionSigned, TxKind, Withdrawal, Withdrawals, MAINNET,
+        U256,
     };
     use std::ops::RangeBounds;
 
@@ -437,7 +463,7 @@ mod tests {
             nonce,
             gas_price: 0x28f000fff,
             gas_limit: 10,
-            to: TransactionKind::Call(Address::default()),
+            to: TxKind::Call(Address::default()),
             value: U256::from(3_u64),
             input: Bytes::from(vec![1, 2]),
             access_list: Default::default(),
@@ -459,7 +485,7 @@ mod tests {
             max_priority_fee_per_gas: 0x28f000fff,
             max_fee_per_blob_gas: 0x7,
             gas_limit: 10,
-            to: TransactionKind::Call(Address::default()),
+            to: TxKind::Call(Address::default()),
             value: U256::from(3_u64),
             input: Bytes::from(vec![1, 2]),
             access_list: Default::default(),

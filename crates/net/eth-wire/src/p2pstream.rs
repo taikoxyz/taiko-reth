@@ -40,7 +40,7 @@ const MAX_P2P_MESSAGE_ID: u8 = P2PMessageID::Pong as u8;
 
 /// [`HANDSHAKE_TIMEOUT`] determines the amount of time to wait before determining that a `p2p`
 /// handshake has timed out.
-const HANDSHAKE_TIMEOUT: Duration = Duration::from_secs(10);
+pub(crate) const HANDSHAKE_TIMEOUT: Duration = Duration::from_secs(10);
 
 /// [`PING_TIMEOUT`] determines the amount of time to wait before determining that a `p2p` ping has
 /// timed out.
@@ -97,9 +97,7 @@ where
         trace!(?hello, "sending p2p hello to peer");
 
         // send our hello message with the Sink
-        let mut raw_hello_bytes = Vec::with_capacity(142);
-        P2PMessage::Hello(hello.message()).encode(&mut raw_hello_bytes);
-        self.inner.send(raw_hello_bytes.into()).await?;
+        self.inner.send(alloy_rlp::encode(P2PMessage::Hello(hello.message())).into()).await?;
 
         let first_message_bytes = tokio::time::timeout(HANDSHAKE_TIMEOUT, self.inner.next())
             .await
@@ -228,7 +226,7 @@ where
 /// This stream emits _non-empty_ Bytes that start with the normalized message id, so that the first
 /// byte of each message starts from 0. If this stream only supports a single capability, for
 /// example `eth` then the first byte of each message will match
-/// [EthMessageID](crate::types::EthMessageID).
+/// [EthMessageID](reth_eth_wire_types::message::EthMessageID).
 #[pin_project]
 #[derive(Debug)]
 pub struct P2PStream<S> {
@@ -305,18 +303,12 @@ impl<S> P2PStream<S> {
 
     /// Queues in a _snappy_ encoded [`P2PMessage::Pong`] message.
     fn send_pong(&mut self) {
-        let pong = P2PMessage::Pong;
-        let mut pong_bytes = BytesMut::with_capacity(pong.length());
-        pong.encode(&mut pong_bytes);
-        self.outgoing_messages.push_back(pong_bytes.freeze());
+        self.outgoing_messages.push_back(Bytes::from(alloy_rlp::encode(P2PMessage::Pong)));
     }
 
     /// Queues in a _snappy_ encoded [`P2PMessage::Ping`] message.
     fn send_ping(&mut self) {
-        let ping = P2PMessage::Ping;
-        let mut ping_bytes = BytesMut::with_capacity(ping.length());
-        ping.encode(&mut ping_bytes);
-        self.outgoing_messages.push_back(ping_bytes.freeze());
+        self.outgoing_messages.push_back(Bytes::from(alloy_rlp::encode(P2PMessage::Ping)));
     }
 }
 
@@ -343,10 +335,10 @@ impl<S> DisconnectP2P for P2PStream<S> {
         // clear any buffered messages and queue in
         self.outgoing_messages.clear();
         let disconnect = P2PMessage::Disconnect(reason);
-        let mut buf = BytesMut::with_capacity(disconnect.length());
+        let mut buf = Vec::with_capacity(disconnect.length());
         disconnect.encode(&mut buf);
 
-        let mut compressed = BytesMut::zeroed(1 + snap::raw::max_compress_len(buf.len() - 1));
+        let mut compressed = vec![0u8; 1 + snap::raw::max_compress_len(buf.len() - 1)];
         let compressed_size =
             self.encoder.compress(&buf[1..], &mut compressed[1..]).map_err(|err| {
                 debug!(
@@ -365,7 +357,7 @@ impl<S> DisconnectP2P for P2PStream<S> {
         // message
         compressed[0] = buf[0];
 
-        self.outgoing_messages.push_back(compressed.freeze());
+        self.outgoing_messages.push_back(compressed.into());
         self.disconnecting = true;
         Ok(())
     }
@@ -486,7 +478,7 @@ where
                     this.pinger.on_pong()?
                 }
                 _ if id == P2PMessageID::Disconnect as u8 => {
-                    // At this point, the `decempres_buf` contains the snappy decompressed
+                    // At this point, the `decompress_buf` contains the snappy decompressed
                     // disconnect message.
                     //
                     // It's possible we already tried to RLP decode this, but it was snappy
@@ -587,6 +579,11 @@ where
                 message_size: item.len(),
                 max_size: MAX_PAYLOAD_SIZE,
             })
+        }
+
+        if item.is_empty() {
+            // empty messages are not allowed
+            return Err(P2PStreamError::EmptyProtocolMessage)
         }
 
         // ensure we have free capacity
@@ -897,11 +894,10 @@ mod tests {
 
             // Unrolled `disconnect` method, without compression
             p2p_stream.outgoing_messages.clear();
-            let disconnect = P2PMessage::Disconnect(DisconnectReason::SubprotocolSpecific);
-            let mut buf = BytesMut::with_capacity(disconnect.length());
-            disconnect.encode(&mut buf);
 
-            p2p_stream.outgoing_messages.push_back(buf.freeze());
+            p2p_stream.outgoing_messages.push_back(Bytes::from(alloy_rlp::encode(
+                P2PMessage::Disconnect(DisconnectReason::SubprotocolSpecific),
+            )));
             p2p_stream.disconnecting = true;
             p2p_stream.close().await.unwrap();
         });
@@ -1031,10 +1027,7 @@ mod tests {
         let snappy_ping = b"\x02\x01\0\xc0";
         let ping = P2PMessage::decode(&mut &snappy_ping[..]).unwrap();
         assert!(matches!(ping, P2PMessage::Ping));
-
-        let mut buf = BytesMut::with_capacity(ping.length());
-        ping.encode(&mut buf);
-        assert_eq!(buf.as_ref(), &snappy_ping[..]);
+        assert_eq!(alloy_rlp::encode(ping), &snappy_ping[..]);
     }
 
     #[test]
@@ -1042,9 +1035,6 @@ mod tests {
         let snappy_pong = b"\x03\x01\0\xc0";
         let pong = P2PMessage::decode(&mut &snappy_pong[..]).unwrap();
         assert!(matches!(pong, P2PMessage::Pong));
-
-        let mut buf = BytesMut::with_capacity(pong.length());
-        pong.encode(&mut buf);
-        assert_eq!(buf.as_ref(), &snappy_pong[..]);
+        assert_eq!(alloy_rlp::encode(pong), &snappy_pong[..]);
     }
 }

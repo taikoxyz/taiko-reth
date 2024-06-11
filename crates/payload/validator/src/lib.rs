@@ -14,7 +14,7 @@ use reth_payload_builder::TaikoExecutionPayload;
 use reth_primitives::{Block, Header, B256, EMPTY_OMMER_ROOT_HASH};
 use reth_primitives::{ChainSpec, SealedBlock};
 use reth_rpc_types::{engine::MaybeCancunPayloadFields, ExecutionPayload, PayloadError};
-use reth_rpc_types_compat::engine::payload::{try_into_block, validate_block_hash};
+use reth_rpc_types_compat::engine::payload::try_into_block;
 use std::sync::Arc;
 
 /// Execution payload validator.;
@@ -105,30 +105,35 @@ impl ExecutionPayloadValidator {
         #[cfg(feature = "taiko")] payload: TaikoExecutionPayload,
         cancun_fields: MaybeCancunPayloadFields,
     ) -> Result<SealedBlock, PayloadError> {
-        let block_hash = payload.block_hash();
+        let expected_hash = payload.block_hash();
 
         // First parse the block
         #[cfg(not(feature = "taiko"))]
-        let block = try_into_block(payload, cancun_fields.parent_beacon_block_root())?;
+        let block = try_into_block(payload, cancun_fields.parent_beacon_block_root())?.seal_slow();
         #[cfg(feature = "taiko")]
         let block = if payload.payload_inner.as_v1().transactions.is_empty()
             && (payload.payload_inner.withdrawals().is_none()
                 || payload.payload_inner.withdrawals().is_some_and(|w| w.is_empty()))
         {
-            create_taiko_block(payload, cancun_fields.parent_beacon_block_root())?
+            create_taiko_block(payload, cancun_fields.parent_beacon_block_root())?.seal_slow()
         } else {
-            try_into_block(payload.payload_inner, cancun_fields.parent_beacon_block_root())?
+            try_into_block(payload.payload_inner, cancun_fields.parent_beacon_block_root())?.seal_slow()
         };
 
-        let cancun_active = self.is_cancun_active_at_timestamp(block.timestamp);
+        // Ensure the hash included in the payload matches the block hash
+        if expected_hash != sealed_block.hash() {
+            return Err(PayloadError::BlockHash {
+                execution: sealed_block.hash(),
+                consensus: expected_hash,
+            })
+        }
 
-        if !cancun_active && block.has_blob_transactions() {
+        let cancun_active = self.is_cancun_active_at_timestamp(sealed_block.timestamp);
+
+        if !cancun_active && sealed_block.has_blob_transactions() {
             // cancun not active but blob transactions present
             return Err(PayloadError::PreCancunBlockWithBlobTransactions);
         }
-
-        // Ensure the hash included in the payload matches the block hash
-        let sealed_block = validate_block_hash(block_hash, block)?;
 
         // EIP-4844 checks
         self.ensure_matching_blob_versioned_hashes(&sealed_block, &cancun_fields)?;

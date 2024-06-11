@@ -16,17 +16,16 @@
 #![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
 
 use reth_beacon_consensus::BeaconEngineMessage;
-use reth_interfaces::{
-    consensus::{Consensus, ConsensusError},
-    executor::{BlockExecutionError, BlockValidationError},
-};
-use reth_node_api::{ConfigureEvm, EngineTypes};
+use reth_consensus::{Consensus, ConsensusError};
+use reth_engine_primitives::EngineTypes;
+use reth_evm::ConfigureEvm;
+use reth_interfaces::executor::{BlockExecutionError, BlockValidationError};
 use reth_primitives::{
     constants::{EMPTY_RECEIPTS, EMPTY_TRANSACTIONS, ETHEREUM_BLOCK_GAS_LIMIT},
     eip4844::calculate_excess_blob_gas,
     proofs, Block, BlockBody, BlockHash, BlockHashOrNumber, BlockNumber, BlockWithSenders, Bloom,
-    ChainSpec, Header, ReceiptWithBloom, SealedBlock, SealedHeader, TransactionSigned, B256,
-    EMPTY_OMMER_ROOT_HASH, U256,
+    ChainSpec, Header, ReceiptWithBloom, SealedBlock, SealedHeader, TransactionSigned, Withdrawals,
+    B256, U256,
 };
 use reth_provider::{
     BlockExecutor, BlockReaderIdExt, BundleStateWithReceipts, CanonStateNotificationSender,
@@ -271,24 +270,25 @@ impl StorageInner {
     pub(crate) fn build_header_template(
         &self,
         transactions: &[TransactionSigned],
+        ommers: &[Header],
+        withdrawals: Option<&Withdrawals>,
         chain_spec: Arc<ChainSpec>,
     ) -> Header {
         let timestamp = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_secs();
 
         // check previous block for base fee
-        let base_fee_per_gas = self
-            .headers
-            .get(&self.best_block)
-            .and_then(|parent| parent.next_block_base_fee(chain_spec.base_fee_params(timestamp)));
+        let base_fee_per_gas = self.headers.get(&self.best_block).and_then(|parent| {
+            parent.next_block_base_fee(chain_spec.base_fee_params_at_timestamp(timestamp))
+        });
 
         let mut header = Header {
             parent_hash: self.best_hash,
-            ommers_hash: EMPTY_OMMER_ROOT_HASH,
+            ommers_hash: proofs::calculate_ommers_root(ommers),
             beneficiary: Default::default(),
             state_root: Default::default(),
             transactions_root: Default::default(),
             receipts_root: Default::default(),
-            withdrawals_root: None,
+            withdrawals_root: withdrawals.map(|w| proofs::calculate_withdrawals_root(w)),
             logs_bloom: Default::default(),
             difficulty: U256::from(2),
             number: self.best_block + 1,
@@ -409,8 +409,8 @@ impl StorageInner {
         // calculate the state root
         let state_root = client
             .latest()
-            .map_err(|_| BlockExecutionError::ProviderError)?
-            .state_root(bundle_state)
+            .map_err(BlockExecutionError::LatestBlock)?
+            .state_root(bundle_state.state())
             .unwrap();
         header.state_root = state_root;
         Ok(header)
@@ -422,6 +422,8 @@ impl StorageInner {
     pub(crate) fn build_and_execute<EvmConfig>(
         &mut self,
         transactions: Vec<TransactionSigned>,
+        ommers: Vec<Header>,
+        withdrawals: Option<Withdrawals>,
         client: &impl StateProviderFactory,
         chain_spec: Arc<ChainSpec>,
         evm_config: EvmConfig,
@@ -429,17 +431,29 @@ impl StorageInner {
     where
         EvmConfig: ConfigureEvm,
     {
-        let header = self.build_header_template(&transactions, chain_spec.clone());
+        let header = self.build_header_template(
+            &transactions,
+            &ommers,
+            withdrawals.as_ref(),
+            chain_spec.clone(),
+        );
 
-        let block = Block { header, body: transactions, ommers: vec![], withdrawals: None }
-            .with_recovered_senders()
-            .ok_or(BlockExecutionError::Validation(BlockValidationError::SenderRecoveryError))?;
+        let block = Block {
+            header,
+            body: transactions,
+            ommers: ommers.clone(),
+            withdrawals: withdrawals.clone(),
+        }
+        .with_recovered_senders()
+        .ok_or(BlockExecutionError::Validation(BlockValidationError::SenderRecoveryError))?;
 
         trace!(target: "consensus::auto", transactions=?&block.body, "executing transactions");
 
         // now execute the block
         let db = State::builder()
-            .with_database_boxed(Box::new(StateProviderDatabase::new(client.latest().unwrap())))
+            .with_database_boxed(Box::new(StateProviderDatabase::new(
+                client.latest().map_err(BlockExecutionError::LatestBlock)?,
+            )))
             .with_bundle_update()
             .build();
         let mut executor = EVMProcessor::new_with_state(chain_spec.clone(), db, evm_config);
@@ -447,18 +461,19 @@ impl StorageInner {
         let (bundle_state, gas_used) = self.execute(&block, &mut executor)?;
 
         let Block { header, body, .. } = block.block;
-        let body = BlockBody { transactions: body, ommers: vec![], withdrawals: None };
+        let body = BlockBody { transactions: body, ommers, withdrawals };
 
-        let mut blob_gas_used = None;
-        if chain_spec.is_cancun_active_at_timestamp(header.timestamp) {
+        let blob_gas_used = if chain_spec.is_cancun_active_at_timestamp(header.timestamp) {
             let mut sum_blob_gas_used = 0;
             for tx in &body.transactions {
                 if let Some(blob_tx) = tx.transaction.as_eip4844() {
                     sum_blob_gas_used += blob_tx.blob_gas();
                 }
             }
-            blob_gas_used = Some(sum_blob_gas_used);
-        }
+            Some(sum_blob_gas_used)
+        } else {
+            None
+        };
 
         trace!(target: "consensus::auto", ?bundle_state, ?header, ?body, "executed block, calculating state root and completing header");
 

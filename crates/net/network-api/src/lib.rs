@@ -14,13 +14,14 @@
 #![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
 
 use reth_eth_wire::{DisconnectReason, EthVersion, Status};
-use reth_primitives::{NodeRecord, PeerId};
-use reth_rpc_types::NetworkStatus;
+use reth_network_types::PeerId;
+use reth_primitives::NodeRecord;
 use std::{future::Future, net::SocketAddr, sync::Arc, time::Instant};
 
 pub use error::NetworkError;
 pub use reputation::{Reputation, ReputationChangeKind};
 use reth_eth_wire::capability::Capabilities;
+use reth_rpc_types::NetworkStatus;
 
 /// Network Error
 pub mod error;
@@ -46,10 +47,6 @@ pub trait NetworkInfo: Send + Sync {
 
     /// Returns `true` when the node is undergoing the very first Pipeline sync.
     fn is_initially_syncing(&self) -> bool;
-
-    /// Returns the sequencer HTTP endpoint, if set.
-    #[cfg(feature = "optimism")]
-    fn sequencer_endpoint(&self) -> Option<&str>;
 }
 
 /// Provides general purpose information about Peers in the network.
@@ -61,6 +58,9 @@ pub trait PeersInfo: Send + Sync {
 
     /// Returns the Ethereum Node Record of the node.
     fn local_node_record(&self) -> NodeRecord;
+
+    /// Returns the local ENR of the node.
+    fn local_enr(&self) -> enr::Enr<enr::secp256k1::SecretKey>;
 }
 
 /// Provides an API for managing the peers of the network.
@@ -69,6 +69,11 @@ pub trait Peers: PeersInfo {
     fn add_peer(&self, peer: PeerId, addr: SocketAddr) {
         self.add_peer_kind(peer, PeerKind::Basic, addr);
     }
+
+    /// Adds a trusted [PeerId] to the peer set.
+    ///
+    /// This allows marking a peer as trusted without having to know the peer's address.
+    fn add_trusted_peer_id(&self, peer: PeerId);
 
     /// Adds a trusted peer to the peer set.
     fn add_trusted_peer(&self, peer: PeerId, addr: SocketAddr) {
@@ -143,6 +148,18 @@ pub enum PeerKind {
     Basic,
     /// Trusted peer.
     Trusted,
+}
+
+impl PeerKind {
+    /// Returns `true` if the peer is trusted.
+    pub const fn is_trusted(&self) -> bool {
+        matches!(self, PeerKind::Trusted)
+    }
+
+    /// Returns `true` if the peer is basic.
+    pub const fn is_basic(&self) -> bool {
+        matches!(self, PeerKind::Basic)
+    }
 }
 
 /// Info about an active peer session.

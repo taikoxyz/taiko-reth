@@ -12,13 +12,12 @@ use reth_primitives::{
     StorageEntry, B256, U256,
 };
 use reth_trie::HashedPostState;
+pub use revm::db::states::OriginalValuesKnown;
 use revm::{
     db::{states::BundleState, BundleAccount},
     primitives::AccountInfo,
 };
 use std::collections::HashMap;
-
-pub use revm::db::states::OriginalValuesKnown;
 
 /// Bundle state of post execution changes and reverts
 #[derive(Default, Debug, Clone, PartialEq, Eq)]
@@ -219,11 +218,13 @@ impl BundleStateWithReceipts {
         self.first_block
     }
 
-    /// Revert to given block number.
+    /// Revert the state to the given block number.
     ///
-    /// If number is in future, or in the past return false
+    /// Returns false if the block number is not in the bundle state.
     ///
-    /// NOTE: Provided block number will stay inside the bundle state.
+    /// # Note
+    ///
+    /// The provided block number will stay inside the bundle state.
     pub fn revert_to(&mut self, block_number: BlockNumber) -> bool {
         let Some(index) = self.block_number_to_index(block_number) else { return false };
 
@@ -296,8 +297,8 @@ impl BundleStateWithReceipts {
     /// files if `static_file_producer` is `Some`. It should be none if there is any kind of
     /// pruning/filtering over the receipts.
     ///
-    /// `omit_changed_check` should be set to true of bundle has some of it data
-    /// detached, This would make some original values not known.
+    /// `omit_changed_check` should be set to true if bundle has some of its data detached. This
+    /// would make some original values not known.
     pub fn write_to_storage<TX>(
         self,
         tx: &TX,
@@ -315,7 +316,12 @@ impl BundleStateWithReceipts {
         let mut bodies_cursor = tx.cursor_read::<tables::BlockBodyIndices>()?;
         let mut receipts_cursor = tx.cursor_write::<tables::Receipts>()?;
 
-        for (idx, receipts) in self.receipts.into_iter().enumerate() {
+        // ATTENTION: Any potential future refactor or change to how this loop works should keep in
+        // mind that the static file producer must always call `increment_block` even if the block
+        // has no receipts. Keeping track of the exact block range of the segment is needed for
+        // consistency, querying and file range segmentation.
+        let blocks = self.receipts.into_iter().enumerate();
+        for (idx, receipts) in blocks {
             let block_number = self.first_block + idx as u64;
             let first_tx_index = bodies_cursor
                 .seek_exact(block_number)?
@@ -324,7 +330,7 @@ impl BundleStateWithReceipts {
 
             if let Some(static_file_producer) = &mut static_file_producer {
                 // Increment block on static file header.
-                static_file_producer.increment_block(StaticFileSegment::Receipts)?;
+                static_file_producer.increment_block(StaticFileSegment::Receipts, block_number)?;
 
                 for (tx_idx, receipt) in receipts.into_iter().enumerate() {
                     let receipt = receipt
@@ -366,8 +372,7 @@ mod tests {
             EmptyDB,
         },
         primitives::{
-            Account as RevmAccount, AccountInfo as RevmAccountInfo, AccountStatus, HashMap,
-            StorageSlot,
+            Account as RevmAccount, AccountInfo as RevmAccountInfo, AccountStatus, StorageSlot,
         },
         DatabaseCommit, State,
     };
@@ -863,7 +868,7 @@ mod tests {
             address1,
             RevmAccount {
                 status: AccountStatus::Touched,
-                info: account_info.clone(),
+                info: account_info,
                 // 0x00 => 0 => 9
                 storage: HashMap::from([(
                     U256::ZERO,
@@ -1072,7 +1077,7 @@ mod tests {
             address1,
             RevmAccount {
                 status: AccountStatus::Touched,
-                info: account1.clone(),
+                info: account1,
                 // 0x01 => 0 => 5
                 storage: HashMap::from([(
                     U256::from(1),
@@ -1135,7 +1140,7 @@ mod tests {
         assert!(this.revert_to(16));
         assert_eq!(this.receipts.len(), 7);
 
-        let mut this = base.clone();
+        let mut this = base;
         assert!(!this.revert_to(17));
         assert_eq!(this.receipts.len(), 7);
     }

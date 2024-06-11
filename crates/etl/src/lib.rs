@@ -18,7 +18,7 @@ use std::{
     cmp::Reverse,
     collections::BinaryHeap,
     io::{self, BufReader, BufWriter, Read, Seek, SeekFrom, Write},
-    path::Path,
+    path::{Path, PathBuf},
 };
 
 use rayon::prelude::*;
@@ -39,9 +39,9 @@ pub struct Collector<K, V>
 where
     K: Encode + Ord,
     V: Compress,
-    <K as Encode>::Encoded: std::fmt::Debug,
-    <V as Compress>::Compressed: std::fmt::Debug,
 {
+    /// Parent directory where to create ETL files
+    parent_dir: Option<PathBuf>,
     /// Directory for temporary file storage
     dir: Option<TempDir>,
     /// Collection of temporary ETL files
@@ -60,14 +60,13 @@ impl<K, V> Collector<K, V>
 where
     K: Key,
     V: Value,
-    <K as Encode>::Encoded: Ord + std::fmt::Debug,
-    <V as Compress>::Compressed: Ord + std::fmt::Debug,
 {
     /// Create a new collector with some capacity.
     ///
     /// Once the capacity (in bytes) is reached, the data is sorted and flushed to disk.
-    pub fn new(buffer_capacity_bytes: usize) -> Self {
+    pub fn new(buffer_capacity_bytes: usize, parent_dir: Option<PathBuf>) -> Self {
         Self {
+            parent_dir,
             dir: None,
             buffer_size_bytes: 0,
             files: Vec::new(),
@@ -115,7 +114,15 @@ where
     /// doesn't exist, it will be created.
     fn dir(&mut self) -> io::Result<&TempDir> {
         if self.dir.is_none() {
-            self.dir = Some(TempDir::new()?);
+            self.dir = match &self.parent_dir {
+                Some(dir) => {
+                    if !dir.exists() {
+                        std::fs::create_dir_all(dir)?;
+                    }
+                    Some(TempDir::new_in(dir)?)
+                }
+                None => Some(TempDir::new()?),
+            };
         }
         Ok(self.dir.as_ref().unwrap())
     }
@@ -273,7 +280,7 @@ mod tests {
         let mut entries: Vec<_> =
             (0..10_000).map(|id| (TxHash::random(), id as TxNumber)).collect();
 
-        let mut collector = Collector::new(1024);
+        let mut collector = Collector::new(1024, None);
         assert!(collector.dir.is_none());
 
         for (k, v) in entries.clone() {

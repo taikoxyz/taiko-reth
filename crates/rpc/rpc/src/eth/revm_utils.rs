@@ -1,7 +1,5 @@
 //! utilities for working with revm
 
-use std::cmp::min;
-
 use crate::eth::error::{EthApiError, EthResult, RpcInvalidTransactionError};
 #[cfg(feature = "optimism")]
 use reth_primitives::revm::env::fill_op_tx_env;
@@ -9,7 +7,7 @@ use reth_primitives::revm::env::fill_op_tx_env;
 use reth_primitives::revm::env::fill_tx_env;
 use reth_primitives::{
     revm::env::fill_tx_env_with_recovered, Address, TransactionSigned,
-    TransactionSignedEcRecovered, TxHash, B256, U256,
+    TransactionSignedEcRecovered, TxHash, TxKind, B256, U256,
 };
 use reth_rpc_types::{
     state::{AccountOverride, StateOverride},
@@ -19,14 +17,14 @@ use reth_rpc_types::{
 use revm::primitives::{Bytes, OptimismFields};
 use revm::{
     db::CacheDB,
-    inspector_handle_register,
     precompile::{PrecompileSpecId, Precompiles},
     primitives::{
-        db::DatabaseRef, BlockEnv, Bytecode, CfgEnvWithHandlerCfg, EnvWithHandlerCfg,
-        ResultAndState, SpecId, TransactTo, TxEnv,
+        db::DatabaseRef, BlockEnv, Bytecode, CfgEnvWithHandlerCfg, EnvWithHandlerCfg, SpecId,
+        TransactTo, TxEnv,
     },
-    Database, GetInspector,
+    Database,
 };
+use std::cmp::min;
 use tracing::trace;
 
 /// Helper type that bundles various overrides for EVM Execution.
@@ -68,7 +66,7 @@ impl From<Option<StateOverride>> for EvmOverrides {
 /// Helper type to work with different transaction types when configuring the EVM env.
 ///
 /// This makes it easier to handle errors.
-pub(crate) trait FillableTransaction {
+pub trait FillableTransaction {
     /// Returns the hash of the transaction.
     fn hash(&self) -> TxHash;
 
@@ -122,110 +120,6 @@ pub(crate) fn get_precompiles(spec_id: SpecId) -> impl IntoIterator<Item = Addre
     Precompiles::new(spec).addresses().copied().map(Address::from)
 }
 
-/// Executes the [EnvWithHandlerCfg] against the given [Database] without committing state changes.
-pub(crate) fn transact<DB>(
-    db: DB,
-    env: EnvWithHandlerCfg,
-) -> EthResult<(ResultAndState, EnvWithHandlerCfg)>
-where
-    DB: Database,
-    <DB as Database>::Error: Into<EthApiError>,
-{
-    let mut evm = revm::Evm::builder().with_db(db).with_env_with_handler_cfg(env).build();
-    let res = evm.transact()?;
-    let (_, env) = evm.into_db_and_env_with_handler_cfg();
-    Ok((res, env))
-}
-
-/// Executes the [EnvWithHandlerCfg] against the given [Database] without committing state changes.
-pub(crate) fn inspect<DB, I>(
-    db: DB,
-    env: EnvWithHandlerCfg,
-    inspector: I,
-) -> EthResult<(ResultAndState, EnvWithHandlerCfg)>
-where
-    DB: Database,
-    <DB as Database>::Error: Into<EthApiError>,
-    I: GetInspector<DB>,
-{
-    let mut evm = revm::Evm::builder()
-        .with_db(db)
-        .with_external_context(inspector)
-        .with_env_with_handler_cfg(env)
-        .append_handler_register(inspector_handle_register)
-        .build();
-    let res = evm.transact()?;
-    let (_, env) = evm.into_db_and_env_with_handler_cfg();
-    Ok((res, env))
-}
-
-/// Same as [inspect] but also returns the database again.
-///
-/// Even though [Database] is also implemented on `&mut`
-/// this is still useful if there are certain trait bounds on the Inspector's database generic type
-pub(crate) fn inspect_and_return_db<DB, I>(
-    db: DB,
-    env: EnvWithHandlerCfg,
-    inspector: I,
-) -> EthResult<(ResultAndState, EnvWithHandlerCfg, DB)>
-where
-    DB: Database,
-    <DB as Database>::Error: Into<EthApiError>,
-    I: GetInspector<DB>,
-{
-    let mut evm = revm::Evm::builder()
-        .with_external_context(inspector)
-        .with_db(db)
-        .with_env_with_handler_cfg(env)
-        .append_handler_register(inspector_handle_register)
-        .build();
-    let res = evm.transact()?;
-    let (db, env) = evm.into_db_and_env_with_handler_cfg();
-    Ok((res, env, db))
-}
-
-/// Replays all the transactions until the target transaction is found.
-///
-/// All transactions before the target transaction are executed and their changes are written to the
-/// _runtime_ db ([CacheDB]).
-///
-/// Note: This assumes the target transaction is in the given iterator.
-/// Returns the index of the target transaction in the given iterator.
-pub(crate) fn replay_transactions_until<DB, I, Tx>(
-    db: &mut CacheDB<DB>,
-    cfg: CfgEnvWithHandlerCfg,
-    block_env: BlockEnv,
-    transactions: I,
-    target_tx_hash: B256,
-) -> Result<usize, EthApiError>
-where
-    DB: DatabaseRef,
-    EthApiError: From<<DB as DatabaseRef>::Error>,
-    I: IntoIterator<Item = Tx>,
-    Tx: FillableTransaction,
-{
-    let mut evm = revm::Evm::builder()
-        .with_db(db)
-        .with_env_with_handler_cfg(EnvWithHandlerCfg::new_with_cfg_env(
-            cfg,
-            block_env,
-            Default::default(),
-        ))
-        .build();
-    let mut index = 0;
-    for tx in transactions.into_iter() {
-        if tx.hash() == target_tx_hash {
-            // reached the target transaction
-            break
-        }
-
-        tx.try_fill_tx_env(evm.tx_mut())?;
-        evm.transact_commit()?;
-        index += 1;
-    }
-    Ok(index)
-}
-
 /// Prepares the [EnvWithHandlerCfg] for execution.
 ///
 /// Does not commit any changes to the underlying database.
@@ -237,7 +131,7 @@ where
 ///  - `nonce` is set to `None`
 pub(crate) fn prepare_call_env<DB>(
     mut cfg: CfgEnvWithHandlerCfg,
-    block: BlockEnv,
+    mut block: BlockEnv,
     request: TransactionRequest,
     gas_limit: u64,
     db: &mut CacheDB<DB>,
@@ -260,24 +154,25 @@ where
     // <https://github.com/ethereum/go-ethereum/blob/ee8e83fa5f6cb261dad2ed0a7bbcde4930c41e6c/internal/ethapi/api.go#L985>
     cfg.disable_base_fee = true;
 
-    let request_gas = request.gas;
-
-    let mut env = build_call_evm_env(cfg, block, request)?;
-    env.tx.nonce = None;
-
-    // apply state overrides
-    if let Some(state_overrides) = overrides.state {
-        apply_state_overrides(state_overrides, db)?;
-    }
-
-    // apply block overrides
+    // apply block overrides, we need to apply them first so that they take effect when we we create
+    // the evm env via `build_call_evm_env`, e.g. basefee
     if let Some(mut block_overrides) = overrides.block {
         if let Some(block_hashes) = block_overrides.block_hash.take() {
             // override block hashes
             db.block_hashes
                 .extend(block_hashes.into_iter().map(|(num, hash)| (U256::from(num), hash)))
         }
-        apply_block_overrides(*block_overrides, &mut env.env.block);
+        apply_block_overrides(*block_overrides, &mut block);
+    }
+
+    let request_gas = request.gas;
+    let mut env = build_call_evm_env(cfg, block, request)?;
+    // set nonce to None so that the next nonce is used when transacting the call
+    env.tx.nonce = None;
+
+    // apply state overrides
+    if let Some(state_overrides) = overrides.state {
+        apply_state_overrides(state_overrides, db)?;
     }
 
     if request_gas.is_none() {
@@ -322,7 +217,7 @@ pub(crate) fn create_txn_env(
     request: TransactionRequest,
 ) -> EthResult<TxEnv> {
     // Ensure that if versioned hashes are set, they're not empty
-    if request.has_empty_blob_hashes() {
+    if request.blob_versioned_hashes.as_ref().map_or(false, |hashes| hashes.is_empty()) {
         return Err(RpcInvalidTransactionError::BlobTransactionMissingBlobHashes.into())
     }
 
@@ -345,28 +240,30 @@ pub(crate) fn create_txn_env(
 
     let CallFees { max_priority_fee_per_gas, gas_price, max_fee_per_blob_gas } =
         CallFees::ensure_fees(
-            gas_price,
-            max_fee_per_gas,
-            max_priority_fee_per_gas,
+            gas_price.map(U256::from),
+            max_fee_per_gas.map(U256::from),
+            max_priority_fee_per_gas.map(U256::from),
             block_env.basefee,
             blob_versioned_hashes.as_deref(),
-            max_fee_per_blob_gas,
+            max_fee_per_blob_gas.map(U256::from),
             block_env.get_blob_gasprice().map(U256::from),
         )?;
 
-    let gas_limit = gas.unwrap_or(block_env.gas_limit.min(U256::from(u64::MAX)));
+    let gas_limit = gas.unwrap_or_else(|| block_env.gas_limit.min(U256::from(u64::MAX)).to());
+    let transact_to = match to {
+        Some(TxKind::Call(to)) => TransactTo::call(to),
+        _ => TransactTo::create(),
+    };
     let env = TxEnv {
         gas_limit: gas_limit.try_into().map_err(|_| RpcInvalidTransactionError::GasUintOverflow)?,
-        nonce: nonce
-            .map(|n| n.try_into().map_err(|_| RpcInvalidTransactionError::NonceTooHigh))
-            .transpose()?,
+        nonce,
         caller: from.unwrap_or_default(),
         gas_price,
         gas_priority_fee: max_priority_fee_per_gas,
-        transact_to: to.map(TransactTo::Call).unwrap_or_else(TransactTo::create),
+        transact_to,
         value: value.unwrap_or_default(),
         data: input.try_into_unique_input()?.unwrap_or_default(),
-        chain_id: chain_id.map(|c| c.to()),
+        chain_id,
         access_list: access_list
             .map(reth_rpc_types::AccessList::into_flattened)
             .unwrap_or_default(),

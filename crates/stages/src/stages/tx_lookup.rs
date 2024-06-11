@@ -1,5 +1,5 @@
-use crate::{ExecInput, ExecOutput, Stage, StageError, UnwindInput, UnwindOutput};
 use num_traits::Zero;
+use reth_config::config::EtlConfig;
 use reth_db::{
     cursor::{DbCursorRO, DbCursorRW},
     database::Database,
@@ -17,6 +17,7 @@ use reth_provider::{
     BlockReader, DatabaseProviderRW, PruneCheckpointReader, PruneCheckpointWriter, StatsReader,
     TransactionsProvider, TransactionsProviderExt,
 };
+use reth_stages_api::{ExecInput, ExecOutput, Stage, StageError, UnwindInput, UnwindOutput};
 use tracing::*;
 
 /// The transaction lookup stage.
@@ -32,19 +33,26 @@ pub struct TransactionLookupStage {
     /// The maximum number of lookup entries to hold in memory before pushing them to
     /// [`reth_etl::Collector`].
     chunk_size: u64,
+    etl_config: EtlConfig,
     prune_mode: Option<PruneMode>,
 }
 
 impl Default for TransactionLookupStage {
     fn default() -> Self {
-        Self { chunk_size: 5_000_000, prune_mode: None }
+        Self { chunk_size: 5_000_000, etl_config: EtlConfig::default(), prune_mode: None }
     }
 }
 
 impl TransactionLookupStage {
     /// Create new instance of [TransactionLookupStage].
-    pub fn new(chunk_size: u64, prune_mode: Option<PruneMode>) -> Self {
-        Self { chunk_size, prune_mode }
+    pub fn new(chunk_size: u64, etl_config: EtlConfig, prune_mode: Option<PruneMode>) -> Self {
+        Self { chunk_size, etl_config, prune_mode }
+    }
+
+    /// Set the ETL configuration to use.
+    pub fn with_etl_config(mut self, etl_config: EtlConfig) -> Self {
+        self.etl_config = etl_config;
+        self
     }
 }
 
@@ -99,9 +107,10 @@ impl<DB: Database> Stage<DB> for TransactionLookupStage {
         }
 
         // 500MB temporary files
-        let mut hash_collector: Collector<TxHash, TxNumber> = Collector::new(500 * (1024 * 1024));
+        let mut hash_collector: Collector<TxHash, TxNumber> =
+            Collector::new(self.etl_config.file_size, self.etl_config.dir.clone());
 
-        debug!(
+        info!(
             target: "sync::stages::transaction_lookup",
             tx_range = ?input.checkpoint().block_number..=input.target(),
             "Updating transaction lookup"
@@ -113,7 +122,7 @@ impl<DB: Database> Stage<DB> for TransactionLookupStage {
 
             let end_block = *block_range.end();
 
-            debug!(target: "sync::stages::transaction_lookup", ?tx_range, "Calculating transaction hashes");
+            info!(target: "sync::stages::transaction_lookup", ?tx_range, "Calculating transaction hashes");
 
             for (key, value) in provider.transaction_hashes_by_range(tx_range)? {
                 hash_collector.insert(key, value)?;
@@ -136,10 +145,10 @@ impl<DB: Database> Stage<DB> for TransactionLookupStage {
                 for (index, hash_to_number) in hash_collector.iter()?.enumerate() {
                     let (hash, number) = hash_to_number?;
                     if index > 0 && index % interval == 0 {
-                        debug!(
+                        info!(
                             target: "sync::stages::transaction_lookup",
                             ?append_only,
-                            progress = format!("{:.2}%", (index as f64 / total_hashes as f64) * 100.0),
+                            progress = %format!("{:.2}%", (index as f64 / total_hashes as f64) * 100.0),
                             "Inserting hashes"
                         );
                     }
@@ -397,12 +406,18 @@ mod tests {
     struct TransactionLookupTestRunner {
         db: TestStageDB,
         chunk_size: u64,
+        etl_config: EtlConfig,
         prune_mode: Option<PruneMode>,
     }
 
     impl Default for TransactionLookupTestRunner {
         fn default() -> Self {
-            Self { db: TestStageDB::default(), chunk_size: 1000, prune_mode: None }
+            Self {
+                db: TestStageDB::default(),
+                chunk_size: 1000,
+                etl_config: EtlConfig::default(),
+                prune_mode: None,
+            }
         }
     }
 
@@ -449,7 +464,11 @@ mod tests {
         }
 
         fn stage(&self) -> Self::S {
-            TransactionLookupStage { chunk_size: self.chunk_size, prune_mode: self.prune_mode }
+            TransactionLookupStage {
+                chunk_size: self.chunk_size,
+                etl_config: self.etl_config.clone(),
+                prune_mode: self.prune_mode,
+            }
         }
     }
 
