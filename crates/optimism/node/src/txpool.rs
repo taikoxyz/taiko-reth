@@ -1,8 +1,9 @@
 //! OP transaction pool types
 use parking_lot::RwLock;
+use reth_evm_optimism::RethL1BlockInfo;
 use reth_primitives::{Block, ChainSpec, GotExpected, InvalidTransactionError, SealedBlock};
 use reth_provider::{BlockReaderIdExt, StateProviderFactory};
-use reth_revm::{optimism::RethL1BlockInfo, L1BlockInfo};
+use reth_revm::L1BlockInfo;
 use reth_transaction_pool::{
     CoinbaseTipOrdering, EthPoolTransaction, EthPooledTransaction, EthTransactionValidator, Pool,
     TransactionOrigin, TransactionValidationOutcome, TransactionValidationTaskExecutor,
@@ -46,7 +47,7 @@ where
     Client: StateProviderFactory + BlockReaderIdExt,
     Tx: EthPoolTransaction,
 {
-    /// Create a new [OpTransactionValidator].
+    /// Create a new [`OpTransactionValidator`].
     pub fn new(inner: EthTransactionValidator<Client, Tx>) -> Self {
         let this = Self::with_block_info(inner, OpL1BlockInfo::default());
         if let Ok(Some(block)) =
@@ -64,7 +65,7 @@ where
         this
     }
 
-    /// Create a new [OpTransactionValidator] with the given [OpL1BlockInfo].
+    /// Create a new [`OpTransactionValidator`] with the given [`OpL1BlockInfo`].
     pub fn with_block_info(
         inner: EthTransactionValidator<Client, Tx>,
         block_info: OpL1BlockInfo,
@@ -75,16 +76,16 @@ where
     /// Update the L1 block info.
     fn update_l1_block_info(&self, block: &Block) {
         self.block_info.timestamp.store(block.timestamp, Ordering::Relaxed);
-        if let Ok(cost_addition) = reth_revm::optimism::extract_l1_info(block) {
+        if let Ok(cost_addition) = reth_evm_optimism::extract_l1_info(block) {
             *self.block_info.l1_block_info.write() = cost_addition;
         }
     }
 
     /// Validates a single transaction.
     ///
-    /// See also [TransactionValidator::validate_transaction]
+    /// See also [`TransactionValidator::validate_transaction`]
     ///
-    /// This behaves the same as [EthTransactionValidator::validate_one], but in addition, ensures
+    /// This behaves the same as [`EthTransactionValidator::validate_one`], but in addition, ensures
     /// that the account has enough balance to cover the L1 gas cost.
     pub fn validate_one(
         &self,
@@ -152,7 +153,7 @@ where
     ///
     /// Returns all outcomes for the given transactions in the same order.
     ///
-    /// See also [Self::validate_one]
+    /// See also [`Self::validate_one`]
     pub fn validate_all(
         &self,
         transactions: Vec<(TransactionOrigin, Tx)>,

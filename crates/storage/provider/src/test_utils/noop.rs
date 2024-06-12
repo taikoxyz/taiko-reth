@@ -2,22 +2,22 @@ use crate::{
     traits::{BlockSource, ReceiptProvider},
     AccountReader, BlockHashReader, BlockIdReader, BlockNumReader, BlockReader, BlockReaderIdExt,
     ChainSpecProvider, ChangeSetReader, EvmEnvProvider, HeaderProvider, L1OriginReader,
-    L1OriginWriter, PruneCheckpointReader, ReceiptProviderIdExt, StageCheckpointReader,
-    StateProvider, StateProviderBox, StateProviderFactory, StateRootProvider, TransactionVariant,
-    TransactionsProvider, WithdrawalsProvider,
+    L1OriginWriter, PruneCheckpointReader, ReceiptProviderIdExt, RequestsProvider,
+    StageCheckpointReader, StateProvider, StateProviderBox, StateProviderFactory, StateRootProvider,
+    TransactionVariant, TransactionsProvider, WithdrawalsProvider,
 };
-use reth_db::models::{AccountBeforeTx, StoredBlockBodyIndices};
+use reth_db_api::models::{AccountBeforeTx, StoredBlockBodyIndices};
 use reth_evm::ConfigureEvmEnv;
-use reth_interfaces::provider::ProviderResult;
 use reth_primitives::{
-    stage::{StageCheckpoint, StageId},
-    trie::AccountProof,
-    Account, Address, Block, BlockHash, BlockHashOrNumber, BlockId, BlockNumber, BlockWithSenders,
-    Bytecode, ChainInfo, ChainSpec, Header, L1Origin, PruneCheckpoint, PruneSegment, Receipt, SealedBlock,
-    SealedBlockWithSenders, SealedHeader, StorageKey, StorageValue, TransactionMeta,
+    proofs::AccountProof, Account, Address, Block, BlockHash, BlockHashOrNumber, BlockId,
+    BlockNumber, BlockWithSenders, Bytecode, ChainInfo, ChainSpec, Header, L1Origin, Receipt,
+    SealedBlock, SealedBlockWithSenders, SealedHeader, StorageKey, StorageValue, TransactionMeta,
     TransactionSigned, TransactionSignedNoHash, TxHash, TxNumber, Withdrawal, Withdrawals, B256,
     MAINNET, U256,
 };
+use reth_prune_types::{PruneCheckpoint, PruneSegment};
+use reth_stages_types::{StageCheckpoint, StageId};
+use reth_storage_errors::provider::ProviderResult;
 use reth_trie::updates::TrieUpdates;
 use revm::{
     db::BundleState,
@@ -121,6 +121,13 @@ impl BlockReader for NoopProvider {
         &self,
         _range: RangeInclusive<BlockNumber>,
     ) -> ProviderResult<Vec<BlockWithSenders>> {
+        Ok(vec![])
+    }
+
+    fn sealed_block_with_senders_range(
+        &self,
+        _range: RangeInclusive<BlockNumber>,
+    ) -> ProviderResult<Vec<SealedBlockWithSenders>> {
         Ok(vec![])
     }
 }
@@ -319,8 +326,8 @@ impl StateProvider for NoopProvider {
         Ok(None)
     }
 
-    fn proof(&self, _address: Address, _keys: &[B256]) -> ProviderResult<AccountProof> {
-        Ok(AccountProof::default())
+    fn proof(&self, address: Address, _keys: &[B256]) -> ProviderResult<AccountProof> {
+        Ok(AccountProof::new(address))
     }
 }
 
@@ -419,7 +426,7 @@ impl StateProviderFactory for NoopProvider {
 
     fn pending_with_provider<'a>(
         &'a self,
-        _bundle_state_data: Box<dyn crate::BundleStateDataProvider + 'a>,
+        _bundle_state_data: Box<dyn crate::FullExecutionDataProvider + 'a>,
     ) -> ProviderResult<StateProviderBox> {
         Ok(Box::new(*self))
     }
@@ -444,6 +451,16 @@ impl WithdrawalsProvider for NoopProvider {
         Ok(None)
     }
     fn latest_withdrawal(&self) -> ProviderResult<Option<Withdrawal>> {
+        Ok(None)
+    }
+}
+
+impl RequestsProvider for NoopProvider {
+    fn requests_by_block(
+        &self,
+        _id: BlockHashOrNumber,
+        _timestamp: u64,
+    ) -> ProviderResult<Option<reth_primitives::Requests>> {
         Ok(None)
     }
 }

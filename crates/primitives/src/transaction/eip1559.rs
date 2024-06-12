@@ -66,7 +66,7 @@ pub struct TxEip1559 {
 
 impl TxEip1559 {
     /// Returns the effective gas price for the given `base_fee`.
-    pub fn effective_gas_price(&self, base_fee: Option<u64>) -> u128 {
+    pub const fn effective_gas_price(&self, base_fee: Option<u64>) -> u128 {
         match base_fee {
             None => self.max_fee_per_gas,
             Some(base_fee) => {
@@ -83,7 +83,7 @@ impl TxEip1559 {
         }
     }
 
-    /// Decodes the inner [TxEip1559] fields from RLP bytes.
+    /// Decodes the inner [`TxEip1559`] fields from RLP bytes.
     ///
     /// NOTE: This assumes a RLP header has already been decoded, and _just_ decodes the following
     /// RLP fields in the following order:
@@ -187,11 +187,11 @@ impl TxEip1559 {
     }
 
     /// Get transaction type
-    pub(crate) fn tx_type(&self) -> TxType {
+    pub(crate) const fn tx_type(&self) -> TxType {
         TxType::Eip1559
     }
 
-    /// Calculates a heuristic for the in-memory size of the [TxEip1559] transaction.
+    /// Calculates a heuristic for the in-memory size of the [`TxEip1559`] transaction.
     #[inline]
     pub fn size(&self) -> usize {
         mem::size_of::<ChainId>() + // chain_id
@@ -205,7 +205,7 @@ impl TxEip1559 {
         self.input.len() // input
     }
 
-    /// Encodes the legacy transaction in RLP for signing.
+    /// Encodes the EIP-1559 transaction in RLP for signing.
     ///
     /// This encodes the transaction as:
     /// `tx_type || rlp(chain_id, nonce, max_priority_fee_per_gas, max_fee_per_gas, gas_limit, to,
@@ -255,7 +255,7 @@ mod tests {
             chain_id: 1,
             nonce: 0x42,
             gas_limit: 44386,
-            to: TxKind::Call( hex!("6069a6c32cf691f5982febae4faf8a6f3ab2f0f6").into()),
+            to: TxKind::Call(hex!("6069a6c32cf691f5982febae4faf8a6f3ab2f0f6").into()),
             value: U256::ZERO,
             input:  hex!("a22cb4650000000000000000000000005eee75727d804a2b13038928d36f8b188945a57a0000000000000000000000000000000000000000000000000000000000000000").into(),
             max_fee_per_gas: 0x4a817c800,
