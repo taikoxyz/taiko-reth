@@ -64,8 +64,8 @@ members = [
     "crates/payload/basic/",
     "crates/payload/builder/",
     "crates/payload/primitives",
-    "crates/payload/ethereum/",
-    "crates/payload/optimism/",
+    "crates/ethereum/payload",
+    "crates/optimism/payload",
     "crates/payload/taiko/",
     "crates/payload/validator/",
     "crates/primitives/",
@@ -300,6 +300,7 @@ reth-node-core = { path = "crates/node-core" }
 reth-node-ethereum = { path = "crates/ethereum/node" }
 reth-node-events = { path = "crates/node/events" }
 reth-node-optimism = { path = "crates/optimism/node" }
+reth-node-taiko = { path = "crates/node-taiko" }
 reth-optimism-consensus = { path = "crates/optimism/consensus" }
 reth-optimism-payload-builder = { path = "crates/optimism/payload" }
 reth-optimism-primitives = { path = "crates/optimism/primitives" }
@@ -328,6 +329,7 @@ reth-static-file = { path = "crates/static-file/static-file" }
 reth-static-file-types = { path = "crates/static-file/types" }
 reth-storage-api = { path = "crates/storage/storage-api" }
 reth-storage-errors = { path = "crates/storage/errors" }
+reth-taiko-payload-builder = { path = "crates/payload/taiko" }
 reth-tasks = { path = "crates/tasks" }
 reth-testing-utils = { path = "testing/testing-utils" }
 reth-tokio-util = { path = "crates/tokio-util" }

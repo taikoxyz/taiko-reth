@@ -2,7 +2,6 @@ use std::collections::BTreeMap;
 
 use alloy_chains::Chain;
 use alloy_genesis::{ChainConfig, Genesis, GenesisAccount};
-use alloy_trie::HashMap;
 use revm_primitives::{Address, Bytes, FixedBytes, U256};
 
 /// Taiko Chain Configuration, sets the chain_id to the internal devnet L2A by default.
@@ -33,6 +32,9 @@ pub fn taiko_base_config() -> ChainConfig {
         ethash: None,
         clique: None,
         extra_fields: Default::default(),
+        prague_time: None,
+        parlia: None,
+        deposit_contract_address: None,
     }
 }
 

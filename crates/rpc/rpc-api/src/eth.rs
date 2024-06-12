@@ -307,20 +307,4 @@ pub trait EthApi {
         keys: Vec<JsonStorageKey>,
         block_number: Option<BlockId>,
     ) -> RpcResult<EIP1186AccountProofResponse>;
-
-    /// HeadL1Origin returns the latest L2 block's corresponding L1 origin.
-    #[cfg(feature = "taiko")]
-    #[method(name = "headL1Origin")]
-    async fn head_l1_origin(&self) -> RpcResult<Option<u64>>;
-
-    /// L1OriginByID returns the L2 block's corresponding L1 origin.
-    #[cfg(feature = "taiko")]
-    #[method(name = "l1OriginByID")]
-    async fn l1_origin_by_id(&self, block_id: u64) -> RpcResult<Option<reth_primitives::L1Origin>>;
-
-    /// GetL2ParentHeaders
-    #[cfg(feature = "taiko")]
-    #[method(name = "getL2ParentHeaders")]
-    async fn get_l2_parent_headers(&self, block_id: u64)
-        -> RpcResult<Vec<reth_primitives::Header>>;
 }

@@ -1,6 +1,6 @@
 use auto_impl::auto_impl;
-use reth_interfaces::provider::ProviderResult;
 use reth_primitives::L1Origin;
+use reth_storage_errors::provider::ProviderResult;
 
 /// Api trait for fetching `L1Origin` related data.
 #[auto_impl::auto_impl(&, Arc)]

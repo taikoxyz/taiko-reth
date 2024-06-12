@@ -317,19 +317,19 @@ where
     /// Handler for: `eth_gasPrice`
     async fn gas_price(&self) -> Result<U256> {
         trace!(target: "rpc::eth", "Serving eth_gasPrice");
-        return Ok(Self::gas_price(self).await?)
+        return Ok(Self::gas_price(self).await?);
     }
 
     /// Handler for: `eth_maxPriorityFeePerGas`
     async fn max_priority_fee_per_gas(&self) -> Result<U256> {
         trace!(target: "rpc::eth", "Serving eth_maxPriorityFeePerGas");
-        return Ok(Self::suggested_priority_fee(self).await?)
+        return Ok(Self::suggested_priority_fee(self).await?);
     }
 
     /// Handler for: `eth_blobBaseFee`
     async fn blob_base_fee(&self) -> Result<U256> {
         trace!(target: "rpc::eth", "Serving eth_blobBaseFee");
-        return Ok(Self::blob_base_fee(self).await?)
+        return Ok(Self::blob_base_fee(self).await?);
     }
 
     // FeeHistory is calculated based on lazy evaluation of fees for historical blocks, and further
@@ -348,7 +348,9 @@ where
         reward_percentiles: Option<Vec<f64>>,
     ) -> Result<FeeHistory> {
         trace!(target: "rpc::eth", ?block_count, ?newest_block, ?reward_percentiles, "Serving eth_feeHistory");
-        return Ok(Self::fee_history(self, block_count.to(), newest_block, reward_percentiles).await?)
+        return Ok(
+            Self::fee_history(self, block_count.to(), newest_block, reward_percentiles).await?
+        );
     }
 
     /// Handler for: `eth_mining`
@@ -421,43 +423,6 @@ where
             }
             _ => e.into(),
         })?)
-    }
-
-    /// HeadL1Origin returns the latest L2 block's corresponding L1 origin.
-    // #[cfg(feature = "taiko")]
-    async fn head_l1_origin(&self) -> Result<Option<u64>> {
-        self.provider().read_head_l1_origin().map_err(|_| {
-            internal_rpc_err("taiko_headL1Origin failed to read latest l2 block's L1 origin")
-        })
-    }
-
-    /// L1OriginByID returns the L2 block's corresponding L1 origin.
-    // #[cfg(feature = "taiko")]
-    async fn l1_origin_by_id(&self, block_id: u64) -> Result<Option<reth_primitives::L1Origin>> {
-        self.provider().read_l1_origin(block_id).map_err(|_| {
-            internal_rpc_err("taiko_l1OriginByID failed to read L1 origin by block id")
-        })
-    }
-
-    /// GetL2ParentHeaders
-    // #[cfg(feature = "taiko")]
-    async fn get_l2_parent_headers(&self, block_id: u64) -> Result<Vec<reth_primitives::Header>> {
-        let start = if block_id > 256 { block_id - 255 } else { 0 };
-        let mut headers = Vec::with_capacity(256);
-
-        for id in start..=block_id {
-            let option = self.provider().header_by_number(id).map_err(|_| {
-                internal_rpc_err("taiko_getL2ParentHeaders failed to read header by number")
-            })?;
-            let Some(header) = option else {
-                return Err(internal_rpc_err(
-                    "taiko_getL2ParentHeaders failed to find parent header by number",
-                ));
-            };
-            headers.push(header);
-        }
-
-        Ok(headers)
     }
 }
 

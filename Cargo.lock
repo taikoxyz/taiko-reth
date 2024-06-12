@@ -6283,7 +6283,7 @@ dependencies = [
  "reth-transaction-pool",
  "reth-trie",
  "rlp",
- "secp256k1",
+ "secp256k1 0.28.2",
  "serde",
  "serde_json",
  "similar-asserts",
@@ -7388,6 +7388,7 @@ dependencies = [
  "reth-network",
  "reth-network-p2p",
  "reth-network-peers",
+ "reth-payload-builder",
  "reth-primitives",
  "reth-provider",
  "reth-prune-types",
@@ -7509,7 +7510,7 @@ dependencies = [
 
 [[package]]
 name = "reth-node-taiko"
-version = "0.2.0-beta.6"
+version = "0.2.0-beta.9"
 dependencies = [
  "eyre",
  "reth-basic-payload-builder",
@@ -7656,6 +7657,7 @@ dependencies = [
  "secp256k1 0.28.2",
  "serde",
  "serde_json",
+ "strum",
  "sucds",
  "tempfile",
  "test-fuzz",
@@ -8138,8 +8140,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "reth-storage-errors"
+version = "0.2.0-beta.9"
+dependencies = [
+ "reth-fs-util",
+ "reth-primitives",
+ "thiserror",
+]
+
+[[package]]
 name = "reth-taiko-payload-builder"
-version = "0.2.0-beta.6"
+version = "0.2.0-beta.9"
 dependencies = [
  "reth-basic-payload-builder",
  "reth-payload-builder",
@@ -8150,15 +8161,6 @@ dependencies = [
  "revm",
  "thiserror",
  "tracing",
-]
-
-[[package]]
-name = "reth-storage-errors"
-version = "0.2.0-beta.9"
-dependencies = [
- "reth-fs-util",
- "reth-primitives",
- "thiserror",
 ]
 
 [[package]]

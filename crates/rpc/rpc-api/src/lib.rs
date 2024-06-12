@@ -30,6 +30,7 @@ mod optimism;
 mod otterscan;
 mod reth;
 mod rpc;
+mod taiko;
 mod trace;
 mod txpool;
 mod validation;
@@ -53,6 +54,7 @@ pub mod servers {
         otterscan::OtterscanServer,
         reth::RethApiServer,
         rpc::RpcApiServer,
+        taiko::TaikoApiServer,
         trace::TraceApiServer,
         txpool::TxPoolApiServer,
         validation::BlockSubmissionValidationApiServer,
@@ -81,6 +83,7 @@ pub mod clients {
         net::NetApiClient,
         otterscan::OtterscanClient,
         rpc::RpcApiServer,
+        taiko::TaikoApiClient,
         trace::TraceApiClient,
         txpool::TxPoolApiClient,
         validation::BlockSubmissionValidationApiClient,
