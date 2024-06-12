@@ -3,9 +3,9 @@ use crate::{
     BlockSource, BlockchainTreePendingStateProvider, BundleStateDataProvider, CanonChainTracker,
     CanonStateNotifications, CanonStateSubscriptions, ChainSpecProvider, ChangeSetReader,
     DatabaseProviderFactory, EvmEnvProvider, HeaderProvider, L1OriginReader, L1OriginWriter,
-    ProviderError, PruneCheckpointReader, ReceiptProvider, ReceiptProviderIdExt, StageCheckpointReader,
-    StateProviderBox, StateProviderFactory, TransactionVariant, TransactionsProvider, TreeViewer,
-    WithdrawalsProvider,
+    ProviderError, PruneCheckpointReader, ReceiptProvider, ReceiptProviderIdExt,
+    StageCheckpointReader, StateProviderBox, StateProviderFactory, TransactionVariant,
+    TransactionsProvider, TreeViewer, WithdrawalsProvider,
 };
 use reth_db::{
     database::Database,
@@ -890,10 +890,9 @@ where
     }
 }
 
-impl<DB, Tree> L1OriginReader for BlockchainProvider<DB, Tree>
+impl<DB> L1OriginReader for BlockchainProvider<DB>
 where
     DB: Database,
-    Tree: Send + Sync,
 {
     fn read_l1_origin(&self, block_id: u64) -> ProviderResult<Option<L1Origin>> {
         self.database.provider()?.read_l1_origin(block_id)
@@ -904,10 +903,9 @@ where
     }
 }
 
-impl<DB, Tree> L1OriginWriter for BlockchainProvider<DB, Tree>
+impl<DB> L1OriginWriter for BlockchainProvider<DB>
 where
     DB: Database,
-    Tree: Send + Sync,
 {
     fn insert_l1_origin(&self, block_id: u64, l1_origin: L1Origin) -> ProviderResult<()> {
         self.database.provider_rw()?.insert_l1_origin(block_id, l1_origin)

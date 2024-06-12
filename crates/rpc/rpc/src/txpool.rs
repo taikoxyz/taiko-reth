@@ -133,7 +133,7 @@ where
         Ok(self.content())
     }
     // TODO:(petar) implement this function
-    /// TxPoolContent retrieves the transaction pool content with the given upper limits.
+    // TxPoolContent retrieves the transaction pool content with the given upper limits.
     // #[cfg(feature = "taiko")]
     // async fn txpool_content(
     //     &self,

@@ -765,6 +765,7 @@ impl TryFromRecoveredTransaction for MockTransaction {
                 value,
                 input,
                 access_list,
+                is_anchor: false,
             }) => Ok(MockTransaction::Eip1559 {
                 hash,
                 sender,

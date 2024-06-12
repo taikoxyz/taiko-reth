@@ -17,6 +17,7 @@ reth-db = { workspace = true, features = ["mdbx"] }
 reth-interfaces = { workspace = true, features = ["clap"] }
 reth-provider.workspace = true
 reth-network = { workspace = true, features = ["serde"] }
+reth-payload-builder = { workspace = true, optional = true }
 reth-rpc-engine-api.workspace = true
 reth-rpc-builder.workspace = true
 reth-rpc.workspace = true
@@ -105,7 +106,7 @@ optimism = [
     "reth-consensus-common/optimism",
     "reth-beacon-consensus/optimism",
 ]
-taiko = ["reth-primitives/taiko"]
+taiko = ["reth-primitives/taiko", "dep:reth-payload-builder"]
 
 jemalloc = ["dep:tikv-jemalloc-ctl"]
 

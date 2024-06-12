@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 use alloy_chains::Chain;
 use alloy_genesis::{ChainConfig, Genesis, GenesisAccount};
 use alloy_trie::HashMap;
@@ -30,6 +32,7 @@ pub fn taiko_base_config() -> ChainConfig {
         terminal_total_difficulty_passed: true,
         ethash: None,
         clique: None,
+        extra_fields: Default::default(),
     }
 }
 
@@ -88,7 +91,7 @@ pub fn get_taiko_genesis(chain: TaikoNamedChain) -> Genesis {
         TaikoNamedChain::Katla => include_str!("../../res/genesis/taiko/katla.json"),
     };
 
-    let alloc: HashMap<Address, GenesisAccount> =
+    let alloc: BTreeMap<Address, GenesisAccount> =
         serde_json::from_str(alloc_str).expect("Invalid alloc json");
     let mut config = taiko_base_config();
     config.chain_id = chain as u64;

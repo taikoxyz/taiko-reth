@@ -5,7 +5,9 @@ use crate::{
 use futures::{future::Either, FutureExt};
 use reth_engine_primitives::EngineTypes;
 use reth_interfaces::RethResult;
-use reth_payload_builder::{error::PayloadBuilderError, TaikoExecutionPayload};
+use reth_payload_builder::error::PayloadBuilderError;
+#[cfg(feature = "taiko")]
+use reth_payload_builder::TaikoExecutionPayload;
 use reth_rpc_types::engine::{
     CancunPayloadFields, ExecutionPayload, ForkChoiceUpdateResult, ForkchoiceState,
     ForkchoiceUpdateError, ForkchoiceUpdated, PayloadId, PayloadStatus, PayloadStatusEnum,

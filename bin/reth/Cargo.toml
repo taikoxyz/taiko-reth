@@ -84,7 +84,9 @@ rand.workspace = true
 # tui
 comfy-table = "7.0"
 crossterm = "0.27.0"
-ratatui = {  version = "0.26", default-features = false, features = ["crossterm"] }
+ratatui = { version = "0.26", default-features = false, features = [
+    "crossterm",
+] }
 human_bytes = "0.4.1"
 
 # async
@@ -150,7 +152,6 @@ taiko = [
     "reth-primitives/taiko",
     "reth-beacon-consensus/taiko",
     "reth-payload-builder/taiko",
-    "reth-rpc-engine-api/taiko",
     "reth-node-core/taiko",
     "dep:reth-taiko-payload-builder",
     "dep:reth-node-taiko",

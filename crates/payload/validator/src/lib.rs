@@ -109,15 +109,17 @@ impl ExecutionPayloadValidator {
 
         // First parse the block
         #[cfg(not(feature = "taiko"))]
-        let block = try_into_block(payload, cancun_fields.parent_beacon_block_root())?.seal_slow();
+        let sealed_block =
+            try_into_block(payload, cancun_fields.parent_beacon_block_root())?.seal_slow();
         #[cfg(feature = "taiko")]
-        let block = if payload.payload_inner.as_v1().transactions.is_empty()
+        let sealed_block = if payload.payload_inner.as_v1().transactions.is_empty()
             && (payload.payload_inner.withdrawals().is_none()
                 || payload.payload_inner.withdrawals().is_some_and(|w| w.is_empty()))
         {
             create_taiko_block(payload, cancun_fields.parent_beacon_block_root())?.seal_slow()
         } else {
-            try_into_block(payload.payload_inner, cancun_fields.parent_beacon_block_root())?.seal_slow()
+            try_into_block(payload.payload_inner, cancun_fields.parent_beacon_block_root())?
+                .seal_slow()
         };
 
         // Ensure the hash included in the payload matches the block hash
@@ -125,7 +127,7 @@ impl ExecutionPayloadValidator {
             return Err(PayloadError::BlockHash {
                 execution: sealed_block.hash(),
                 consensus: expected_hash,
-            })
+            });
         }
 
         let cancun_active = self.is_cancun_active_at_timestamp(sealed_block.timestamp);

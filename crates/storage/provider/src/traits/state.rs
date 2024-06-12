@@ -1,7 +1,7 @@
 use super::AccountReader;
 use crate::{
     BlockHashReader, BlockIdReader, BundleStateWithReceipts, L1OriginReader, L1OriginWriter,
-    StateRootProvider
+    StateRootProvider,
 };
 use auto_impl::auto_impl;
 use reth_interfaces::provider::{ProviderError, ProviderResult};
@@ -101,7 +101,9 @@ pub trait StateProvider: BlockHashReader + AccountReader + StateRootProvider + S
 /// the parent block. For example, in order to trace block `n`, the state after block `n - 1` needs
 /// to be used, since block `n` was executed on its parent block's state.
 #[auto_impl(&, Arc, Box)]
-pub trait StateProviderFactory: BlockIdReader + L1OriginWriter + L1OriginReader + Send + Sync {
+pub trait StateProviderFactory:
+    BlockIdReader + L1OriginWriter + L1OriginReader + Send + Sync
+{
     /// Storage provider for latest block.
     fn latest(&self) -> ProviderResult<StateProviderBox>;
 
@@ -228,22 +230,4 @@ pub trait BundleStateDataProvider: Send + Sync {
     ///
     /// Needed to create state provider.
     fn canonical_fork(&self) -> BlockNumHash;
-}
-
-/// A type that can compute the state root of a given post state.
-#[auto_impl[Box,&, Arc]]
-pub trait StateRootProvider: Send + Sync {
-    /// Returns the state root of the `BundleState` on top of the current state.
-    ///
-    /// NOTE: It is recommended to provide a different implementation from
-    /// `state_root_with_updates` since it affects the memory usage during state root
-    /// computation.
-    fn state_root(&self, bundle_state: &BundleStateWithReceipts) -> ProviderResult<B256>;
-
-    /// Returns the state root of the BundleState on top of the current state with trie
-    /// updates to be committed to the database.
-    fn state_root_with_updates(
-        &self,
-        bundle_state: &BundleStateWithReceipts,
-    ) -> ProviderResult<(B256, TrieUpdates)>;
 }

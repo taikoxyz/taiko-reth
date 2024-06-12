@@ -6249,6 +6249,7 @@ name = "reth"
 version = "0.2.0-beta.6"
 dependencies = [
  "ahash",
+ "alloy-chains",
  "alloy-rlp",
  "aquamarine",
  "assert_matches",
@@ -6294,7 +6295,6 @@ dependencies = [
  "reth-node-events",
  "reth-node-optimism",
  "reth-node-taiko",
- "reth-optimism-payload-builder",
  "reth-payload-builder",
  "reth-payload-validator",
  "reth-primitives",
@@ -6314,12 +6314,13 @@ dependencies = [
  "reth-transaction-pool",
  "reth-trie",
  "rlp",
- "secp256k1 0.27.0",
+ "secp256k1",
  "serde",
  "serde_json",
  "similar-asserts",
  "tempfile",
  "thiserror",
+ "tikv-jemallocator",
  "tokio",
  "toml",
  "tracing",
@@ -7208,6 +7209,7 @@ dependencies = [
  "reth-net-nat",
  "reth-network",
  "reth-network-api",
+ "reth-payload-builder",
  "reth-primitives",
  "reth-provider",
  "reth-rpc",
@@ -7324,17 +7326,8 @@ dependencies = [
 ]
 
 [[package]]
-name = "reth-optimism-consensus"
-version = "0.2.0-beta.6"
-dependencies = [
- "reth-consensus",
- "reth-consensus-common",
- "reth-primitives",
-]
-
-[[package]]
 name = "reth-node-taiko"
-version = "0.2.0-beta.1"
+version = "0.2.0-beta.6"
 dependencies = [
  "eyre",
  "reth-basic-payload-builder",
@@ -7350,6 +7343,15 @@ dependencies = [
  "reth-tracing",
  "reth-transaction-pool",
  "serde",
+]
+
+[[package]]
+name = "reth-optimism-consensus"
+version = "0.2.0-beta.6"
+dependencies = [
+ "reth-consensus",
+ "reth-consensus-common",
+ "reth-primitives",
 ]
 
 [[package]]
@@ -7377,6 +7379,7 @@ dependencies = [
 name = "reth-payload-builder"
 version = "0.2.0-beta.6"
 dependencies = [
+ "alloy-rlp",
  "futures-util",
  "metrics",
  "reth-engine-primitives",
@@ -7390,7 +7393,8 @@ dependencies = [
  "revm",
  "revm-primitives",
  "serde",
- "sha2",
+ "serde_json",
+ "sha2 0.10.8",
  "thiserror",
  "tokio",
  "tokio-stream",
@@ -7428,7 +7432,7 @@ dependencies = [
  "hash-db",
  "itertools 0.12.1",
  "modular-bitfield",
- "num_enum 0.7.2",
+ "num_enum",
  "nybbles",
  "once_cell",
  "plain_hasher",
@@ -7482,7 +7486,7 @@ dependencies = [
  "reth-trie",
  "revm",
  "serde_json",
- "strum 0.26.1",
+ "strum",
  "tempfile",
  "tokio",
  "tokio-stream",
@@ -7796,7 +7800,7 @@ dependencies = [
 
 [[package]]
 name = "reth-taiko-payload-builder"
-version = "0.2.0-beta.1"
+version = "0.2.0-beta.6"
 dependencies = [
  "reth-basic-payload-builder",
  "reth-payload-builder",

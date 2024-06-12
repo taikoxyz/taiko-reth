@@ -654,7 +654,7 @@ impl TryFrom<reth_rpc_types::Transaction> for Transaction {
                     return Err(ConversionError::Eip2718Error(
                         RlpError::Custom("EIP-1559 fields are present in a legacy transaction")
                             .into(),
-                    ))
+                    ));
                 }
                 Ok(Transaction::Legacy(TxLegacy {
                     chain_id: tx.chain_id,
@@ -704,6 +704,7 @@ impl TryFrom<reth_rpc_types::Transaction> for Transaction {
                     value: tx.value,
                     access_list: tx.access_list.ok_or(ConversionError::MissingAccessList)?,
                     input: tx.input,
+                    is_anchor: false,
                 }))
             }
             Some(TxType::Eip4844) => {
@@ -884,7 +885,7 @@ impl TransactionSignedNoHash {
         // `from` address.
         #[cfg(feature = "optimism")]
         if let Transaction::Deposit(TxDeposit { from, .. }) = self.transaction {
-            return Some(from)
+            return Some(from);
         }
 
         let signature_hash = self.signature_hash();
@@ -913,7 +914,7 @@ impl TransactionSignedNoHash {
         #[cfg(feature = "optimism")]
         {
             if let Transaction::Deposit(TxDeposit { from, .. }) = self.transaction {
-                return Some(from)
+                return Some(from);
             }
 
             // pre bedrock system transactions were sent from the zero address as legacy
@@ -921,7 +922,7 @@ impl TransactionSignedNoHash {
             //
             // NOTE: this is very hacky and only relevant for op-mainnet pre bedrock
             if self.is_legacy() && self.signature == Signature::optimism_deposit_tx_signature() {
-                return Some(Address::ZERO)
+                return Some(Address::ZERO);
             }
         }
 
