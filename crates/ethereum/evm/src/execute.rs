@@ -1,6 +1,6 @@
 //! Ethereum block executor.
 
-use crate::EthEvmConfig;
+use crate::{taiko::{check_anchor_tx, TaikoData}, EthEvmConfig};
 use reth_evm::{
     execute::{
         BatchBlockOutput, BatchExecutor, EthBlockExecutionInput, EthBlockOutput, Executor,
@@ -13,8 +13,7 @@ use reth_interfaces::{
     provider::ProviderError,
 };
 use reth_primitives::{
-    BlockWithSenders, ChainSpec, GotExpected, Hardfork, Header, PruneModes, Receipt, Receipts,
-    Withdrawals, U256,
+    BlockWithSenders, ChainSpec, GotExpected, Hardfork, Header, PruneModes, Receipt, Receipts, Withdrawals, U256
 };
 use reth_provider::BundleStateWithReceipts;
 use reth_revm::{
@@ -27,11 +26,14 @@ use reth_revm::{
     Evm, State,
 };
 use revm_primitives::{
-    db::{Database, DatabaseCommit},
-    BlockEnv, CfgEnvWithHandlerCfg, EnvWithHandlerCfg, ResultAndState,
+    db::{Database, DatabaseCommit}, Address, BlockEnv, CfgEnvWithHandlerCfg, EnvWithHandlerCfg, ResultAndState
 };
 use std::sync::Arc;
 use tracing::debug;
+use revm_primitives::EVMError;
+use reth_revm::JournaledState;
+use revm_primitives::HashSet;
+use anyhow::Result;
 
 /// Provides executors to execute regular ethereum blocks
 #[derive(Debug, Clone)]
@@ -73,7 +75,7 @@ where
     EvmConfig: ConfigureEvm,
     EvmConfig: ConfigureEvmEnv<TxMeta = ()>,
 {
-    fn eth_executor<DB>(&self, db: DB) -> EthBlockExecutor<EvmConfig, DB>
+    pub fn eth_executor<DB>(&self, db: DB) -> EthBlockExecutor<EvmConfig, DB>
     where
         DB: Database<Error = ProviderError>,
     {
@@ -140,10 +142,14 @@ where
         &mut self,
         block: &BlockWithSenders,
         mut evm: Evm<'_, Ext, &mut State<DB>>,
+        optimistic: bool,
+        taiko_data: Option<TaikoData>,
     ) -> Result<(Vec<Receipt>, u64), BlockExecutionError>
     where
         DB: Database<Error = ProviderError>,
     {
+        let is_taiko = self.chain_spec.is_taiko();
+
         // apply pre execution changes
         apply_beacon_root_contract_call(
             &self.chain_spec,
@@ -156,11 +162,35 @@ where
         // execute transactions
         let mut cumulative_gas_used = 0;
         let mut receipts = Vec::with_capacity(block.body.len());
-        for (sender, transaction) in block.transactions_with_sender() {
+        for (idx, (sender, transaction)) in block.transactions_with_sender().enumerate() {
+            //println!("tx: {:?}", tx_number);
+
+            let is_anchor = is_taiko && idx == 0;
+
+            // verify the anchor tx
+            if is_anchor {
+                check_anchor_tx(transaction, sender, &block.block, taiko_data.clone().unwrap())
+                    .map_err(|e| BlockExecutionError::CanonicalRevert { inner: e.to_string() })?;
+            }
+
+            // if the signature was not valid, the sender address will have been set to zero
+            if *sender == Address::ZERO {
+                // Signature can be invalid if not taiko or not the anchor tx
+                if is_taiko && !is_anchor {
+                    // If the signature is not valid, skip the transaction
+                    continue;
+                }
+                // In all other cases, the tx needs to have a valid signature
+                return Err(BlockExecutionError::CanonicalRevert { inner: "invalid tx".to_string() });
+            }
+
             // The sum of the transaction’s gas limit, Tg, and the gas utilized in this block prior,
             // must be no greater than the block’s gasLimit.
             let block_available_gas = block.header.gas_limit - cumulative_gas_used;
             if transaction.gas_limit() > block_available_gas {
+                if optimistic {
+                    continue;
+                }
                 return Err(BlockValidationError::TransactionGasLimitMoreThanAvailableBlockGas {
                     transaction_gas_limit: transaction.gas_limit(),
                     block_available_gas,
@@ -170,14 +200,51 @@ where
 
             EvmConfig::fill_tx_env(evm.tx_mut(), transaction, *sender, ());
 
+            // Set taiko specific data
+            evm.tx_mut().taiko.is_anchor = is_anchor;
+            // set the treasury address
+            evm.tx_mut().taiko.treasury = taiko_data.clone().unwrap().l2_contract;
+
             // Execute transaction.
-            let ResultAndState { result, state } = evm.transact().map_err(move |err| {
+            let res = evm.transact().map_err(move |err| {
                 // Ensure hash is calculated for error log, if not already done
                 BlockValidationError::EVM {
                     hash: transaction.recalculate_hash(),
                     error: err.into(),
                 }
-            })?;
+            });
+            if res.is_err() {
+                // Clear the state for the next tx
+                evm.context.evm.journaled_state = JournaledState::new(evm.context.evm.journaled_state.spec, HashSet::new());
+
+                if optimistic {
+                    continue;
+                }
+
+                if !is_taiko || is_anchor {
+                    return Err(BlockExecutionError::Validation(res.err().unwrap()));
+                }
+                // only continue for invalid tx errors, not db errors (because those can be
+                // manipulated by the prover)
+                match res {
+                    Err(BlockValidationError::EVM { hash, error }) => match *error {
+                        EVMError::Transaction(invalid_transaction) => {
+                            println!("Invalid tx at {}: {:?}", idx, invalid_transaction);
+                            // skip the tx
+                            continue;
+                        },
+                        _ => {
+                            // any other error is not allowed
+                            return Err(BlockExecutionError::Validation(BlockValidationError::EVM { hash, error }));
+                        },
+                    },
+                    _ => {
+                        // Any other type of error is not allowed
+                        return Err(BlockExecutionError::Validation(res.err().unwrap()));
+                    }
+                }
+            }
+            let ResultAndState { result, state } = res?;
             evm.db_mut().commit(state);
 
             // append gas used
@@ -200,14 +267,16 @@ where
         }
         drop(evm);
 
-        // Check if gas used matches the value set in header.
-        if block.gas_used != cumulative_gas_used {
-            let receipts = Receipts::from_block_receipt(receipts);
-            return Err(BlockValidationError::BlockGasUsed {
-                gas: GotExpected { got: cumulative_gas_used, expected: block.gas_used },
-                gas_spent_by_tx: receipts.gas_spent_by_tx()?,
+        if !optimistic {
+            // Check if gas used matches the value set in header.
+            if block.gas_used != cumulative_gas_used {
+                let receipts = Receipts::from_block_receipt(receipts);
+                return Err(BlockValidationError::BlockGasUsed {
+                    gas: GotExpected { got: cumulative_gas_used, expected: block.gas_used },
+                    gas_spent_by_tx: receipts.gas_spent_by_tx()?,
+                }
+                .into())
             }
-            .into())
         }
 
         Ok((receipts, cumulative_gas_used))
@@ -227,17 +296,33 @@ pub struct EthBlockExecutor<EvmConfig, DB> {
     state: State<DB>,
     /// Optional inspector stack for debugging
     inspector: Option<InspectorStack>,
+    /// Allows the execution to continue even when a tx is invalid
+    optimistic: bool,
+    /// Taiko data
+    taiko_data: Option<TaikoData>,
 }
 
 impl<EvmConfig, DB> EthBlockExecutor<EvmConfig, DB> {
     /// Creates a new Ethereum block executor.
     pub fn new(chain_spec: Arc<ChainSpec>, evm_config: EvmConfig, state: State<DB>) -> Self {
-        Self { executor: EthEvmExecutor { chain_spec, evm_config }, state, inspector: None }
+        Self { executor: EthEvmExecutor { chain_spec, evm_config }, state, inspector: None, optimistic: false, taiko_data: None }
     }
 
     /// Sets the inspector stack for debugging.
     pub fn with_inspector(mut self, inspector: Option<InspectorStack>) -> Self {
         self.inspector = inspector;
+        self
+    }
+
+    /// Optimistic execution
+    pub fn taiko_data(mut self, taiko_data: TaikoData) -> Self {
+        self.taiko_data = Some(taiko_data);
+        self
+    }
+
+    /// Optimistic execution
+    pub fn optimistic(mut self, optimistic: bool) -> Self {
+        self.optimistic = optimistic;
         self
     }
 
@@ -248,7 +333,7 @@ impl<EvmConfig, DB> EthBlockExecutor<EvmConfig, DB> {
 
     /// Returns mutable reference to the state that wraps the underlying database.
     #[allow(unused)]
-    fn state_mut(&mut self) -> &mut State<DB> {
+    pub fn state_mut(&mut self) -> &mut State<DB> {
         &mut self.state
     }
 }
@@ -302,11 +387,11 @@ where
                     env,
                     inspector,
                 );
-                self.executor.execute_pre_and_transactions(block, evm)?
+                self.executor.execute_pre_and_transactions(block, evm, self.optimistic, self.taiko_data.clone())?
             } else {
                 let evm = self.executor.evm_config.evm_with_env(&mut self.state, env);
 
-                self.executor.execute_pre_and_transactions(block, evm)?
+                self.executor.execute_pre_and_transactions(block, evm, self.optimistic, self.taiko_data.clone())?
             }
         };
 
@@ -317,7 +402,7 @@ where
         // operation as hashing that is required for state root got calculated in every
         // transaction This was replaced with is_success flag.
         // See more about EIP here: https://eips.ethereum.org/EIPS/eip-658
-        if self.chain_spec().is_byzantium_active_at_block(block.header.number) {
+        if !self.optimistic && self.chain_spec().is_byzantium_active_at_block(block.header.number) {
             if let Err(error) =
                 verify_receipt(block.header.receipts_root, block.header.logs_bloom, receipts.iter())
             {
@@ -367,9 +452,10 @@ where
             // return balance to DAO beneficiary.
             *balance_increments.entry(DAO_HARDFORK_BENEFICIARY).or_default() += drained_balance;
         }
+
         // increment balances
         self.state
-            .increment_balances(balance_increments)
+            .increment_balances(balance_increments.clone())
             .map_err(|_| BlockValidationError::IncrementBalanceFailed)?;
 
         Ok(())
@@ -383,7 +469,7 @@ where
     DB: Database<Error = ProviderError>,
 {
     type Input<'a> = EthBlockExecutionInput<'a, BlockWithSenders>;
-    type Output = EthBlockOutput<Receipt>;
+    type Output = EthBlockOutput<Receipt, DB>;
     type Error = BlockExecutionError;
 
     /// Executes the block and commits the state changes.
@@ -400,7 +486,7 @@ where
         // prepare the state for extraction
         self.state.merge_transitions(BundleRetention::PlainState);
 
-        Ok(EthBlockOutput { state: self.state.take_bundle(), receipts, gas_used })
+        Ok(EthBlockOutput { state: self.state.take_bundle(), receipts, gas_used, db: self.state })
     }
 }
 

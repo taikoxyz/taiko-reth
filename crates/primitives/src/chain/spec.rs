@@ -78,6 +78,72 @@ pub static MAINNET: Lazy<Arc<ChainSpec>> = Lazy::new(|| {
     .into()
 });
 
+/// The Taiko A7 spec
+pub static TAIKO_A7: Lazy<Arc<ChainSpec>> = Lazy::new(|| {
+    ChainSpec {
+        chain: 167009.into(),
+        genesis: serde_json::from_str(include_str!("../../res/genesis/mainnet.json"))
+            .expect("Can't deserialize Mainnet genesis json"),
+        genesis_hash: None,
+        paris_block_and_final_difficulty: None,
+        fork_timestamps: ForkTimestamps::default().shanghai(0),
+        hardforks: BTreeMap::from([
+            (Hardfork::Frontier, ForkCondition::Block(0)),
+            (Hardfork::Homestead, ForkCondition::Block(0)),
+            (Hardfork::Dao, ForkCondition::Block(0)),
+            (Hardfork::Tangerine, ForkCondition::Block(0)),
+            (Hardfork::SpuriousDragon, ForkCondition::Block(0)),
+            (Hardfork::Byzantium, ForkCondition::Block(0)),
+            (Hardfork::Constantinople, ForkCondition::Block(0)),
+            (Hardfork::Petersburg, ForkCondition::Block(0)),
+            (Hardfork::Istanbul, ForkCondition::Block(1561651)),
+            (Hardfork::Berlin, ForkCondition::Block(4460644)),
+            (Hardfork::London, ForkCondition::Block(5062605)),
+            (
+                Hardfork::Paris,
+                ForkCondition::TTD { fork_block: None, total_difficulty: U256::from(0) },
+            ),
+            (Hardfork::Shanghai, ForkCondition::Timestamp(0)),
+        ]),
+        deposit_contract: None,
+        ..Default::default()
+    }
+    .into()
+});
+
+/// The Taiko A7 spec
+pub static TAIKO_MAINNET: Lazy<Arc<ChainSpec>> = Lazy::new(|| {
+    ChainSpec {
+        chain: 167000.into(),
+        genesis: serde_json::from_str(include_str!("../../res/genesis/mainnet.json"))
+            .expect("Can't deserialize Mainnet genesis json"),
+        genesis_hash: None,
+        paris_block_and_final_difficulty: None,
+        fork_timestamps: ForkTimestamps::default().shanghai(0),
+        hardforks: BTreeMap::from([
+            (Hardfork::Frontier, ForkCondition::Block(0)),
+            (Hardfork::Homestead, ForkCondition::Block(0)),
+            (Hardfork::Dao, ForkCondition::Block(0)),
+            (Hardfork::Tangerine, ForkCondition::Block(0)),
+            (Hardfork::SpuriousDragon, ForkCondition::Block(0)),
+            (Hardfork::Byzantium, ForkCondition::Block(0)),
+            (Hardfork::Constantinople, ForkCondition::Block(0)),
+            (Hardfork::Petersburg, ForkCondition::Block(0)),
+            (Hardfork::Istanbul, ForkCondition::Block(1561651)),
+            (Hardfork::Berlin, ForkCondition::Block(4460644)),
+            (Hardfork::London, ForkCondition::Block(5062605)),
+            (
+                Hardfork::Paris,
+                ForkCondition::TTD { fork_block: None, total_difficulty: U256::from(0) },
+            ),
+            (Hardfork::Shanghai, ForkCondition::Timestamp(0)),
+        ]),
+        deposit_contract: None,
+        ..Default::default()
+    }
+    .into()
+});
+
 /// The Goerli spec
 pub static GOERLI: Lazy<Arc<ChainSpec>> = Lazy::new(|| {
     ChainSpec {
@@ -581,6 +647,13 @@ impl ChainSpec {
     #[inline]
     pub fn is_optimism(&self) -> bool {
         self.chain.is_optimism()
+    }
+
+    /// Returns `true` if this chain contains Taiko configuration.
+    #[inline]
+    pub fn is_taiko(&self) -> bool {
+        let id = self.chain.id();
+        id >= 167000 && id <= 168000
     }
 
     /// Returns `true` if this chain is Optimism mainnet.
