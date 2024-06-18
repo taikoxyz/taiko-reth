@@ -106,6 +106,8 @@ pub mod error;
 mod events;
 mod metrics;
 mod service;
+#[cfg(feature = "taiko")]
+mod taiko;
 mod traits;
 
 pub mod noop;
@@ -116,6 +118,11 @@ pub mod test_utils;
 pub use events::Events;
 pub use reth_rpc_types::engine::PayloadId;
 pub use service::{PayloadBuilderHandle, PayloadBuilderService, PayloadStore};
+#[cfg(feature = "taiko")]
+pub use taiko::{
+    TaikoBuiltPayload, TaikoExecutionPayload, TaikoExecutionPayloadEnvelope,
+    TaikoPayloadAttributes, TaikoPayloadBuilderAttributes,
+};
 pub use traits::{KeepPayloadJobAlive, PayloadJob, PayloadJobGenerator};
 
 // re-export the Ethereum engine primitives for convenience

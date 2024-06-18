@@ -2,8 +2,8 @@ use super::access_list::AccessList;
 use crate::{keccak256, Bytes, ChainId, Signature, TxKind, TxType, B256, U256};
 use alloy_rlp::{length_of_length, Decodable, Encodable, Header};
 use bytes::BytesMut;
+use core::mem;
 use reth_codecs::{main_codec, Compact};
-use std::mem;
 
 /// A transaction with a priority fee ([EIP-1559](https://eips.ethereum.org/EIPS/eip-1559)).
 #[main_codec]
@@ -53,6 +53,9 @@ pub struct TxEip1559 {
     /// A gas cost is charged, though at a discount relative to the cost of
     /// accessing outside the list.
     pub access_list: AccessList,
+    /// CHANGE(taiko): Add is_anchor field
+    #[cfg(feature = "taiko")]
+    pub is_anchor: bool,
     /// Input has two uses depending if transaction is Create or Call (if `to` field is None or
     /// Some). pub init: An unlimited size byte array specifying the
     /// EVM-code for the account initialisation procedure CREATE,
@@ -63,7 +66,7 @@ pub struct TxEip1559 {
 
 impl TxEip1559 {
     /// Returns the effective gas price for the given `base_fee`.
-    pub fn effective_gas_price(&self, base_fee: Option<u64>) -> u128 {
+    pub const fn effective_gas_price(&self, base_fee: Option<u64>) -> u128 {
         match base_fee {
             None => self.max_fee_per_gas,
             Some(base_fee) => {
@@ -80,7 +83,7 @@ impl TxEip1559 {
         }
     }
 
-    /// Decodes the inner [TxEip1559] fields from RLP bytes.
+    /// Decodes the inner [`TxEip1559`] fields from RLP bytes.
     ///
     /// NOTE: This assumes a RLP header has already been decoded, and _just_ decodes the following
     /// RLP fields in the following order:
@@ -105,20 +108,27 @@ impl TxEip1559 {
             value: Decodable::decode(buf)?,
             input: Decodable::decode(buf)?,
             access_list: Decodable::decode(buf)?,
+            #[cfg(feature = "taiko")]
+            is_anchor: Decodable::decode(buf)?,
         })
     }
 
     /// Encodes only the transaction's fields into the desired buffer, without a RLP header.
     pub(crate) fn fields_len(&self) -> usize {
-        self.chain_id.length() +
-            self.nonce.length() +
-            self.max_priority_fee_per_gas.length() +
-            self.max_fee_per_gas.length() +
-            self.gas_limit.length() +
-            self.to.length() +
-            self.value.length() +
-            self.input.0.length() +
-            self.access_list.length()
+        let anchor_len = 0;
+        #[cfg(feature = "taiko")]
+        let anchor_len = self.is_anchor.length();
+
+        self.chain_id.length()
+            + self.nonce.length()
+            + self.max_priority_fee_per_gas.length()
+            + self.max_fee_per_gas.length()
+            + self.gas_limit.length()
+            + self.to.length()
+            + self.value.length()
+            + self.input.0.length()
+            + self.access_list.length()
+            + anchor_len
     }
 
     /// Encodes only the transaction's fields into the desired buffer, without a RLP header.
@@ -132,6 +142,8 @@ impl TxEip1559 {
         self.value.encode(out);
         self.input.0.encode(out);
         self.access_list.encode(out);
+        #[cfg(feature = "taiko")]
+        self.is_anchor.encode(out);
     }
 
     /// Inner encoding function that is used for both rlp [`Encodable`] trait and for calculating
@@ -175,11 +187,11 @@ impl TxEip1559 {
     }
 
     /// Get transaction type
-    pub(crate) fn tx_type(&self) -> TxType {
+    pub(crate) const fn tx_type(&self) -> TxType {
         TxType::Eip1559
     }
 
-    /// Calculates a heuristic for the in-memory size of the [TxEip1559] transaction.
+    /// Calculates a heuristic for the in-memory size of the [`TxEip1559`] transaction.
     #[inline]
     pub fn size(&self) -> usize {
         mem::size_of::<ChainId>() + // chain_id
@@ -193,7 +205,7 @@ impl TxEip1559 {
         self.input.len() // input
     }
 
-    /// Encodes the legacy transaction in RLP for signing.
+    /// Encodes the EIP-1559 transaction in RLP for signing.
     ///
     /// This encodes the transaction as:
     /// `tx_type || rlp(chain_id, nonce, max_priority_fee_per_gas, max_fee_per_gas, gas_limit, to,
@@ -243,12 +255,14 @@ mod tests {
             chain_id: 1,
             nonce: 0x42,
             gas_limit: 44386,
-            to: TxKind::Call( hex!("6069a6c32cf691f5982febae4faf8a6f3ab2f0f6").into()),
+            to: TxKind::Call(hex!("6069a6c32cf691f5982febae4faf8a6f3ab2f0f6").into()),
             value: U256::ZERO,
             input:  hex!("a22cb4650000000000000000000000005eee75727d804a2b13038928d36f8b188945a57a0000000000000000000000000000000000000000000000000000000000000000").into(),
             max_fee_per_gas: 0x4a817c800,
             max_priority_fee_per_gas: 0x3b9aca00,
             access_list: AccessList::default(),
+            #[cfg(feature = "taiko")]
+            is_anchor: false,
         });
 
         let sig = Signature {

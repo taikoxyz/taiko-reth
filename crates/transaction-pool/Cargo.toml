@@ -13,14 +13,15 @@ workspace = true
 
 [dependencies]
 # reth
-reth-eth-wire.workspace = true
+reth-chainspec.workspace = true
+reth-eth-wire-types.workspace = true
 reth-primitives.workspace = true
+reth-fs-util.workspace = true
 reth-provider.workspace = true
 reth-tasks.workspace = true
-revm.workspace = true
+
+# ethereum
 alloy-rlp.workspace = true
-reth-revm = { workspace = true, optional = true }
-reth-network-types.workspace = true
 
 # async/futures
 futures-util.workspace = true
@@ -67,6 +68,7 @@ default = ["serde"]
 serde = ["dep:serde"]
 test-utils = ["rand", "paste", "serde"]
 arbitrary = ["proptest", "reth-primitives/arbitrary"]
+taiko = ["reth-primitives/taiko"]
 
 [[bench]]
 name = "truncate"

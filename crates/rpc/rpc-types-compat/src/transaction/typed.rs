@@ -40,6 +40,7 @@ pub fn to_primitive_transaction(
             input: tx.input,
             access_list: tx.access_list,
             max_priority_fee_per_gas: tx.max_priority_fee_per_gas.to(),
+            is_anchor: false,
         }),
         TypedTransactionRequest::EIP4844(tx) => Transaction::Eip4844(TxEip4844 {
             chain_id: tx.chain_id,
@@ -47,7 +48,8 @@ pub fn to_primitive_transaction(
             gas_limit: tx.gas_limit.to(),
             max_fee_per_gas: tx.max_fee_per_gas.to(),
             max_priority_fee_per_gas: tx.max_priority_fee_per_gas.to(),
-            to: tx.kind,
+            placeholder: Some(()),
+            to: tx.to,
             value: tx.value,
             access_list: tx.access_list,
             blob_versioned_hashes: tx.blob_versioned_hashes,

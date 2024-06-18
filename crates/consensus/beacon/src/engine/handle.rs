@@ -6,32 +6,27 @@ use crate::{
 };
 use futures::TryFutureExt;
 use reth_engine_primitives::EngineTypes;
-use reth_interfaces::RethResult;
+use reth_errors::RethResult;
 use reth_rpc_types::engine::{
     CancunPayloadFields, ExecutionPayload, ForkchoiceState, ForkchoiceUpdated, PayloadStatus,
 };
-use tokio::sync::{mpsc, mpsc::UnboundedSender, oneshot};
-use tokio_stream::wrappers::UnboundedReceiverStream;
+use reth_tokio_util::{EventSender, EventStream};
+use tokio::sync::{mpsc::UnboundedSender, oneshot};
+
+#[cfg(feature = "taiko")]
+use reth_payload_builder::TaikoExecutionPayload;
 
 /// A _shareable_ beacon consensus frontend type. Used to interact with the spawned beacon consensus
 /// engine task.
 ///
 /// See also `BeaconConsensusEngine`
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct BeaconConsensusEngineHandle<Engine>
 where
     Engine: EngineTypes,
 {
     pub(crate) to_engine: UnboundedSender<BeaconEngineMessage<Engine>>,
-}
-
-impl<Engine> Clone for BeaconConsensusEngineHandle<Engine>
-where
-    Engine: EngineTypes,
-{
-    fn clone(&self) -> Self {
-        Self { to_engine: self.to_engine.clone() }
-    }
+    event_sender: EventSender<BeaconConsensusEngineEvent>,
 }
 
 // === impl BeaconConsensusEngineHandle ===
@@ -41,8 +36,11 @@ where
     Engine: EngineTypes,
 {
     /// Creates a new beacon consensus engine handle.
-    pub fn new(to_engine: UnboundedSender<BeaconEngineMessage<Engine>>) -> Self {
-        Self { to_engine }
+    pub const fn new(
+        to_engine: UnboundedSender<BeaconEngineMessage<Engine>>,
+        event_sender: EventSender<BeaconConsensusEngineEvent>,
+    ) -> Self {
+        Self { to_engine, event_sender }
     }
 
     /// Sends a new payload message to the beacon consensus engine and waits for a response.
@@ -50,7 +48,8 @@ where
     /// See also <https://github.com/ethereum/execution-apis/blob/3d627c95a4d3510a8187dd02e0250ecb4331d27e/src/engine/shanghai.md#engine_newpayloadv2>
     pub async fn new_payload(
         &self,
-        payload: ExecutionPayload,
+        #[cfg(not(feature = "taiko"))] payload: ExecutionPayload,
+        #[cfg(feature = "taiko")] payload: TaikoExecutionPayload,
         cancun_fields: Option<CancunPayloadFields>,
     ) -> Result<PayloadStatus, BeaconOnNewPayloadError> {
         let (tx, rx) = oneshot::channel();
@@ -97,9 +96,7 @@ where
     }
 
     /// Creates a new [`BeaconConsensusEngineEvent`] listener stream.
-    pub fn event_listener(&self) -> UnboundedReceiverStream<BeaconConsensusEngineEvent> {
-        let (tx, rx) = mpsc::unbounded_channel();
-        let _ = self.to_engine.send(BeaconEngineMessage::EventListener(tx));
-        UnboundedReceiverStream::new(rx)
+    pub fn event_listener(&self) -> EventStream<BeaconConsensusEngineEvent> {
+        self.event_sender.new_listener()
     }
 }
