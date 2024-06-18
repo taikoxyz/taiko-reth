@@ -7,17 +7,17 @@ use crate::{
     TransactionsProvider, WithdrawalsProvider,
 };
 use parking_lot::Mutex;
+use reth_chainspec::{ChainInfo, ChainSpec};
 use reth_db_api::models::{AccountBeforeTx, StoredBlockBodyIndices};
 use reth_evm::ConfigureEvmEnv;
 use reth_primitives::{
-    keccak256, proofs::AccountProof, Account, Address, Block, BlockHash, BlockHashOrNumber,
-    BlockId, BlockNumber, BlockWithSenders, Bytecode, Bytes, ChainInfo, ChainSpec, Header,
-    L1Origin, Receipt, SealedBlock, SealedBlockWithSenders, SealedHeader, StorageKey, StorageValue,
-    TransactionMeta, TransactionSigned, TransactionSignedNoHash, TxHash, TxNumber, Withdrawal,
-    Withdrawals, B256, U256,
+    keccak256, Account, Address, Block, BlockHash, BlockHashOrNumber, BlockId, BlockNumber,
+    BlockWithSenders, Bytecode, Bytes, Header, L1Origin, Receipt, SealedBlock, SealedBlockWithSenders,
+    SealedHeader, StorageKey, StorageValue, TransactionMeta, TransactionSigned,
+    TransactionSignedNoHash, TxHash, TxNumber, Withdrawal, Withdrawals, B256, U256,
 };
 use reth_storage_errors::provider::{ProviderError, ProviderResult};
-use reth_trie::updates::TrieUpdates;
+use reth_trie::{updates::TrieUpdates, AccountProof};
 use revm::{
     db::BundleState,
     primitives::{BlockEnv, CfgEnvWithHandlerCfg},
@@ -47,7 +47,7 @@ impl Default for MockEthProvider {
             blocks: Default::default(),
             headers: Default::default(),
             accounts: Default::default(),
-            chain_spec: Arc::new(reth_primitives::ChainSpecBuilder::mainnet().build()),
+            chain_spec: Arc::new(reth_chainspec::ChainSpecBuilder::mainnet().build()),
         }
     }
 }

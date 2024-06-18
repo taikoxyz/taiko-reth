@@ -1449,7 +1449,7 @@ pub struct MockTransactionSet {
 
 impl MockTransactionSet {
     /// Create a new [`MockTransactionSet`] from a list of transactions
-    fn new(transactions: Vec<MockTransaction>) -> Self {
+    const fn new(transactions: Vec<MockTransaction>) -> Self {
         Self { transactions }
     }
 

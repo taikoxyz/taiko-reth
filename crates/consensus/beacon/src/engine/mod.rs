@@ -244,7 +244,6 @@ where
         task_spawner: Box<dyn TaskSpawner>,
         sync_state_updater: Box<dyn NetworkSyncUpdater>,
         max_block: Option<BlockNumber>,
-        run_pipeline_continuously: bool,
         payload_builder: PayloadBuilderHandle<EngineT>,
         target: Option<B256>,
         pipeline_run_threshold: u64,
@@ -258,7 +257,6 @@ where
             task_spawner,
             sync_state_updater,
             max_block,
-            run_pipeline_continuously,
             payload_builder,
             target,
             pipeline_run_threshold,
@@ -289,7 +287,6 @@ where
         task_spawner: Box<dyn TaskSpawner>,
         sync_state_updater: Box<dyn NetworkSyncUpdater>,
         max_block: Option<BlockNumber>,
-        run_pipeline_continuously: bool,
         payload_builder: PayloadBuilderHandle<EngineT>,
         target: Option<B256>,
         pipeline_run_threshold: u64,
@@ -303,7 +300,6 @@ where
             pipeline,
             client,
             task_spawner.clone(),
-            run_pipeline_continuously,
             max_block,
             blockchain.chain_spec(),
             event_sender.clone(),
@@ -1453,11 +1449,6 @@ where
             return Ok(());
         }
 
-        // update the canon chain if continuous is enabled
-        if self.sync.run_pipeline_continuously() {
-            self.set_canonical_head(ctrl.block_number().unwrap_or_default())?;
-        }
-
         let sync_target_state = match self.forkchoice_state_tracker.sync_target_state() {
             Some(current_state) => current_state,
             None => {
@@ -1990,7 +1981,7 @@ mod tests {
         BeaconForkChoiceUpdateError,
     };
     use assert_matches::assert_matches;
-    use reth_primitives::{ChainSpecBuilder, MAINNET};
+    use reth_chainspec::{ChainSpecBuilder, MAINNET};
     use reth_provider::{BlockWriter, ProviderFactory};
     use reth_rpc_types::engine::{ForkchoiceState, ForkchoiceUpdated, PayloadStatus};
     use reth_rpc_types_compat::engine::payload::block_to_payload_v1;

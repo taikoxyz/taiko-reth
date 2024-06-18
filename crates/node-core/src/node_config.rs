@@ -11,12 +11,13 @@ use crate::{
 };
 use metrics_exporter_prometheus::PrometheusHandle;
 use once_cell::sync::Lazy;
+use reth_chainspec::{ChainSpec, MAINNET};
 use reth_config::config::PruneConfig;
 use reth_db_api::{database::Database, database_metrics::DatabaseMetrics};
 use reth_network_p2p::headers::client::HeadersClient;
 use reth_primitives::{
     constants::eip4844::MAINNET_KZG_TRUSTED_SETUP, kzg::KzgSettings, BlockHashOrNumber,
-    BlockNumber, ChainSpec, Head, SealedHeader, B256, MAINNET,
+    BlockNumber, Head, SealedHeader, B256,
 };
 use reth_provider::{
     providers::StaticFileProvider, BlockHashReader, HeaderProvider, ProviderFactory,
@@ -237,27 +238,6 @@ impl NodeConfig {
     pub const fn with_pruning(mut self, pruning: PruningArgs) -> Self {
         self.pruning = pruning;
         self
-    }
-
-    /// Returns the initial pipeline target, based on whether or not the node is running in
-    /// `debug.tip` mode, `debug.continuous` mode, or neither.
-    ///
-    /// If running in `debug.tip` mode, the configured tip is returned.
-    /// Otherwise, if running in `debug.continuous` mode, the genesis hash is returned.
-    /// Otherwise, `None` is returned. This is what the node will do by default.
-    pub fn initial_pipeline_target(&self, genesis_hash: B256) -> Option<B256> {
-        if let Some(tip) = self.debug.tip {
-            // Set the provided tip as the initial pipeline target.
-            debug!(target: "reth::cli", %tip, "Tip manually set");
-            Some(tip)
-        } else if self.debug.continuous {
-            // Set genesis as the initial pipeline target.
-            // This will allow the downloader to start
-            debug!(target: "reth::cli", "Continuous sync mode enabled");
-            Some(genesis_hash)
-        } else {
-            None
-        }
     }
 
     /// Returns pruning configuration.

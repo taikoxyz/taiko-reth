@@ -6,10 +6,12 @@ use std::{
     net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV4, SocketAddrV6},
 };
 
+use alloy_primitives::Bytes;
 use derive_more::Display;
 use discv5::ListenConfig;
 use multiaddr::{Multiaddr, Protocol};
-use reth_primitives::{Bytes, EnrForkIdEntry, ForkId, NodeRecord};
+use reth_ethereum_forks::{EnrForkIdEntry, ForkId};
+use reth_network_peers::NodeRecord;
 use tracing::warn;
 
 use crate::{enr::discv4_id_to_multiaddr_id, filter::MustNotIncludeKeys, NetworkStackId};
@@ -447,7 +449,7 @@ impl BootNode {
 mod test {
     use std::net::SocketAddrV4;
 
-    use reth_primitives::hex;
+    use alloy_primitives::hex;
 
     use super::*;
 

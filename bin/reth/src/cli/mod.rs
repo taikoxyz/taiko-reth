@@ -13,12 +13,13 @@ use crate::{
     version::{LONG_VERSION, SHORT_VERSION},
 };
 use clap::{value_parser, Parser, Subcommand};
+use reth_chainspec::ChainSpec;
 use reth_cli_runner::CliRunner;
 use reth_db::DatabaseEnv;
 use reth_node_builder::{NodeBuilder, WithLaunchContext};
-use reth_primitives::ChainSpec;
 use reth_tracing::FileWorkerGuard;
 use std::{ffi::OsString, fmt, future::Future, sync::Arc};
+use tracing::info;
 
 /// Re-export of the `reth_node_core` types specifically in the `cli` module.
 ///
@@ -139,6 +140,7 @@ impl<Ext: clap::Args + fmt::Debug> Cli<Ext> {
             self.logs.log_file_directory.join(self.chain.chain.to_string());
 
         let _guard = self.init_tracing()?;
+        info!(target: "reth::cli", "Initialized tracing, debug log directory: {}", self.logs.log_file_directory);
 
         let runner = CliRunner::default();
         match self.command {
