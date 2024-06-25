@@ -506,13 +506,13 @@ raiko-lib = { git = "https://github.com/taikoxyz/raiko.git", branch = "reth-wip"
 anyhow = "1.0"
 
 [patch.crates-io]
-revm = { git = "https://github.com/taikoxyz/revm.git", branch = "v36-taiko", default-features = false, features = [
+revm = { git = "https://github.com/taikoxyz/revm.git", branch = "v36-taiko-kzg", default-features = false, features = [
     "std",
     "serde",
     "taiko",
 ]}
-revm-interpreter = { git = "https://github.com/taikoxyz/revm.git", branch = "v36-taiko" }
-revm-precompile = { git = "https://github.com/taikoxyz/revm.git", branch = "v36-taiko" }
-revm-primitives = { git = "https://github.com/taikoxyz/revm.git", branch = "v36-taiko"}
-c-kzg = { git = "https://github.com/brechtpd/c-kzg-4844", branch = "for-alpha7" }
+revm-interpreter = { git = "https://github.com/taikoxyz/revm.git", branch = "v36-taiko-kzg" }
+revm-precompile = { git = "https://github.com/taikoxyz/revm.git", branch = "v36-taiko-kzg" }
+revm-primitives = { git = "https://github.com/taikoxyz/revm.git", branch = "v36-taiko-kzg"}
 secp256k1 = { git = "https://github.com/CeciliaZ030/rust-secp256k1", branch = "sp1-patch" }
+blst = { git = "https://github.com/CeciliaZ030/blst.git", branch = "v0.3.12-serialize" }
