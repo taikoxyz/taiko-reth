@@ -9523,7 +9523,7 @@ dependencies = [
 [[package]]
 name = "revm"
 version = "9.0.0"
-source = "git+https://github.com/taikoxyz/revm.git?branch=v36-taiko-kzg#44e1c7f884127f207103c647dac7b8828a1116a4"
+source = "git+https://github.com/taikoxyz/revm.git?branch=v36-taiko-kzg#610eaf6438fd43c918cb3147894b5caea9d7e8e6"
 dependencies = [
  "auto_impl",
  "cfg-if",
@@ -9568,7 +9568,7 @@ dependencies = [
 [[package]]
 name = "revm-interpreter"
 version = "5.0.0"
-source = "git+https://github.com/taikoxyz/revm.git?branch=v36-taiko-kzg#44e1c7f884127f207103c647dac7b8828a1116a4"
+source = "git+https://github.com/taikoxyz/revm.git?branch=v36-taiko-kzg#610eaf6438fd43c918cb3147894b5caea9d7e8e6"
 dependencies = [
  "revm-primitives 4.0.0 (git+https://github.com/taikoxyz/revm.git?branch=v36-taiko-kzg)",
  "serde",
@@ -9586,7 +9586,7 @@ dependencies = [
 [[package]]
 name = "revm-precompile"
 version = "7.0.0"
-source = "git+https://github.com/taikoxyz/revm.git?branch=v36-taiko-kzg#44e1c7f884127f207103c647dac7b8828a1116a4"
+source = "git+https://github.com/taikoxyz/revm.git?branch=v36-taiko-kzg#610eaf6438fd43c918cb3147894b5caea9d7e8e6"
 dependencies = [
  "aurora-engine-modexp",
  "blst",
@@ -9620,7 +9620,7 @@ dependencies = [
 [[package]]
 name = "revm-primitives"
 version = "4.0.0"
-source = "git+https://github.com/taikoxyz/revm.git?branch=v36-taiko-kzg#44e1c7f884127f207103c647dac7b8828a1116a4"
+source = "git+https://github.com/taikoxyz/revm.git?branch=v36-taiko-kzg#610eaf6438fd43c918cb3147894b5caea9d7e8e6"
 dependencies = [
  "alloy-primitives",
  "auto_impl",
