@@ -131,7 +131,7 @@ impl ConfigBuilder {
     }
 
     /// Adds boot nodes in the form a list of [`NodeRecord`]s, parsed enodes.
-    pub fn add_unsigned_boot_nodes(mut self, enodes: impl Iterator<Item = NodeRecord>) -> Self {
+    pub fn add_unsigned_boot_nodes(mut self, enodes: impl IntoIterator<Item = NodeRecord>) -> Self {
         for node in enodes {
             if let Ok(node) = BootNode::from_unsigned(node) {
                 self.bootstrap_nodes.insert(node);
@@ -190,7 +190,7 @@ impl ConfigBuilder {
         self
     }
 
-    /// Sets the the number of times at which to run boost lookup queries to bootstrap the node.
+    /// Sets the number of times at which to run boost lookup queries to bootstrap the node.
     pub const fn bootstrap_lookup_countdown(mut self, counts: u64) -> Self {
         self.bootstrap_lookup_countdown = Some(counts);
         self

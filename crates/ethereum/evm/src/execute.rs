@@ -4,6 +4,8 @@ use crate::{
     dao_fork::{DAO_HARDFORK_BENEFICIARY, DAO_HARDKFORK_ACCOUNTS},
     EthEvmConfig,
 };
+#[cfg(not(feature = "std"))]
+use alloc::{sync::Arc, vec, vec::Vec};
 use reth_chainspec::{ChainSpec, MAINNET};
 use reth_ethereum_consensus::validate_block_post_execution;
 use reth_evm::{
@@ -29,10 +31,11 @@ use reth_revm::{
 };
 use revm_primitives::{
     db::{Database, DatabaseCommit},
-    BlockEnv, CfgEnvWithHandlerCfg, EnvWithHandlerCfg, ResultAndState,
+    BlockEnv, CfgEnvWithHandlerCfg, EVMError, EnvWithHandlerCfg, ResultAndState,
 };
-use std::sync::Arc;
 
+#[cfg(feature = "std")]
+use std::{fmt::Display, sync::Arc};
 /// Provides executors to execute regular ethereum blocks
 #[derive(Debug, Clone)]
 pub struct EthExecutorProvider<EvmConfig = EthEvmConfig> {
@@ -65,7 +68,7 @@ where
 {
     fn eth_executor<DB>(&self, db: DB) -> EthBlockExecutor<EvmConfig, DB>
     where
-        DB: Database<Error = ProviderError>,
+        DB: Database<Error: Into<ProviderError>>,
     {
         EthBlockExecutor::new(
             self.chain_spec.clone(),
@@ -79,20 +82,22 @@ impl<EvmConfig> BlockExecutorProvider for EthExecutorProvider<EvmConfig>
 where
     EvmConfig: ConfigureEvm,
 {
-    type Executor<DB: Database<Error = ProviderError>> = EthBlockExecutor<EvmConfig, DB>;
+    type Executor<DB: Database<Error: Into<ProviderError> + Display>> =
+        EthBlockExecutor<EvmConfig, DB>;
 
-    type BatchExecutor<DB: Database<Error = ProviderError>> = EthBatchExecutor<EvmConfig, DB>;
+    type BatchExecutor<DB: Database<Error: Into<ProviderError> + Display>> =
+        EthBatchExecutor<EvmConfig, DB>;
 
     fn executor<DB>(&self, db: DB) -> Self::Executor<DB>
     where
-        DB: Database<Error = ProviderError>,
+        DB: Database<Error: Into<ProviderError> + Display>,
     {
         self.eth_executor(db)
     }
 
     fn batch_executor<DB>(&self, db: DB, prune_modes: PruneModes) -> Self::BatchExecutor<DB>
     where
-        DB: Database<Error = ProviderError>,
+        DB: Database<Error: Into<ProviderError> + Display>,
     {
         let executor = self.eth_executor(db);
         EthBatchExecutor {
@@ -140,7 +145,8 @@ where
         mut evm: Evm<'_, Ext, &mut State<DB>>,
     ) -> Result<EthExecuteOutput, BlockExecutionError>
     where
-        DB: Database<Error = ProviderError>,
+        DB: Database,
+        DB::Error: Into<ProviderError> + std::fmt::Display,
     {
         // apply pre execution changes
         apply_beacon_root_contract_call(
@@ -177,10 +183,17 @@ where
 
             // Execute transaction.
             let ResultAndState { result, state } = evm.transact().map_err(move |err| {
+                let new_err = match err {
+                    EVMError::Transaction(e) => EVMError::Transaction(e),
+                    EVMError::Header(e) => EVMError::Header(e),
+                    EVMError::Database(e) => EVMError::Database(e.into()),
+                    EVMError::Custom(e) => EVMError::Custom(e),
+                    EVMError::Precompile(e) => EVMError::Precompile(e),
+                };
                 // Ensure hash is calculated for error log, if not already done
                 BlockValidationError::EVM {
                     hash: transaction.recalculate_hash(),
-                    error: err.into(),
+                    error: Box::new(new_err),
                 }
             })?;
             evm.db_mut().commit(state);
@@ -255,7 +268,7 @@ impl<EvmConfig, DB> EthBlockExecutor<EvmConfig, DB> {
 impl<EvmConfig, DB> EthBlockExecutor<EvmConfig, DB>
 where
     EvmConfig: ConfigureEvm,
-    DB: Database<Error = ProviderError>,
+    DB: Database<Error: Into<ProviderError> + Display>,
 {
     /// Configures a new evm configuration and block environment for the given block.
     ///
@@ -353,7 +366,7 @@ where
 impl<EvmConfig, DB> Executor<DB> for EthBlockExecutor<EvmConfig, DB>
 where
     EvmConfig: ConfigureEvm,
-    DB: Database<Error = ProviderError>,
+    DB: Database<Error: Into<ProviderError> + std::fmt::Display>,
 {
     type Input<'a> = BlockExecutionInput<'a, BlockWithSenders>;
     type Output = BlockExecutionOutput<Receipt>;
@@ -403,7 +416,7 @@ impl<EvmConfig, DB> EthBatchExecutor<EvmConfig, DB> {
 impl<EvmConfig, DB> BatchExecutor<DB> for EthBatchExecutor<EvmConfig, DB>
 where
     EvmConfig: ConfigureEvm,
-    DB: Database<Error = ProviderError>,
+    DB: Database<Error: Into<ProviderError> + Display>,
 {
     type Input<'a> = BlockExecutionInput<'a, BlockWithSenders>;
     type Output = ExecutionOutcome;
@@ -467,11 +480,10 @@ mod tests {
         keccak256, public_key_to_address, Account, Block, Transaction, TxKind, TxLegacy, B256,
     };
     use reth_revm::{
-        database::StateProviderDatabase, state_change::HISTORY_SERVE_WINDOW,
-        test_utils::StateProviderTest, TransitionState,
+        database::StateProviderDatabase, test_utils::StateProviderTest, TransitionState,
     };
     use reth_testing_utils::generators::{self, sign_tx_with_key_pair};
-    use revm_primitives::{b256, fixed_bytes, Bytes};
+    use revm_primitives::{b256, fixed_bytes, Bytes, BLOCKHASH_SERVE_WINDOW};
     use secp256k1::{Keypair, Secp256k1};
     use std::collections::HashMap;
 
@@ -976,7 +988,7 @@ mod tests {
 
     #[test]
     fn eip_2935_fork_activation_within_window_bounds() {
-        let fork_activation_block = HISTORY_SERVE_WINDOW - 10;
+        let fork_activation_block = (BLOCKHASH_SERVE_WINDOW - 10) as u64;
         let db = create_state_provider_with_block_hashes(fork_activation_block);
 
         let chain_spec = Arc::new(
@@ -1039,7 +1051,7 @@ mod tests {
 
     #[test]
     fn eip_2935_fork_activation_outside_window_bounds() {
-        let fork_activation_block = HISTORY_SERVE_WINDOW + 256;
+        let fork_activation_block = (BLOCKHASH_SERVE_WINDOW + 256) as u64;
         let db = create_state_provider_with_block_hashes(fork_activation_block);
 
         let chain_spec = Arc::new(
@@ -1090,7 +1102,7 @@ mod tests {
                 .state_mut()
                 .storage(
                     HISTORY_STORAGE_ADDRESS,
-                    U256::from(fork_activation_block % HISTORY_SERVE_WINDOW - 1)
+                    U256::from(fork_activation_block % BLOCKHASH_SERVE_WINDOW as u64 - 1)
                 )
                 .unwrap(),
             U256::ZERO
