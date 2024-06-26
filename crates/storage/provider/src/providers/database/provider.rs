@@ -8,14 +8,15 @@ use crate::{
     AccountReader, BlockExecutionWriter, BlockHashReader, BlockNumReader, BlockReader, BlockWriter,
     Chain, EvmEnvProvider, FinalizedBlockReader, FinalizedBlockWriter, HashingWriter,
     HeaderProvider, HeaderSyncGap, HeaderSyncGapProvider, HistoricalStateProvider, HistoryWriter,
-    LatestStateProvider, OriginalValuesKnown, ProviderError, PruneCheckpointReader,
-    PruneCheckpointWriter, RequestsProvider, StageCheckpointReader, StateProviderBox, StateWriter,
-    StatsReader, StorageReader, TransactionVariant, TransactionsProvider, TransactionsProviderExt,
-    WithdrawalsProvider,
+    L1OriginReader, L1OriginWriter, LatestStateProvider, OriginalValuesKnown, ProviderError,
+    PruneCheckpointReader, PruneCheckpointWriter, RequestsProvider, StageCheckpointReader,
+    StateProviderBox, StateWriter, StatsReader, StorageReader, TransactionVariant,
+    TransactionsProvider, TransactionsProviderExt, WithdrawalsProvider,
 };
+use alloy_rpc_types_engine::L1Origin;
 use itertools::{izip, Itertools};
 use reth_chainspec::{ChainInfo, ChainSpec};
-use reth_db::{tables, BlockNumberList};
+use reth_db::{models::HeadL1OriginKey, tables, BlockNumberList};
 use reth_db_api::{
     common::KeyValue,
     cursor::{DbCursorRO, DbCursorRW, DbDupCursorRO, RangeWalker},
@@ -2119,6 +2120,26 @@ impl<TX: DbTxMut> StageCheckpointWriter for DatabaseProvider<TX> {
         }
 
         Ok(())
+    }
+}
+
+impl<TX: DbTx> L1OriginReader for DatabaseProvider<TX> {
+    fn get_l1_origin(&self, block_hash: BlockNumber) -> ProviderResult<Option<L1Origin>> {
+        Ok(self.tx.get::<tables::L1Origins>(block_hash)?)
+    }
+
+    fn get_head_l1_origin(&self) -> ProviderResult<Option<BlockNumber>> {
+        Ok(self.tx.get::<tables::HeadL1Origin>(HeadL1OriginKey)?)
+    }
+}
+
+impl<TX: DbTxMut> L1OriginWriter for DatabaseProvider<TX> {
+    fn save_l1_origin(&self, block_hash: BlockNumber, l1_origin: L1Origin) -> ProviderResult<()> {
+        Ok(self.tx.put::<tables::L1Origins>(block_hash, l1_origin)?)
+    }
+
+    fn save_head_l1_origin(&self, block_hash: BlockNumber) -> ProviderResult<()> {
+        Ok(self.tx.put::<tables::HeadL1Origin>(HeadL1OriginKey, block_hash)?)
     }
 }
 

@@ -103,7 +103,7 @@ pub struct BlockExecutionOutput<T, DB> {
     /// The total gas used by the block.
     pub gas_used: u64,
     /// The full state.
-    pub db: State<DB>,
+    pub db: Option<State<DB>>,
 }
 
 /// A helper type for ethereum block inputs that consists of a block and the total difficulty.

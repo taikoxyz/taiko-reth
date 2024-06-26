@@ -307,7 +307,7 @@ reth-optimism-primitives = { path = "crates/optimism/primitives" }
 reth-payload-builder = { path = "crates/payload/builder" }
 reth-payload-primitives = { path = "crates/payload/primitives" }
 reth-payload-validator = { path = "crates/payload/validator" }
-reth-primitives = { path = "crates/primitives" }
+reth-primitives = { path = "crates/primitives", features = ["taiko"] }
 reth-primitives-traits = { path = "crates/primitives-traits" }
 reth-provider = { path = "crates/storage/provider" }
 reth-prune = { path = "crates/prune/prune" }
@@ -342,7 +342,9 @@ reth-trie-parallel = { path = "crates/trie/parallel" }
 revm = { version = "9.0.0", features = [
     "std",
     "secp256k1",
+    "serde",
     "blst",
+    "taiko",
 ], default-features = false }
 revm-primitives = { version = "4.0.0", features = [
     "std",
@@ -360,11 +362,15 @@ alloy-rpc-types = { version = "0.1", default-features = false, features = [
     "eth",
 ] }
 alloy-rpc-types-anvil = { version = "0.1", default-features = false }
-alloy-rpc-types-beacon = { version = "0.1", default-features = false }
+alloy-rpc-types-beacon = { version = "0.1", default-features = false, features = [
+    "taiko",
+] }
 alloy-rpc-types-admin = { version = "0.1", default-features = false }
 alloy-rpc-types-txpool = { version = "0.1", default-features = false }
 alloy-serde = { version = "0.1", default-features = false }
-alloy-rpc-types-engine = { version = "0.1", default-features = false }
+alloy-rpc-types-engine = { version = "0.1", default-features = false, features = [
+    "taiko",
+] }
 alloy-rpc-types-eth = { version = "0.1", default-features = false }
 alloy-rpc-types-trace = { version = "0.1", default-features = false }
 alloy-genesis = { version = "0.1", default-features = false }
@@ -506,13 +512,15 @@ raiko-lib = { git = "https://github.com/taikoxyz/raiko.git", branch = "reth-wip"
 anyhow = "1.0"
 
 [patch.crates-io]
-revm = { git = "https://github.com/taikoxyz/revm.git", branch = "v36-taiko", default-features = false, features = [
-    "std",
-    "serde",
-    "taiko",
-]}
-revm-interpreter = { git = "https://github.com/taikoxyz/revm.git", branch = "v36-taiko" }
-revm-precompile = { git = "https://github.com/taikoxyz/revm.git", branch = "v36-taiko" }
-revm-primitives = { git = "https://github.com/taikoxyz/revm.git", branch = "v36-taiko"}
+alloy-rpc-types-engine = { git = "https://github.com/taikoxyz/alloy.git", branch = "v0.1.1-taiko" }
+alloy-rpc-types-beacon = { git = "https://github.com/taikoxyz/alloy.git", branch = "v0.1.1-taiko" }
+alloy-eips = { git = "https://github.com/taikoxyz/alloy.git", branch = "v0.1.1-taiko" }
+revm = { git = "https://github.com/taikoxyz/revm.git", branch = "v36-taiko-reth" }
+revm-interpreter = { git = "https://github.com/taikoxyz/revm.git", branch = "v36-taiko-reth" }
+revm-precompile = { git = "https://github.com/taikoxyz/revm.git", branch = "v36-taiko-reth" }
+revm-primitives = { git = "https://github.com/taikoxyz/revm.git", branch = "v36-taiko-reth" }
 c-kzg = { git = "https://github.com/brechtpd/c-kzg-4844", branch = "for-alpha7" }
 secp256k1 = { git = "https://github.com/CeciliaZ030/rust-secp256k1", branch = "sp1-patch" }
+
+[patch.'https://github.com/bluealloy/revm.git']
+revm = { git = "https://github.com/taikoxyz/revm.git", branch = "v36-taiko-reth" }

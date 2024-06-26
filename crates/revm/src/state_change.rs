@@ -17,7 +17,7 @@ use reth_storage_errors::provider::ProviderError;
 use revm::{
     interpreter::Host,
     primitives::{
-        Account, AccountInfo, Bytecode, StorageSlot as EvmStorageSlot, ExecutionResult, FixedBytes, ResultAndState,
+        Account, AccountInfo, Bytecode, EvmStorageSlot, ExecutionResult, FixedBytes, ResultAndState,
     },
     Database, DatabaseCommit, Evm,
 };

@@ -149,6 +149,8 @@ pub fn block_to_payload_v1(value: SealedBlock) -> ExecutionPayloadV1 {
         base_fee_per_gas: U256::from(value.base_fee_per_gas.unwrap_or_default()),
         block_hash: value.hash(),
         transactions,
+        tx_hash: Default::default(),
+        withdrawals_hash: Default::default(),
     }
 }
 
@@ -172,6 +174,8 @@ pub fn block_to_payload_v2(value: SealedBlock) -> ExecutionPayloadV2 {
             base_fee_per_gas: U256::from(value.base_fee_per_gas.unwrap_or_default()),
             block_hash: value.hash(),
             transactions,
+            tx_hash: Default::default(),
+            withdrawals_hash: Default::default(),
         },
         withdrawals: value.withdrawals.unwrap_or_default().into_inner(),
     }
@@ -201,6 +205,8 @@ pub fn block_to_payload_v3(value: SealedBlock) -> (ExecutionPayloadV3, Option<B2
                 base_fee_per_gas: U256::from(value.base_fee_per_gas.unwrap_or_default()),
                 block_hash: value.hash(),
                 transactions,
+                tx_hash: Default::default(),
+                withdrawals_hash: Default::default(),
             },
             withdrawals: value.withdrawals.unwrap_or_default().into_inner(),
         },
@@ -386,6 +392,8 @@ pub fn execution_payload_from_sealed_block(value: SealedBlock) -> ExecutionPaylo
         base_fee_per_gas: U256::from(value.base_fee_per_gas.unwrap_or_default()),
         block_hash: value.hash(),
         transactions,
+        tx_hash: Default::default(),
+        withdrawals_hash: Default::default(),
     }
 }
 

@@ -212,6 +212,8 @@ fn rich_block_to_execution_payload_v3(block: RichBlock) -> ExecutionNewPayload {
                         buffer.into()
                     })
                     .collect(),
+                tx_hash: Default::default(),
+                withdrawals_hash: Default::default(),
             },
             withdrawals: block.withdrawals.clone().unwrap_or_default(),
         },

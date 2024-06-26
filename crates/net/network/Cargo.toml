@@ -39,7 +39,13 @@ discv5.workspace = true
 # async/futures
 futures.workspace = true
 pin-project.workspace = true
-tokio = { workspace = true, features = ["io-util", "net", "macros", "rt-multi-thread", "time"] }
+tokio = { workspace = true, features = [
+    "io-util",
+    "net",
+    "macros",
+    "rt-multi-thread",
+    "time",
+] }
 tokio-stream.workspace = true
 tokio-util = { workspace = true, features = ["codec"] }
 
@@ -60,7 +66,11 @@ fnv = "1.0"
 thiserror.workspace = true
 parking_lot.workspace = true
 rand.workspace = true
-secp256k1 = { workspace = true, features = ["global-context", "rand-std", "recovery"] }
+secp256k1 = { workspace = true, features = [
+    "global-context",
+    "rand-std",
+    "recovery",
+] }
 derive_more.workspace = true
 schnellru.workspace = true
 itertools.workspace = true
@@ -83,7 +93,7 @@ reth-transaction-pool = { workspace = true, features = ["test-utils"] }
 
 # alloy deps for testing against nodes
 alloy-node-bindings.workspace = true
-alloy-provider= { workspace = true, features = ["admin-api"] }
+alloy-provider = { workspace = true, features = ["admin-api"] }
 
 # misc
 serial_test.workspace = true
@@ -94,9 +104,19 @@ pprof = { workspace = true, features = ["criterion", "flamegraph"] }
 criterion = { workspace = true, features = ["async_tokio", "html_reports"] }
 
 [features]
-default = ["serde"]
-serde = ["dep:serde", "dep:humantime-serde", "secp256k1/serde", "enr/serde", "dep:serde_json"]
-test-utils = ["reth-provider/test-utils", "dep:tempfile", "reth-transaction-pool/test-utils"]
+default = ["serde", "reth-chainspec/network"]
+serde = [
+    "dep:serde",
+    "dep:humantime-serde",
+    "secp256k1/serde",
+    "enr/serde",
+    "dep:serde_json",
+]
+test-utils = [
+    "reth-provider/test-utils",
+    "dep:tempfile",
+    "reth-transaction-pool/test-utils",
+]
 geth-tests = []
 
 [[bench]]

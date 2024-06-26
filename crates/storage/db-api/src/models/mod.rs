@@ -7,6 +7,7 @@ use crate::{
 use reth_codecs::{main_codec, Compact};
 use reth_primitives::{Address, B256, *};
 use reth_prune_types::{PruneCheckpoint, PruneSegment};
+use reth_rpc_types::engine::L1Origin;
 use reth_stages_types::StageCheckpoint;
 use reth_trie_common::{StoredNibbles, StoredNibblesSubKey, *};
 
@@ -16,11 +17,13 @@ pub mod client_version;
 pub mod integer_list;
 pub mod sharded_key;
 pub mod storage_sharded_key;
+pub mod taiko;
 
 pub use accounts::*;
 pub use blocks::*;
 pub use client_version::ClientVersion;
 pub use sharded_key::ShardedKey;
+pub use taiko::*;
 
 /// Macro that implements [`Encode`] and [`Decode`] for uint types.
 macro_rules! impl_uints {
@@ -223,7 +226,8 @@ impl_compression_for_compact!(
     ClientVersion,
     Requests,
     // Non-DB
-    GenesisAccount
+    GenesisAccount,
+    L1Origin
 );
 
 macro_rules! impl_compression_fixed_compact {

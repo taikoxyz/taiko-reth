@@ -16,6 +16,7 @@ reth-codecs-derive = { path = "./derive", default-features = false }
 
 # eth
 alloy-consensus = { workspace = true, optional = true }
+alloy-rpc-types-engine = { workspace = true, optional = true }
 alloy-eips = { workspace = true, optional = true }
 alloy-genesis = { workspace = true, optional = true }
 alloy-primitives.workspace = true
@@ -46,5 +47,6 @@ alloy = [
     "dep:alloy-eips",
     "dep:alloy-genesis",
     "dep:modular-bitfield",
+    "dep:alloy-rpc-types-engine",
 ]
 optimism = ["reth-codecs-derive/optimism"]

@@ -2,8 +2,10 @@
 
 use crate::{
     dao_fork::{DAO_HARDFORK_BENEFICIARY, DAO_HARDKFORK_ACCOUNTS},
-    taiko::{check_anchor_tx, TaikoData}, EthEvmConfig,
+    taiko::{check_anchor_tx, TaikoData},
+    EthEvmConfig,
 };
+use anyhow::Result;
 use reth_chainspec::{ChainSpec, MAINNET};
 pub use reth_ethereum_consensus::validate_block_post_execution;
 use reth_evm::{
@@ -25,15 +27,13 @@ use reth_revm::{
         apply_beacon_root_contract_call, apply_blockhashes_update,
         apply_withdrawal_requests_contract_call, post_block_balance_increments,
     },
-    Evm, State,
-    JournaledState,
+    Evm, JournaledState, State,
 };
 use revm_primitives::{
-    db::{Database, DatabaseCommit}, Address, BlockEnv, CfgEnvWithHandlerCfg, EnvWithHandlerCfg, ResultAndState,
-    EVMError, HashSet,
+    db::{Database, DatabaseCommit},
+    Address, BlockEnv, CfgEnvWithHandlerCfg, EVMError, EnvWithHandlerCfg, HashSet, ResultAndState,
 };
 use std::sync::Arc;
-use anyhow::Result;
 
 /// Provides executors to execute regular ethereum blocks
 #[derive(Debug, Clone)]
@@ -185,7 +185,9 @@ where
                     continue;
                 }
                 // In all other cases, the tx needs to have a valid signature
-                return Err(BlockExecutionError::CanonicalRevert { inner: "invalid tx".to_string() });
+                return Err(BlockExecutionError::CanonicalRevert {
+                    inner: "invalid tx".to_string(),
+                });
             }
 
             // The sum of the transaction’s gas limit, Tg, and the gas utilized in this block prior,
@@ -219,7 +221,8 @@ where
             });
             if res.is_err() {
                 // Clear the state for the next tx
-                evm.context.evm.journaled_state = JournaledState::new(evm.context.evm.journaled_state.spec, HashSet::new());
+                evm.context.evm.journaled_state =
+                    JournaledState::new(evm.context.evm.journaled_state.spec, HashSet::new());
 
                 if optimistic {
                     continue;
@@ -236,11 +239,13 @@ where
                             println!("Invalid tx at {}: {:?}", idx, invalid_transaction);
                             // skip the tx
                             continue;
-                        },
+                        }
                         _ => {
                             // any other error is not allowed
-                            return Err(BlockExecutionError::Validation(BlockValidationError::EVM { hash, error }));
-                        },
+                            return Err(BlockExecutionError::Validation(
+                                BlockValidationError::EVM { hash, error },
+                            ));
+                        }
                     },
                     _ => {
                         // Any other type of error is not allowed
@@ -307,7 +312,12 @@ pub struct EthBlockExecutor<EvmConfig, DB> {
 impl<EvmConfig, DB> EthBlockExecutor<EvmConfig, DB> {
     /// Creates a new Ethereum block executor.
     pub const fn new(chain_spec: Arc<ChainSpec>, evm_config: EvmConfig, state: State<DB>) -> Self {
-        Self { executor: EthEvmExecutor { chain_spec, evm_config }, state, optimistic: false, taiko_data: None }
+        Self {
+            executor: EthEvmExecutor { chain_spec, evm_config },
+            state,
+            optimistic: false,
+            taiko_data: None,
+        }
     }
 
     /// Optimistic execution
@@ -376,7 +386,12 @@ where
         let env = self.evm_env_for_block(&block.header, total_difficulty);
         let output = {
             let evm = self.executor.evm_config.evm_with_env(&mut self.state, env);
-            self.executor.execute_state_transitions(block, evm, self.optimistic, self.taiko_data.clone())
+            self.executor.execute_state_transitions(
+                block,
+                evm,
+                self.optimistic,
+                self.taiko_data.clone(),
+            )
         }?;
 
         // 3. apply post execution changes
@@ -456,7 +471,13 @@ where
         // NOTE: we need to merge keep the reverts for the bundle retention
         self.state.merge_transitions(BundleRetention::Reverts);
 
-        Ok(BlockExecutionOutput { state: self.state.take_bundle(), receipts, requests, gas_used, db: self.state })
+        Ok(BlockExecutionOutput {
+            state: self.state.take_bundle(),
+            receipts,
+            requests,
+            gas_used,
+            db: Some(self.state),
+        })
     }
 }
 
