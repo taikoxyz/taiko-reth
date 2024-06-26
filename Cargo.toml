@@ -514,5 +514,5 @@ revm = { git = "https://github.com/taikoxyz/revm.git", branch = "v36-taiko-kzg",
 revm-interpreter = { git = "https://github.com/taikoxyz/revm.git", branch = "v36-taiko-kzg" }
 revm-precompile = { git = "https://github.com/taikoxyz/revm.git", branch = "v36-taiko-kzg" }
 revm-primitives = { git = "https://github.com/taikoxyz/revm.git", branch = "v36-taiko-kzg"}
-secp256k1 = { git = "https://github.com/CeciliaZ030/rust-secp256k1", branch = "sp1-patch" }
 blst = { git = "https://github.com/CeciliaZ030/blst.git", branch = "v0.3.12-serialize" }
+secp256k1 = { git = "https://github.com/CeciliaZ030/rust-secp256k1", branch = "sp1-patch" }
