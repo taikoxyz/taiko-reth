@@ -3,6 +3,7 @@
 use std::path::Path;
 
 /// Returns the default page size that can be used in this OS.
+#[cfg(feature = "not-zkvm")]
 pub(crate) fn default_page_size() -> usize {
     let os_page_size = page_size::get();
 

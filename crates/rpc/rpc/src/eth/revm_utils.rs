@@ -233,6 +233,7 @@ pub fn create_txn_env(block_env: &BlockEnv, request: TransactionRequest) -> EthR
         max_fee_per_blob_gas,
         #[cfg(feature = "optimism")]
         optimism: OptimismFields { enveloped_tx: Some(Bytes::new()), ..Default::default() },
+        taiko: revm_primitives::TaikoFields::default(),
     };
 
     Ok(env)

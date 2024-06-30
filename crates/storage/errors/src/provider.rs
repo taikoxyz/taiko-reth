@@ -142,6 +142,9 @@ pub enum ProviderError {
     /// Storage lock error.
     #[error(transparent)]
     StorageLockError(#[from] crate::lockfile::StorageLockError),
+    /// RPC error.
+    #[error("failed to fetch data from RPC: {0}")]
+    RPC(String),
 }
 
 impl From<reth_fs_util::FsPathError> for ProviderError {

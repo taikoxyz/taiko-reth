@@ -149,7 +149,7 @@ pub struct TransactionSequence {
 
 /// Ethereum blockchain test data state.
 #[derive(Clone, Debug, Eq, PartialEq, Deserialize)]
-pub struct State(BTreeMap<Address, Account>);
+pub struct State(pub BTreeMap<Address, Account>);
 
 impl State {
     /// Write the state to the database.
@@ -194,7 +194,7 @@ impl Deref for State {
 }
 
 /// An account.
-#[derive(Debug, PartialEq, Eq, Deserialize, Clone)]
+#[derive(Debug, Default, PartialEq, Eq, Deserialize, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct Account {
     /// Balance.

@@ -3,7 +3,7 @@
 use reth_execution_types::ExecutionOutcome;
 use reth_primitives::{BlockNumber, BlockWithSenders, Receipt, Request, U256};
 use reth_prune_types::PruneModes;
-use revm::db::BundleState;
+use revm::db::{BundleState, State};
 use revm_primitives::db::Database;
 
 pub use reth_execution_errors::{BlockExecutionError, BlockValidationError};
@@ -93,7 +93,7 @@ pub trait BatchExecutor<DB> {
 ///
 /// TODO(mattsse): combine with `ExecutionOutcome`
 #[derive(Debug)]
-pub struct BlockExecutionOutput<T> {
+pub struct BlockExecutionOutput<T, DB> {
     /// The changed state of the block after execution.
     pub state: BundleState,
     /// All the receipts of the transactions in the block.
@@ -102,6 +102,8 @@ pub struct BlockExecutionOutput<T> {
     pub requests: Vec<Request>,
     /// The total gas used by the block.
     pub gas_used: u64,
+    /// The full state.
+    pub db: State<DB>,
 }
 
 /// A helper type for ethereum block inputs that consists of a block and the total difficulty.
@@ -142,7 +144,7 @@ pub trait BlockExecutorProvider: Send + Sync + Clone + Unpin + 'static {
     type Executor<DB: Database<Error = ProviderError>>: for<'a> Executor<
         DB,
         Input<'a> = BlockExecutionInput<'a, BlockWithSenders>,
-        Output = BlockExecutionOutput<Receipt>,
+        Output = BlockExecutionOutput<Receipt, DB>,
         Error = BlockExecutionError,
     >;
 

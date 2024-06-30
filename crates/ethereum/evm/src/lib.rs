@@ -16,8 +16,10 @@ use reth_primitives::{
     Address, Head, Header, TransactionSigned, U256,
 };
 use reth_revm::{Database, EvmBuilder};
+use reth_revm::taiko::handler_register;
 
 pub mod execute;
+pub mod taiko;
 
 /// Ethereum DAO hardfork state change data.
 pub mod dao_fork;
@@ -56,6 +58,7 @@ impl ConfigureEvmEnv for EthEvmConfig {
         cfg_env.perf_analyse_created_bytecodes = AnalysisKind::Analyse;
 
         cfg_env.handler_cfg.spec_id = spec_id;
+        cfg_env.handler_cfg.is_taiko = chain_spec.is_taiko();
     }
 }
 
@@ -65,8 +68,14 @@ impl ConfigureEvm for EthEvmConfig {
     fn evm<'a, DB: Database + 'a>(
         &self,
         db: DB,
+        is_taiko: bool,
     ) -> reth_revm::Evm<'a, Self::DefaultExternalContext<'a>, DB> {
-        EvmBuilder::default().with_db(db).build()
+        let builder = EvmBuilder::default().with_db(db);
+        if is_taiko {
+            builder.append_handler_register(handler_register::taiko_handle_register).build()
+        } else {
+            builder.build()
+        }
     }
 }
 

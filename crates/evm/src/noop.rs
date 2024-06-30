@@ -40,7 +40,7 @@ impl BlockExecutorProvider for NoopBlockExecutorProvider {
 
 impl<DB> Executor<DB> for NoopBlockExecutorProvider {
     type Input<'a> = BlockExecutionInput<'a, BlockWithSenders>;
-    type Output = BlockExecutionOutput<Receipt>;
+    type Output = BlockExecutionOutput<Receipt, DB>;
     type Error = BlockExecutionError;
 
     fn execute(self, _: Self::Input<'_>) -> Result<Self::Output, Self::Error> {

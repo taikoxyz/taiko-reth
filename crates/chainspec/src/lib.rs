@@ -12,7 +12,7 @@ pub use alloy_chains::{Chain, ChainKind, NamedChain};
 pub use info::ChainInfo;
 pub use spec::{
     AllGenesisFormats, BaseFeeParams, BaseFeeParamsKind, ChainSpec, ChainSpecBuilder,
-    DepositContract, ForkBaseFeeParams, DEV, GOERLI, HOLESKY, MAINNET, SEPOLIA,
+    DepositContract, ForkBaseFeeParams, DEV, GOERLI, HOLESKY, MAINNET, SEPOLIA, TAIKO_A7, TAIKO_MAINNET,
 };
 #[cfg(feature = "optimism")]
 pub use spec::{BASE_MAINNET, BASE_SEPOLIA, OP_MAINNET, OP_SEPOLIA};
@@ -22,6 +22,7 @@ pub use spec::{BASE_MAINNET, BASE_SEPOLIA, OP_MAINNET, OP_SEPOLIA};
 /// The chain info module.
 mod info;
 
+#[cfg(feature = "network")]
 /// Network related constants
 pub mod net;
 

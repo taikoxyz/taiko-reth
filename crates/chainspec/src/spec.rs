@@ -16,6 +16,7 @@ use once_cell::sync::Lazy;
 use reth_ethereum_forks::{
     DisplayHardforks, ForkCondition, ForkFilter, ForkFilterKey, ForkHash, ForkId, Hardfork, Head,
 };
+#[cfg(feature = "network")]
 use reth_network_peers::NodeRecord;
 use reth_primitives_traits::{
     constants::{
@@ -38,6 +39,7 @@ pub use alloy_eips::eip1559::BaseFeeParams;
 
 #[cfg(feature = "optimism")]
 use crate::net::{base_nodes, base_testnet_nodes, op_nodes, op_testnet_nodes};
+#[cfg(feature = "network")]
 use crate::net::{goerli_nodes, holesky_nodes, mainnet_nodes, sepolia_nodes};
 
 /// The Ethereum mainnet spec
@@ -87,6 +89,70 @@ pub static MAINNET: Lazy<Arc<ChainSpec>> = Lazy::new(|| {
         )),
         base_fee_params: BaseFeeParamsKind::Constant(BaseFeeParams::ethereum()),
         prune_delete_limit: 3500,
+    }
+    .into()
+});
+
+/// The Taiko A7 spec
+pub static TAIKO_A7: Lazy<Arc<ChainSpec>> = Lazy::new(|| {
+    ChainSpec {
+        chain: 167009.into(),
+        genesis: serde_json::from_str(include_str!("../res/genesis/mainnet.json"))
+            .expect("Can't deserialize Mainnet genesis json"),
+        genesis_hash: None,
+        paris_block_and_final_difficulty: None,
+        hardforks: BTreeMap::from([
+            (Hardfork::Frontier, ForkCondition::Block(0)),
+            (Hardfork::Homestead, ForkCondition::Block(0)),
+            (Hardfork::Dao, ForkCondition::Block(0)),
+            (Hardfork::Tangerine, ForkCondition::Block(0)),
+            (Hardfork::SpuriousDragon, ForkCondition::Block(0)),
+            (Hardfork::Byzantium, ForkCondition::Block(0)),
+            (Hardfork::Constantinople, ForkCondition::Block(0)),
+            (Hardfork::Petersburg, ForkCondition::Block(0)),
+            (Hardfork::Istanbul, ForkCondition::Block(1561651)),
+            (Hardfork::Berlin, ForkCondition::Block(4460644)),
+            (Hardfork::London, ForkCondition::Block(5062605)),
+            (
+                Hardfork::Paris,
+                ForkCondition::TTD { fork_block: None, total_difficulty: U256::from(0) },
+            ),
+            (Hardfork::Shanghai, ForkCondition::Timestamp(0)),
+        ]),
+        deposit_contract: None,
+        ..Default::default()
+    }
+    .into()
+});
+
+/// The Taiko Mainnet spec
+pub static TAIKO_MAINNET: Lazy<Arc<ChainSpec>> = Lazy::new(|| {
+    ChainSpec {
+        chain: 167000.into(),
+        genesis: serde_json::from_str(include_str!("../res/genesis/mainnet.json"))
+            .expect("Can't deserialize Mainnet genesis json"),
+        genesis_hash: None,
+        paris_block_and_final_difficulty: None,
+        hardforks: BTreeMap::from([
+            (Hardfork::Frontier, ForkCondition::Block(0)),
+            (Hardfork::Homestead, ForkCondition::Block(0)),
+            (Hardfork::Dao, ForkCondition::Block(0)),
+            (Hardfork::Tangerine, ForkCondition::Block(0)),
+            (Hardfork::SpuriousDragon, ForkCondition::Block(0)),
+            (Hardfork::Byzantium, ForkCondition::Block(0)),
+            (Hardfork::Constantinople, ForkCondition::Block(0)),
+            (Hardfork::Petersburg, ForkCondition::Block(0)),
+            (Hardfork::Istanbul, ForkCondition::Block(1561651)),
+            (Hardfork::Berlin, ForkCondition::Block(4460644)),
+            (Hardfork::London, ForkCondition::Block(5062605)),
+            (
+                Hardfork::Paris,
+                ForkCondition::TTD { fork_block: None, total_difficulty: U256::from(0) },
+            ),
+            (Hardfork::Shanghai, ForkCondition::Timestamp(0)),
+        ]),
+        deposit_contract: None,
+        ..Default::default()
     }
     .into()
 });
@@ -594,6 +660,13 @@ impl ChainSpec {
         self.chain.is_optimism()
     }
 
+    /// Returns `true` if this is a Taiko chain.
+    #[inline]
+    pub fn is_taiko(&self) -> bool {
+        let id = self.chain.id();
+        id >= 167000 && id <= 168000
+    }
+
     /// Returns `true` if this chain is Optimism mainnet.
     #[inline]
     pub fn is_optimism_mainnet(&self) -> bool {
@@ -990,6 +1063,7 @@ impl ChainSpec {
         ChainSpecBuilder::default()
     }
 
+    #[cfg(feature = "network")]
     /// Returns the known bootnode records for the given chain.
     pub fn bootnodes(&self) -> Option<Vec<NodeRecord>> {
         use NamedChain as C;
