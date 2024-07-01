@@ -1,11 +1,11 @@
 use crate::{
     args::DatabaseArgs,
     dirs::{DataDirPath, PlatformPath},
-    utils::DbTool,
 };
 use clap::Parser;
 use reth_db::{open_db_read_only, tables_to_generic, DatabaseEnv, Tables};
 use reth_db_api::{cursor::DbCursorRO, database::Database, table::Table, transaction::DbTx};
+use reth_db_common::DbTool;
 use std::{
     collections::HashMap,
     fmt::Debug,
@@ -298,12 +298,12 @@ where
     ) {
         // do not bother comparing if the key is already in the discrepancies map
         if self.discrepancies.contains_key(&key) {
-            return
+            return;
         }
 
         // do not bother comparing if the key is already in the extra elements map
         if self.extra_elements.contains_key(&key) {
-            return
+            return;
         }
 
         match (first, second) {

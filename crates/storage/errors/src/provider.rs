@@ -18,6 +18,9 @@ pub type ProviderResult<Ok> = Result<Ok, ProviderError>;
 /// Bundled errors variants thrown by various providers.
 #[derive(Clone, Debug, thiserror_no_std::Error, PartialEq, Eq)]
 pub enum ProviderError {
+    /// Serde error.
+    #[error("{0}")]
+    Serde(String),
     /// Database error.
     #[error(transparent)]
     Database(#[from] crate::db::DatabaseError),

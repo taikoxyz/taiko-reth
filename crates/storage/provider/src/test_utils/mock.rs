@@ -2,8 +2,9 @@ use crate::{
     traits::{BlockSource, ReceiptProvider},
     AccountReader, BlockHashReader, BlockIdReader, BlockNumReader, BlockReader, BlockReaderIdExt,
     ChainSpecProvider, ChangeSetReader, EvmEnvProvider, FullExecutionDataProvider, HeaderProvider,
-    ReceiptProviderIdExt, RequestsProvider, StateProvider, StateProviderBox, StateProviderFactory,
-    StateRootProvider, TransactionVariant, TransactionsProvider, WithdrawalsProvider,
+    L1OriginReader, L1OriginWriter, ReceiptProviderIdExt, RequestsProvider, StateProvider,
+    StateProviderBox, StateProviderFactory, StateRootProvider, TransactionVariant,
+    TransactionsProvider, WithdrawalsProvider,
 };
 use parking_lot::Mutex;
 use reth_chainspec::{ChainInfo, ChainSpec};
@@ -11,7 +12,7 @@ use reth_db_api::models::{AccountBeforeTx, StoredBlockBodyIndices};
 use reth_evm::ConfigureEvmEnv;
 use reth_primitives::{
     keccak256, Account, Address, Block, BlockHash, BlockHashOrNumber, BlockId, BlockNumber,
-    BlockWithSenders, Bytecode, Bytes, Header, Receipt, SealedBlock, SealedBlockWithSenders,
+    BlockWithSenders, Bytecode, Bytes, Header, L1Origin, Receipt, SealedBlock, SealedBlockWithSenders,
     SealedHeader, StorageKey, StorageValue, TransactionMeta, TransactionSigned,
     TransactionSignedNoHash, TxHash, TxNumber, Withdrawal, Withdrawals, B256, U256,
 };
@@ -249,7 +250,7 @@ impl TransactionsProvider for MockEthProvider {
                         excess_blob_gas: block.header.excess_blob_gas,
                         timestamp: block.header.timestamp,
                     };
-                    return Ok(Some((tx.clone(), meta)))
+                    return Ok(Some((tx.clone(), meta)));
                 }
             }
         }
@@ -261,7 +262,7 @@ impl TransactionsProvider for MockEthProvider {
         let mut current_tx_number: TxNumber = 0;
         for block in lock.values() {
             if current_tx_number + (block.body.len() as TxNumber) > id {
-                return Ok(Some(block.header.number))
+                return Ok(Some(block.header.number));
             }
             current_tx_number += block.body.len() as TxNumber;
         }
@@ -474,6 +475,14 @@ impl BlockReader for MockEthProvider {
         Ok(None)
     }
 
+    fn sealed_block_with_senders(
+        &self,
+        _id: BlockHashOrNumber,
+        _transaction_kind: TransactionVariant,
+    ) -> ProviderResult<Option<SealedBlockWithSenders>> {
+        Ok(None)
+    }
+
     fn block_range(&self, range: RangeInclusive<BlockNumber>) -> ProviderResult<Vec<Block>> {
         let lock = self.blocks.lock();
 
@@ -599,22 +608,6 @@ impl EvmEnvProvider for MockEthProvider {
         Ok(())
     }
 
-    fn fill_block_env_at(
-        &self,
-        _block_env: &mut BlockEnv,
-        _at: BlockHashOrNumber,
-    ) -> ProviderResult<()> {
-        Ok(())
-    }
-
-    fn fill_block_env_with_header(
-        &self,
-        _block_env: &mut BlockEnv,
-        _header: &Header,
-    ) -> ProviderResult<()> {
-        Ok(())
-    }
-
     fn fill_cfg_env_at<EvmConfig>(
         &self,
         _cfg: &mut CfgEnvWithHandlerCfg,
@@ -702,5 +695,25 @@ impl ChangeSetReader for MockEthProvider {
         _block_number: BlockNumber,
     ) -> ProviderResult<Vec<AccountBeforeTx>> {
         Ok(Vec::default())
+    }
+}
+
+impl L1OriginReader for MockEthProvider {
+    fn read_l1_origin(&self, _block_id: u64) -> ProviderResult<Option<L1Origin>> {
+        Ok(None)
+    }
+
+    fn read_head_l1_origin(&self) -> ProviderResult<Option<u64>> {
+        Ok(None)
+    }
+}
+
+impl L1OriginWriter for MockEthProvider {
+    fn insert_l1_origin(&self, _block_id: u64, _origin: L1Origin) -> ProviderResult<()> {
+        Ok(())
+    }
+
+    fn insert_head_l1_origin(&self, _block_id: u64) -> ProviderResult<()> {
+        Ok(())
     }
 }

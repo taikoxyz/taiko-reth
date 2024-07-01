@@ -1,4 +1,5 @@
-use crate::result::ToRpcResult;
+use std::sync::Arc;
+
 use alloy_genesis::ChainConfig;
 use alloy_primitives::B256;
 use async_trait::async_trait;
@@ -7,11 +8,11 @@ use reth_chainspec::ChainSpec;
 use reth_network_api::{NetworkInfo, PeerKind, Peers};
 use reth_network_peers::{AnyNode, NodeRecord};
 use reth_rpc_api::AdminApiServer;
+use reth_rpc_server_types::ToRpcResult;
 use reth_rpc_types::{
     admin::{EthProtocolInfo, NodeInfo, Ports, ProtocolInfo},
     PeerEthProtocolInfo, PeerInfo, PeerNetworkInfo, PeerProtocolsInfo,
 };
-use std::sync::Arc;
 
 /// `admin` API implementation.
 ///
@@ -37,7 +38,7 @@ where
 {
     /// Handler for `admin_addPeer`
     fn add_peer(&self, record: NodeRecord) -> RpcResult<bool> {
-        self.network.add_peer(record.id, record.tcp_addr());
+        self.network.add_peer_with_udp(record.id, record.tcp_addr(), record.udp_addr());
         Ok(true)
     }
 
@@ -50,7 +51,7 @@ where
     /// Handler for `admin_addTrustedPeer`
     fn add_trusted_peer(&self, record: AnyNode) -> RpcResult<bool> {
         if let Some(record) = record.node_record() {
-            self.network.add_trusted_peer(record.id, record.tcp_addr())
+            self.network.add_trusted_peer_with_udp(record.id, record.tcp_addr(), record.udp_addr())
         }
         self.network.add_trusted_peer_id(record.peer_id());
         Ok(true)

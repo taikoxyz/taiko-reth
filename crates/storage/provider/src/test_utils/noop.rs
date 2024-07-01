@@ -1,17 +1,17 @@
 use crate::{
     traits::{BlockSource, ReceiptProvider},
     AccountReader, BlockHashReader, BlockIdReader, BlockNumReader, BlockReader, BlockReaderIdExt,
-    ChainSpecProvider, ChangeSetReader, EvmEnvProvider, HeaderProvider, PruneCheckpointReader,
-    ReceiptProviderIdExt, RequestsProvider, StageCheckpointReader, StateProvider, StateProviderBox,
-    StateProviderFactory, StateRootProvider, TransactionVariant, TransactionsProvider,
-    WithdrawalsProvider,
+    ChainSpecProvider, ChangeSetReader, EvmEnvProvider, HeaderProvider, L1OriginReader,
+    L1OriginWriter, PruneCheckpointReader, ReceiptProviderIdExt, RequestsProvider,
+    StageCheckpointReader, StateProvider, StateProviderBox, StateProviderFactory, StateRootProvider,
+    TransactionVariant, TransactionsProvider, WithdrawalsProvider,
 };
 use reth_chainspec::{ChainInfo, ChainSpec, MAINNET};
 use reth_db_api::models::{AccountBeforeTx, StoredBlockBodyIndices};
 use reth_evm::ConfigureEvmEnv;
 use reth_primitives::{
     Account, Address, Block, BlockHash, BlockHashOrNumber, BlockId, BlockNumber, BlockWithSenders,
-    Bytecode, Header, Receipt, SealedBlock, SealedBlockWithSenders, SealedHeader, StorageKey,
+    Bytecode, Header, L1Origin, Receipt, SealedBlock, SealedBlockWithSenders, SealedHeader, StorageKey,
     StorageValue, TransactionMeta, TransactionSigned, TransactionSignedNoHash, TxHash, TxNumber,
     Withdrawal, Withdrawals, B256, U256,
 };
@@ -110,6 +110,14 @@ impl BlockReader for NoopProvider {
         _id: BlockHashOrNumber,
         _transaction_kind: TransactionVariant,
     ) -> ProviderResult<Option<reth_primitives::BlockWithSenders>> {
+        Ok(None)
+    }
+
+    fn sealed_block_with_senders(
+        &self,
+        _id: BlockHashOrNumber,
+        _transaction_kind: TransactionVariant,
+    ) -> ProviderResult<Option<SealedBlockWithSenders>> {
         Ok(None)
     }
 
@@ -358,22 +366,6 @@ impl EvmEnvProvider for NoopProvider {
         Ok(())
     }
 
-    fn fill_block_env_at(
-        &self,
-        _block_env: &mut BlockEnv,
-        _at: BlockHashOrNumber,
-    ) -> ProviderResult<()> {
-        Ok(())
-    }
-
-    fn fill_block_env_with_header(
-        &self,
-        _block_env: &mut BlockEnv,
-        _header: &Header,
-    ) -> ProviderResult<()> {
-        Ok(())
-    }
-
     fn fill_cfg_env_at<EvmConfig>(
         &self,
         _cfg: &mut CfgEnvWithHandlerCfg,
@@ -471,5 +463,25 @@ impl PruneCheckpointReader for NoopProvider {
         _segment: PruneSegment,
     ) -> ProviderResult<Option<PruneCheckpoint>> {
         Ok(None)
+    }
+}
+
+impl L1OriginReader for NoopProvider {
+    fn read_l1_origin(&self, _block_id: u64) -> ProviderResult<Option<L1Origin>> {
+        Ok(None)
+    }
+
+    fn read_head_l1_origin(&self) -> ProviderResult<Option<u64>> {
+        Ok(None)
+    }
+}
+
+impl L1OriginWriter for NoopProvider {
+    fn insert_l1_origin(&self, _block_id: u64, _origin: L1Origin) -> ProviderResult<()> {
+        Ok(())
+    }
+
+    fn insert_head_l1_origin(&self, _block_id: u64) -> ProviderResult<()> {
+        Ok(())
     }
 }

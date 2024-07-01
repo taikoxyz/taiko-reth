@@ -40,10 +40,12 @@ c-kzg = { workspace = true, features = ["serde"], optional = true }
 # misc
 bytes.workspace = true
 derive_more.workspace = true
+itertools.workspace = true
 modular-bitfield.workspace = true
 once_cell.workspace = true
 rayon.workspace = true
 serde.workspace = true
+serde_json.workspace = true
 tempfile = { workspace = true, optional = true }
 thiserror-no-std = { workspace = true, default-features = false }
 zstd = { version = "0.13", features = ["experimental"], optional = true }
@@ -107,6 +109,7 @@ optimism = [
 ]
 alloy-compat = ["reth-primitives-traits/alloy-compat", "dep:alloy-rpc-types"]
 std = ["thiserror-no-std/std"]
+taiko = []
 test-utils = ["reth-primitives-traits/test-utils"]
 
 [[bench]]

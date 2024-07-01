@@ -171,6 +171,7 @@ impl TransactionBuilder {
                 value: self.value,
                 access_list: self.access_list,
                 input: self.input,
+                is_anchor: false,
             }
             .into(),
             self.signer,

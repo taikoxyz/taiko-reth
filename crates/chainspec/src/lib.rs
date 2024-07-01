@@ -26,14 +26,17 @@ extern crate alloc;
 /// The chain info module.
 mod info;
 
-/// Network related constants
-pub mod net;
-
 /// The chain spec module.
 mod spec;
 
 /// Chain specific constants
 pub(crate) mod constants;
+
+#[cfg(feature = "taiko")]
+mod taiko;
+
+#[cfg(feature = "taiko")]
+pub use spec::{TAIKO_INTERNAL_L2_A, TAIKO_TESTNET};
 
 /// Re-export for convenience
 pub use reth_ethereum_forks::*;
