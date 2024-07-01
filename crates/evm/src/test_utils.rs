@@ -58,6 +58,7 @@ impl<DB> Executor<DB> for MockExecutorProvider {
             receipts: receipts.into_iter().flatten().flatten().collect(),
             requests: requests.into_iter().flatten().collect(),
             gas_used: 0,
+            db: None,
         })
     }
 }

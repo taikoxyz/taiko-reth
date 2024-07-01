@@ -51,3 +51,6 @@ pub use trie::*;
 
 mod withdrawals;
 pub use withdrawals::*;
+
+mod taiko;
+pub use taiko::*;

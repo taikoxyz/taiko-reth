@@ -28,6 +28,7 @@ use reth_db_api::{
         blocks::{HeaderHash, StoredBlockOmmers},
         client_version::ClientVersion,
         storage_sharded_key::StorageShardedKey,
+        taiko::HeadL1OriginKey,
         CompactU256, ShardedKey, StoredBlockBodyIndices, StoredBlockWithdrawals,
     },
     table::{Decode, DupSort, Encode, Table},
@@ -37,6 +38,7 @@ use reth_primitives::{
     StorageEntry, TransactionSignedNoHash, TxHash, TxNumber, B256,
 };
 use reth_prune_types::{PruneCheckpoint, PruneSegment};
+use reth_rpc_types::engine::L1Origin;
 use reth_stages_types::StageCheckpoint;
 use reth_trie_common::{StorageTrieEntry, StoredBranchNode, StoredNibbles, StoredNibblesSubKey};
 use serde::{Deserialize, Serialize};
@@ -411,6 +413,12 @@ tables! {
 
     /// Stores generic chain state info, like the last finalized block.
     table ChainState<Key = ChainStateKey, Value = BlockNumber>;
+
+    /// Stores the l1 origin of the block
+    table L1Origins<Key = BlockNumber, Value = L1Origin>;
+
+    /// Stores the latest l1 origin
+    table HeadL1Origin<Key = HeadL1OriginKey, Value = BlockNumber>;
 }
 
 /// Keys for the `ChainState` table.
