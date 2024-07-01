@@ -12,7 +12,7 @@
 use reth_payload_builder::TaikoExecutionPayload;
 #[cfg(feature = "taiko")]
 use reth_primitives::{Block, Header, B256, EMPTY_OMMER_ROOT_HASH};
-use reth_chainspec::ChainSpec;
+use reth_chainspec::{ChainSpec, EthereumHardforks};
 use reth_primitives::SealedBlock;
 use reth_rpc_types::{engine::MaybeCancunPayloadFields, ExecutionPayload, PayloadError};
 use reth_rpc_types_compat::engine::payload::try_into_block;

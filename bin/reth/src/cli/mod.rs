@@ -8,7 +8,7 @@ use crate::{
     commands::{
         config_cmd, db, debug_cmd, dump_genesis, import, init_cmd, init_state,
         node::{self, NoArgs},
-        p2p, recover, stage, t8n, test_vectors,
+        p2p, prune, recover, stage, t8n, test_vectors,
     },
     version::{LONG_VERSION, SHORT_VERSION},
 };
@@ -165,6 +165,7 @@ impl<Ext: clap::Args + fmt::Debug> Cli<Ext> {
             Commands::Config(command) => runner.run_until_ctrl_c(command.execute()),
             Commands::Debug(command) => runner.run_command_until_exit(|ctx| command.execute(ctx)),
             Commands::Recover(command) => runner.run_command_until_exit(|ctx| command.execute(ctx)),
+            Commands::Prune(command) => runner.run_until_ctrl_c(command.execute()),
         }
     }
 
@@ -230,6 +231,9 @@ pub enum Commands<Ext: clap::Args + fmt::Debug = NoArgs> {
     /// Scripts for node recovery
     #[command(name = "recover")]
     Recover(recover::Command),
+    /// Prune according to the configuration without any limits
+    #[command(name = "prune")]
+    Prune(prune::PruneCommand),
 }
 
 #[cfg(test)]

@@ -5,10 +5,9 @@ use async_trait::async_trait;
 use jsonrpsee::core::RpcResult;
 use reth_provider::{BlockReader, L1OriginReader};
 use reth_rpc_api::TaikoApiServer;
+use reth_rpc_server_types::result::internal_rpc_err;
 use reth_rpc_types::{txpool::TxpoolContent, Transaction};
 use reth_transaction_pool::{AllPoolTransactions, PoolTransaction, TransactionPool};
-
-use crate::result::internal_rpc_err;
 
 /// Taiko API.
 #[derive(Debug)]
