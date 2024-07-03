@@ -2,6 +2,7 @@ use crate::{metrics::EngineApiMetrics, EngineApiError, EngineApiResult};
 use async_trait::async_trait;
 use jsonrpsee_core::RpcResult;
 use reth_beacon_consensus::BeaconConsensusEngineHandle;
+use reth_chainspec::ChainSpec;
 use reth_engine_primitives::EngineTypes;
 use reth_evm::provider::EvmEnvProvider;
 use reth_payload_builder::PayloadStore;
@@ -850,8 +851,9 @@ mod tests {
     use reth_ethereum_engine_primitives::EthEngineTypes;
     use reth_testing_utils::generators::random_block;
 
+    use reth_chainspec::MAINNET;
     use reth_payload_builder::test_utils::spawn_test_payload_service;
-    use reth_primitives::{SealedBlock, B256, MAINNET};
+    use reth_primitives::{SealedBlock, B256};
     use reth_provider::test_utils::MockEthProvider;
     use reth_rpc_types::engine::{ClientCode, ClientVersionV1};
     use reth_rpc_types_compat::engine::payload::execution_payload_from_sealed_block;

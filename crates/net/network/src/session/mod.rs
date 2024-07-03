@@ -5,7 +5,6 @@ use crate::{
     metrics::SessionManagerMetrics,
     session::{active::ActiveSession, config::SessionCounter},
 };
-use fnv::FnvHashMap;
 use futures::{future::Either, io, FutureExt, StreamExt};
 use reth_ecies::{stream::ECIESStream, ECIESError};
 use reth_eth_wire::{
@@ -15,10 +14,10 @@ use reth_eth_wire::{
     UnauthedP2PStream,
 };
 use reth_metrics::common::mpsc::MeteredPollSender;
-use reth_net_common::stream::HasRemoteAddr;
 use reth_network_peers::PeerId;
 use reth_primitives::{ForkFilter, ForkId, ForkTransition, Head};
 use reth_tasks::TaskSpawner;
+use rustc_hash::FxHashMap;
 use secp256k1::SecretKey;
 use std::{
     collections::HashMap,
@@ -87,7 +86,7 @@ pub struct SessionManager {
     ///
     /// Events produced during the authentication phase are reported to this manager. Once the
     /// session is authenticated, it can be moved to the `active_session` set.
-    pending_sessions: FnvHashMap<SessionId, PendingSessionHandle>,
+    pending_sessions: FxHashMap<SessionId, PendingSessionHandle>,
     /// All active sessions that are ready to exchange messages.
     active_sessions: HashMap<PeerId, ActiveSessionHandle>,
     /// The original Sender half of the [`PendingSessionEvent`] channel.
@@ -927,7 +926,7 @@ async fn authenticate(
 
 /// Returns an [`ECIESStream`] if it can be built. If not, send a
 /// [`PendingSessionEvent::EciesAuthError`] and returns `None`
-async fn get_eciess_stream<Io: AsyncRead + AsyncWrite + Unpin + HasRemoteAddr>(
+async fn get_eciess_stream<Io: AsyncRead + AsyncWrite + Unpin>(
     stream: Io,
     secret_key: SecretKey,
     direction: Direction,

@@ -3,22 +3,22 @@ use crate::{
     AccountReader, BlockHashReader, BlockIdReader, BlockNumReader, BlockReader, BlockReaderIdExt,
     ChainSpecProvider, ChangeSetReader, EvmEnvProvider, HeaderProvider, L1OriginReader,
     L1OriginWriter, PruneCheckpointReader, ReceiptProviderIdExt, RequestsProvider,
-    StageCheckpointReader, StateProvider, StateProviderBox, StateProviderFactory, StateRootProvider,
-    TransactionVariant, TransactionsProvider, WithdrawalsProvider,
+    StageCheckpointReader, StateProvider, StateProviderBox, StateProviderFactory,
+    StateRootProvider, TransactionVariant, TransactionsProvider, WithdrawalsProvider,
 };
+use reth_chainspec::{ChainInfo, ChainSpec, MAINNET};
 use reth_db_api::models::{AccountBeforeTx, StoredBlockBodyIndices};
 use reth_evm::ConfigureEvmEnv;
 use reth_primitives::{
-    proofs::AccountProof, Account, Address, Block, BlockHash, BlockHashOrNumber, BlockId,
-    BlockNumber, BlockWithSenders, Bytecode, ChainInfo, ChainSpec, Header, L1Origin, Receipt,
-    SealedBlock, SealedBlockWithSenders, SealedHeader, StorageKey, StorageValue, TransactionMeta,
-    TransactionSigned, TransactionSignedNoHash, TxHash, TxNumber, Withdrawal, Withdrawals, B256,
-    MAINNET, U256,
+    Account, Address, Block, BlockHash, BlockHashOrNumber, BlockId, BlockNumber, BlockWithSenders,
+    Bytecode, Header, Receipt, SealedBlock, SealedBlockWithSenders, SealedHeader, StorageKey,
+    StorageValue, TransactionMeta, TransactionSigned, TransactionSignedNoHash, TxHash, TxNumber,
+    Withdrawal, Withdrawals, B256, U256,
 };
 use reth_prune_types::{PruneCheckpoint, PruneSegment};
 use reth_stages_types::{StageCheckpoint, StageId};
 use reth_storage_errors::provider::ProviderResult;
-use reth_trie::updates::TrieUpdates;
+use reth_trie::{updates::TrieUpdates, AccountProof};
 use revm::{
     db::BundleState,
     primitives::{BlockEnv, CfgEnvWithHandlerCfg},

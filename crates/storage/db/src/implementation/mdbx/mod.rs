@@ -41,7 +41,6 @@ const DEFAULT_MAX_READERS: u64 = 32_000;
 
 /// Space that a read-only transaction can occupy until the warning is emitted.
 /// See [`reth_libmdbx::EnvironmentBuilder::set_handle_slow_readers`] for more information.
-#[cfg(not(windows))]
 const MAX_SAFE_READER_SPACE: usize = 10 * GIGABYTE;
 
 /// Environment used when opening a MDBX environment. RO/RW.
@@ -483,7 +482,8 @@ mod tests {
         table::{Encode, Table},
     };
     use reth_libmdbx::Error;
-    use reth_primitives::{Account, Address, Header, IntegerList, StorageEntry, B256, U256};
+    use reth_primitives::{Account, Address, Header, StorageEntry, B256, U256};
+    use reth_primitives_traits::IntegerList;
     use reth_storage_errors::db::{DatabaseWriteError, DatabaseWriteOperation};
     use std::str::FromStr;
     use tempfile::TempDir;

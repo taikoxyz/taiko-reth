@@ -26,7 +26,7 @@ pub struct ExecutionPayloadValidator {
 
 impl ExecutionPayloadValidator {
     /// Create a new validator.
-    pub fn new(chain_spec: Arc<ChainSpec>) -> Self {
+    pub const fn new(chain_spec: Arc<ChainSpec>) -> Self {
         Self { chain_spec }
     }
 
@@ -118,9 +118,9 @@ impl ExecutionPayloadValidator {
         let sealed_block =
             try_into_block(payload, cancun_fields.parent_beacon_block_root())?.seal_slow();
         #[cfg(feature = "taiko")]
-        let sealed_block = if payload.payload_inner.as_v1().transactions.is_empty()
-            && (payload.payload_inner.withdrawals().is_none()
-                || payload.payload_inner.withdrawals().is_some_and(|w| w.is_empty()))
+        let sealed_block = if payload.payload_inner.as_v1().transactions.is_empty() &&
+            (payload.payload_inner.withdrawals().is_none() ||
+                payload.payload_inner.withdrawals().is_some_and(|w| w.is_empty()))
         {
             create_taiko_block(payload, cancun_fields.parent_beacon_block_root())?.seal_slow()
         } else {
