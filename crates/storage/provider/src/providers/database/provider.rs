@@ -1,10 +1,11 @@
+#[cfg(feature = "taiko")]
+use crate::traits::{L1OriginReader, L1OriginWriter};
 use crate::{
     bundle_state::{BundleStateInit, HashedStateChanges, RevertsInit},
     providers::{database::metrics, static_file::StaticFileWriter, StaticFileProvider},
     to_range,
     traits::{
-        AccountExtReader, BlockSource, ChangeSetReader, L1OriginReader, L1OriginWriter,
-        ReceiptProvider, StageCheckpointWriter,
+        AccountExtReader, BlockSource, ChangeSetReader, ReceiptProvider, StageCheckpointWriter,
     },
     AccountReader, BlockExecutionWriter, BlockHashReader, BlockNumReader, BlockReader, BlockWriter,
     EvmEnvProvider, FinalizedBlockReader, FinalizedBlockWriter, HashingWriter, HeaderProvider,
@@ -32,6 +33,8 @@ use reth_db_api::{
 use reth_evm::ConfigureEvmEnv;
 use reth_execution_types::{Chain, ExecutionOutcome};
 use reth_network_p2p::headers::downloader::SyncTarget;
+#[cfg(feature = "taiko")]
+use reth_primitives::L1Origin;
 use reth_primitives::{
     keccak256,
     revm::{config::revm_spec, env::fill_block_env},
@@ -2866,6 +2869,7 @@ fn range_size_hint(range: &impl RangeBounds<TxNumber>) -> Option<usize> {
     end.checked_sub(start).map(|x| x as _)
 }
 
+#[cfg(feature = "taiko")]
 impl<TX: DbTx> L1OriginReader for DatabaseProvider<TX> {
     fn read_l1_origin(&self, block_id: u64) -> ProviderResult<Option<L1Origin>> {
         let result = self.tx.get::<tables::L1Origins>(L1Origin::key(block_id))?;
@@ -2883,6 +2887,7 @@ impl<TX: DbTx> L1OriginReader for DatabaseProvider<TX> {
     }
 }
 
+#[cfg(feature = "taiko")]
 impl<TX: DbTxMut> L1OriginWriter for DatabaseProvider<TX> {
     fn insert_l1_origin(&self, block_id: u64, l1_origin: L1Origin) -> ProviderResult<()> {
         let bytes =

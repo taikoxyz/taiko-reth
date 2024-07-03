@@ -16,6 +16,7 @@ reth-ethereum-forks.workspace = true
 reth-network-peers.workspace = true
 reth-trie-common.workspace = true
 reth-primitives-traits.workspace = true
+revm-primitives = { workspace = true, optional = true }
 
 # ethereum
 alloy-chains = { workspace = true, features = ["serde", "rlp"] }
@@ -28,6 +29,10 @@ alloy-trie.workspace = true
 once_cell.workspace = true
 serde_json.workspace = true
 derive_more.workspace = true
+strum = { workspace = true, optional = true }
+num_enum = { version = "0.7.2", optional = true }
+serde = { workspace = true, features = ["derive"], optional = true }
+schemars = { version = "0.8.21", optional = true }
 
 [dev-dependencies]
 # eth
@@ -41,12 +46,9 @@ rand.workspace = true
 
 [features]
 default = ["std"]
-optimism = [
-    "reth-ethereum-forks/optimism"
-]
+taiko = ["dep:strum", "dep:num_enum", "dep:revm-primitives"]
+optimism = ["reth-ethereum-forks/optimism"]
 std = []
-arbitrary = [
-    "alloy-chains/arbitrary"
-]
-
-
+arbitrary = ["alloy-chains/arbitrary"]
+serde = ["dep:serde"]
+schema = ["dep:schemars"]

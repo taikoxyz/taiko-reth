@@ -71,26 +71,26 @@ pub enum TaikoNamedChain {
 
 impl From<TaikoNamedChain> for Chain {
     fn from(val: TaikoNamedChain) -> Self {
-        Chain::from_id_unchecked(val as u64)
+        Self::from_id_unchecked(val as u64)
     }
 }
 
 pub fn get_taiko_genesis(chain: TaikoNamedChain) -> Genesis {
     let alloc_str = match chain {
         TaikoNamedChain::TaikoInternalL2A => {
-            include_str!("../../res/genesis/taiko/internal_l2a.json")
+            include_str!("../res/genesis/taiko/internal_l2a.json")
         }
         TaikoNamedChain::TaikoInternalL2B => {
-            include_str!("../../res/genesis/taiko/internal_l2b.json")
+            include_str!("../res/genesis/taiko/internal_l2b.json")
         }
         TaikoNamedChain::Snaefellsjokull => {
-            include_str!("../../res/genesis/taiko/snaefellsjokull.json")
+            include_str!("../res/genesis/taiko/snaefellsjokull.json")
         }
-        TaikoNamedChain::Askja => include_str!("../../res/genesis/taiko/askja.json"),
-        TaikoNamedChain::Grimsvotn => include_str!("../../res/genesis/taiko/grimsvotn.json"),
-        TaikoNamedChain::Eldfell => include_str!("../../res/genesis/taiko/eldfell.json"),
-        TaikoNamedChain::Jolnir => include_str!("../../res/genesis/taiko/jolnir.json"),
-        TaikoNamedChain::Katla => include_str!("../../res/genesis/taiko/katla.json"),
+        TaikoNamedChain::Askja => include_str!("../res/genesis/taiko/askja.json"),
+        TaikoNamedChain::Grimsvotn => include_str!("../res/genesis/taiko/grimsvotn.json"),
+        TaikoNamedChain::Eldfell => include_str!("../res/genesis/taiko/eldfell.json"),
+        TaikoNamedChain::Jolnir => include_str!("../res/genesis/taiko/jolnir.json"),
+        TaikoNamedChain::Katla => include_str!("../res/genesis/taiko/katla.json"),
     };
 
     let alloc: BTreeMap<Address, GenesisAccount> =

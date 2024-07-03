@@ -137,4 +137,4 @@ pub use optimism::*;
 
 /// Taiko specific re-exports
 #[cfg(feature = "taiko")]
-pub use crate::chain::{TAIKO_INTERNAL_L2_A, TAIKO_TESTNET};
+pub use reth_chainspec::{TAIKO_INTERNAL_L2_A, TAIKO_TESTNET};

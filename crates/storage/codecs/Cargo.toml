@@ -15,7 +15,9 @@ workspace = true
 reth-codecs-derive = { path = "./derive", default-features = false }
 
 # eth
-alloy-consensus = { workspace = true, optional = true, features = ["arbitrary"] }
+alloy-consensus = { workspace = true, optional = true, features = [
+    "arbitrary",
+] }
 alloy-eips = { workspace = true, optional = true }
 alloy-genesis = { workspace = true, optional = true }
 alloy-primitives.workspace = true
@@ -49,3 +51,4 @@ alloy = [
     "dep:modular-bitfield",
 ]
 optimism = ["reth-codecs-derive/optimism"]
+taiko = ["reth-codecs-derive/taiko"]

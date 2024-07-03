@@ -1,14 +1,18 @@
 use crate::{
     traits::{BlockSource, ReceiptProvider},
     AccountReader, BlockHashReader, BlockIdReader, BlockNumReader, BlockReader, BlockReaderIdExt,
-    ChainSpecProvider, ChangeSetReader, EvmEnvProvider, HeaderProvider, L1OriginReader,
-    L1OriginWriter, PruneCheckpointReader, ReceiptProviderIdExt, RequestsProvider,
-    StageCheckpointReader, StateProvider, StateProviderBox, StateProviderFactory,
-    StateRootProvider, TransactionVariant, TransactionsProvider, WithdrawalsProvider,
+    ChainSpecProvider, ChangeSetReader, EvmEnvProvider, HeaderProvider, PruneCheckpointReader,
+    ReceiptProviderIdExt, RequestsProvider, StageCheckpointReader, StateProvider, StateProviderBox,
+    StateProviderFactory, StateRootProvider, TransactionVariant, TransactionsProvider,
+    WithdrawalsProvider,
 };
+#[cfg(feature = "taiko")]
+use crate::{L1OriginReader, L1OriginWriter};
 use reth_chainspec::{ChainInfo, ChainSpec, MAINNET};
 use reth_db_api::models::{AccountBeforeTx, StoredBlockBodyIndices};
 use reth_evm::ConfigureEvmEnv;
+#[cfg(feature = "taiko")]
+use reth_primitives::L1Origin;
 use reth_primitives::{
     Account, Address, Block, BlockHash, BlockHashOrNumber, BlockId, BlockNumber, BlockWithSenders,
     Bytecode, Header, Receipt, SealedBlock, SealedBlockWithSenders, SealedHeader, StorageKey,
@@ -474,6 +478,7 @@ impl PruneCheckpointReader for NoopProvider {
     }
 }
 
+#[cfg(feature = "taiko")]
 impl L1OriginReader for NoopProvider {
     fn read_l1_origin(&self, _block_id: u64) -> ProviderResult<Option<L1Origin>> {
         Ok(None)
@@ -484,6 +489,7 @@ impl L1OriginReader for NoopProvider {
     }
 }
 
+#[cfg(feature = "taiko")]
 impl L1OriginWriter for NoopProvider {
     fn insert_l1_origin(&self, _block_id: u64, _origin: L1Origin) -> ProviderResult<()> {
         Ok(())

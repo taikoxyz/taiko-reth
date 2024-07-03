@@ -38,8 +38,8 @@ impl TryFrom<alloy_rpc_types::Block> for Block {
                         ))
                     })
                     .collect(),
-                alloy_rpc_types::BlockTransactions::Hashes(_)
-                | alloy_rpc_types::BlockTransactions::Uncle => {
+                alloy_rpc_types::BlockTransactions::Hashes(_) |
+                alloy_rpc_types::BlockTransactions::Uncle => {
                     // alloy deserializes empty blocks into `BlockTransactions::Hashes`, if the tx
                     // root is the empty root then we can just return an empty vec.
                     if block.header.transactions_root == EMPTY_TRANSACTIONS {
@@ -151,6 +151,7 @@ impl TryFrom<alloy_rpc_types::Transaction> for Transaction {
                     value: tx.value,
                     access_list: tx.access_list.ok_or(ConversionError::MissingAccessList)?,
                     input: tx.input,
+                    #[cfg(feature = "taiko")]
                     is_anchor: false,
                 }))
             }

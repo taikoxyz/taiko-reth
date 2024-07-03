@@ -353,6 +353,7 @@ revm = { version = "10.0.0", features = [
     "std",
     "secp256k1",
     "blst",
+    "taiko",
 ], default-features = false }
 revm-primitives = { version = "5.0.0", features = [
     "std",
@@ -506,3 +507,15 @@ serial_test = "3"
 similar-asserts = "1.5.0"
 test-fuzz = "5"
 iai-callgrind = "0.11"
+
+
+[patch.crates-io]
+revm = { git = "https://github.com/taikoxyz/revm.git", branch = "v37-taiko" }
+revm-interpreter = { git = "https://github.com/taikoxyz/revm.git", branch = "v37-taiko" }
+revm-precompile = { git = "https://github.com/taikoxyz/revm.git", branch = "v37-taiko" }
+revm-primitives = { git = "https://github.com/taikoxyz/revm.git", branch = "v37-taiko" }
+c-kzg = { git = "https://github.com/brechtpd/c-kzg-4844", branch = "for-alpha7" }
+secp256k1 = { git = "https://github.com/CeciliaZ030/rust-secp256k1", branch = "sp1-patch" }
+
+[patch.'https://github.com/bluealloy/revm.git']
+revm = { git = "https://github.com/taikoxyz/revm.git", branch = "v37-taiko" }

@@ -2,14 +2,17 @@ use crate::{
     traits::{BlockSource, ReceiptProvider},
     AccountReader, BlockHashReader, BlockIdReader, BlockNumReader, BlockReader, BlockReaderIdExt,
     ChainSpecProvider, ChangeSetReader, EvmEnvProvider, FullExecutionDataProvider, HeaderProvider,
-    L1OriginReader, L1OriginWriter, ReceiptProviderIdExt, RequestsProvider, StateProvider,
-    StateProviderBox, StateProviderFactory, StateRootProvider, TransactionVariant,
-    TransactionsProvider, WithdrawalsProvider,
+    ReceiptProviderIdExt, RequestsProvider, StateProvider, StateProviderBox, StateProviderFactory,
+    StateRootProvider, TransactionVariant, TransactionsProvider, WithdrawalsProvider,
 };
+#[cfg(feature = "taiko")]
+use crate::{L1OriginReader, L1OriginWriter};
 use parking_lot::Mutex;
 use reth_chainspec::{ChainInfo, ChainSpec};
 use reth_db_api::models::{AccountBeforeTx, StoredBlockBodyIndices};
 use reth_evm::ConfigureEvmEnv;
+#[cfg(feature = "taiko")]
+use reth_primitives::L1Origin;
 use reth_primitives::{
     keccak256, Account, Address, Block, BlockHash, BlockHashOrNumber, BlockId, BlockNumber,
     BlockWithSenders, Bytecode, Bytes, Header, Receipt, SealedBlock, SealedBlockWithSenders,
@@ -706,6 +709,7 @@ impl ChangeSetReader for MockEthProvider {
     }
 }
 
+#[cfg(feature = "taiko")]
 impl L1OriginReader for MockEthProvider {
     fn read_l1_origin(&self, _block_id: u64) -> ProviderResult<Option<L1Origin>> {
         Ok(None)
@@ -716,6 +720,7 @@ impl L1OriginReader for MockEthProvider {
     }
 }
 
+#[cfg(feature = "taiko")]
 impl L1OriginWriter for MockEthProvider {
     fn insert_l1_origin(&self, _block_id: u64, _origin: L1Origin) -> ProviderResult<()> {
         Ok(())

@@ -2,11 +2,13 @@ use crate::{
     AccountReader, BlockHashReader, BlockIdReader, BlockNumReader, BlockReader, BlockReaderIdExt,
     BlockSource, BlockchainTreePendingStateProvider, CanonChainTracker, CanonStateNotifications,
     CanonStateSubscriptions, ChainSpecProvider, ChangeSetReader, DatabaseProviderFactory,
-    EvmEnvProvider, FullExecutionDataProvider, HeaderProvider, L1OriginReader, L1OriginWriter,
-    ProviderError, PruneCheckpointReader, ReceiptProvider, ReceiptProviderIdExt, RequestsProvider,
+    EvmEnvProvider, FullExecutionDataProvider, HeaderProvider, ProviderError,
+    PruneCheckpointReader, ReceiptProvider, ReceiptProviderIdExt, RequestsProvider,
     StageCheckpointReader, StateProviderBox, StateProviderFactory, StaticFileProviderFactory,
     TransactionVariant, TransactionsProvider, TreeViewer, WithdrawalsProvider,
 };
+#[cfg(feature = "taiko")]
+use crate::{L1OriginReader, L1OriginWriter};
 use reth_blockchain_tree_api::{
     error::{CanonicalError, InsertBlockError},
     BlockValidationKind, BlockchainTreeEngine, BlockchainTreeViewer, CanonicalOutcome,
@@ -18,6 +20,8 @@ use reth_db_api::{
     models::{AccountBeforeTx, StoredBlockBodyIndices},
 };
 use reth_evm::ConfigureEvmEnv;
+#[cfg(feature = "taiko")]
+use reth_primitives::L1Origin;
 use reth_primitives::{
     Account, Address, Block, BlockHash, BlockHashOrNumber, BlockId, BlockNumHash, BlockNumber,
     BlockNumberOrTag, BlockWithSenders, Header, Receipt, SealedBlock, SealedBlockWithSenders,
@@ -920,6 +924,7 @@ where
     }
 }
 
+#[cfg(feature = "taiko")]
 impl<DB> L1OriginReader for BlockchainProvider<DB>
 where
     DB: Database,
@@ -933,6 +938,7 @@ where
     }
 }
 
+#[cfg(feature = "taiko")]
 impl<DB> L1OriginWriter for BlockchainProvider<DB>
 where
     DB: Database,
