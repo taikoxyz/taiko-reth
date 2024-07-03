@@ -11,9 +11,10 @@ use reth_primitives::{
     hex::FromHex,
     proofs,
     revm::env::tx_env_with_recovered,
-    Address, Block, Header, Receipt, Receipts, TransactionSigned, EMPTY_OMMER_ROOT_HASH, U256,
+    Address, Block, EthereumHardforks, Header, Receipt, Receipts, TransactionSigned,
+    EMPTY_OMMER_ROOT_HASH, U256,
 };
-use reth_provider::{BundleStateWithReceipts, StateProviderFactory};
+use reth_provider::{L1OriginWriter, StateProviderFactory};
 use reth_revm::database::StateProviderDatabase;
 use reth_transaction_pool::{BestTransactionsAttributes, TransactionPool};
 use revm::{
@@ -30,7 +31,7 @@ pub struct TaikoPayloadBuilder;
 /// Implementation of the [PayloadBuilder] trait for [TaikoPayloadBuilder].
 impl<Pool, Client> PayloadBuilder<Pool, Client> for TaikoPayloadBuilder
 where
-    Client: StateProviderFactory,
+    Client: StateProviderFactory + L1OriginWriter,
     Pool: TransactionPool,
 {
     type Attributes = TaikoPayloadBuilderAttributes;
@@ -46,11 +47,12 @@ where
     fn on_missing_payload(
         &self,
         _args: BuildArguments<Pool, Client, TaikoPayloadBuilderAttributes, TaikoBuiltPayload>,
-    ) -> Option<TaikoBuiltPayload> {
-        None
+    ) -> MissingPayloadBehaviour<Self::BuiltPayload> {
+        MissingPayloadBehaviour::AwaitInProgress
     }
 
     fn build_empty_payload(
+        &self,
         client: &Client,
         config: PayloadConfig<Self::Attributes>,
     ) -> Result<TaikoBuiltPayload, PayloadBuilderError> {
@@ -103,8 +105,7 @@ where
         db.merge_transitions(BundleRetention::PlainState);
 
         // calculate the state root
-        let bundle_state =
-            BundleStateWithReceipts::new(db.take_bundle(), Receipts::new(), block_number);
+        let bundle_state = db.take_bundle();
         let state_root = state.state_root(&bundle_state).map_err(|err| {
                 warn!(target: "payload_builder", parent_hash=%parent_block.hash(), %err, "failed to calculate state root for empty payload");
                 err
@@ -148,9 +149,10 @@ where
             blob_gas_used,
             excess_blob_gas,
             parent_beacon_block_root: attributes.payload_attributes.parent_beacon_block_root,
+            requests_root: None,
         };
 
-        let block = Block { header, body: vec![], ommers: vec![], withdrawals };
+        let block = Block { header, body: vec![], ommers: vec![], withdrawals, requests: None };
         let sealed_block = block.seal_slow();
 
         Ok(TaikoBuiltPayload::new(
@@ -173,7 +175,7 @@ pub(crate) fn taiko_payload_builder<Pool, Client>(
     args: BuildArguments<Pool, Client, TaikoPayloadBuilderAttributes, TaikoBuiltPayload>,
 ) -> Result<BuildOutcome<TaikoBuiltPayload>, PayloadBuilderError>
 where
-    Client: StateProviderFactory,
+    Client: StateProviderFactory + L1OriginWriter,
     Pool: TransactionPool,
 {
     let BuildArguments { client, pool, mut cached_reads, config, cancel, best_payload } = args;
@@ -320,11 +322,7 @@ where
     // and 4788 contract call
     db.merge_transitions(BundleRetention::PlainState);
 
-    let bundle = BundleStateWithReceipts::new(
-        db.take_bundle(),
-        Receipts::from_vec(vec![receipts]),
-        block_number,
-    );
+    let bundle = db.take_bundle();
     let receipts_root = bundle.receipts_root_slow(block_number).expect("Number is in range");
     let logs_bloom = bundle.block_logs_bloom(block_number).expect("Number is in range");
 

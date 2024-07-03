@@ -1,22 +1,22 @@
 use crate::EthPayloadBuilderAttributes;
 use alloy_rlp::Error as DecodeError;
-use reth_node_api::{BuiltPayload, PayloadBuilderAttributes};
+use reth_chainspec::ChainSpec;
+use reth_evm_ethereum::revm_spec_by_timestamp_after_merge;
+use reth_payload_primitives::{BuiltPayload, EngineApiMessageVersion, EngineObjectValidationError};
 use reth_primitives::{
-    revm::config::revm_spec_by_timestamp_after_merge,
     revm_primitives::{BlobExcessGasAndPrice, BlockEnv, CfgEnv, CfgEnvWithHandlerCfg, SpecId},
-    Address, BlobTransactionSidecar, Bytes, ChainSpec, Header, L1Origin, SealedBlock,
-    TaikoBlockMetadata, Withdrawals, B256, U256,
+    Address, BlobTransactionSidecar, Header, L1Origin, SealedBlock, TaikoBlockMetadata,
+    Withdrawals, B256, U256,
 };
 use reth_rpc_types::{
     engine::{
-        BlobsBundleV1, ExecutionPayloadEnvelopeV2, ExecutionPayloadEnvelopeV3, ExecutionPayloadV1,
-        PayloadAttributes, PayloadId,
+        self, BlobsBundleV1, ExecutionPayloadEnvelopeV2, ExecutionPayloadEnvelopeV3,
+        ExecutionPayloadV1, PayloadId,
     },
-    ExecutionPayload, ExecutionPayloadV2, ExecutionPayloadV3,
+    ExecutionPayload, Withdrawal,
 };
-use reth_rpc_types_compat::engine::{
-    convert_withdrawal_to_standalone_withdraw,
-    payload::{block_to_payload_v3, convert_block_to_payload_field_v2, try_block_to_payload_v1},
+use reth_rpc_types_compat::engine::payload::{
+    block_to_payload_v1, block_to_payload_v3, convert_block_to_payload_field_v2,
 };
 use serde::{Deserialize, Serialize};
 // use std::sync::Arc;
@@ -27,7 +27,7 @@ use serde::{Deserialize, Serialize};
 pub struct TaikoPayloadAttributes {
     /// The payload attributes
     #[serde(flatten)]
-    pub payload_attributes: PayloadAttributes,
+    pub payload_attributes: engine::PayloadAttributes,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub base_fee_per_gas: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -35,7 +35,7 @@ pub struct TaikoPayloadAttributes {
     pub l1_origin: L1Origin,
 }
 
-impl reth_node_api::PayloadAttributes for TaikoPayloadAttributes {
+impl reth_payload_primitives::PayloadAttributes for TaikoPayloadAttributes {
     fn timestamp(&self) -> u64 {
         self.payload_attributes.timestamp()
     }
@@ -51,8 +51,8 @@ impl reth_node_api::PayloadAttributes for TaikoPayloadAttributes {
     fn ensure_well_formed_attributes(
         &self,
         chain_spec: &ChainSpec,
-        version: reth_node_api::EngineApiMessageVersion,
-    ) -> Result<(), reth_node_api::AttributesValidationError> {
+        version: EngineApiMessageVersion,
+    ) -> Result<(), EngineObjectValidationError> {
         self.payload_attributes.ensure_well_formed_attributes(chain_spec, version)
     }
 }
@@ -70,7 +70,7 @@ pub struct TaikoPayloadBuilderAttributes {
     pub l1_origin: L1Origin,
 }
 
-impl PayloadBuilderAttributes for TaikoPayloadBuilderAttributes {
+impl reth_payload_primitives::PayloadBuilderAttributes for TaikoPayloadBuilderAttributes {
     type RpcPayloadAttributes = TaikoPayloadAttributes;
     type Error = DecodeError;
 
@@ -148,7 +148,7 @@ impl PayloadBuilderAttributes for TaikoPayloadBuilderAttributes {
             *base_fee_per_gas
         } else {
             parent
-                .next_block_base_fee(chain_spec.base_fee_params(self.timestamp()))
+                .next_block_base_fee(chain_spec.base_fee_params_at_timestamp(self.timestamp()))
                 .unwrap_or_default()
         });
 
@@ -248,7 +248,7 @@ impl<'a> BuiltPayload for &'a TaikoBuiltPayload {
 // V1 engine_getPayloadV1 response
 impl From<TaikoBuiltPayload> for ExecutionPayloadV1 {
     fn from(value: TaikoBuiltPayload) -> Self {
-        try_block_to_payload_v1(value.block)
+        block_to_payload_v1(value.block)
     }
 }
 
@@ -269,7 +269,7 @@ impl From<TaikoBuiltPayload> for ExecutionPayloadEnvelopeV3 {
         let TaikoBuiltPayload { block, fees, sidecars, .. } = value;
 
         ExecutionPayloadEnvelopeV3 {
-            execution_payload: block_to_payload_v3(block.clone()),
+            execution_payload: block_to_payload_v3(block.clone()).0,
             block_value: fees,
             // From the engine API spec:
             //
@@ -343,21 +343,13 @@ impl From<TaikoBuiltPayload> for TaikoExecutionPayloadEnvelope {
     fn from(value: TaikoBuiltPayload) -> Self {
         let TaikoBuiltPayload { block, fees, sidecars, .. } = value;
 
-        let withdrawals: Vec<reth_rpc_types::withdrawal::Withdrawal> = block
-            .withdrawals
-            .clone()
-            .unwrap_or_default()
-            .into_iter()
-            .map(convert_withdrawal_to_standalone_withdraw)
-            .collect();
-
-        TaikoExecutionPayloadEnvelope {
+        Self {
             execution_payload: TaikoExecutionPayload {
                 tx_hash: block.header.transactions_root,
                 withdrawals_hash: block.header.withdrawals_root.unwrap_or_default(),
                 taiko_block: true,
 
-                payload_inner: ExecutionPayload::V3(block_to_payload_v3(block)),
+                payload_inner: ExecutionPayload::V3(block_to_payload_v3(block).0),
             },
             block_value: fees,
             blobs_bundle: sidecars.into_iter().map(Into::into).collect::<Vec<_>>().into(),
@@ -370,11 +362,11 @@ impl From<TaikoBuiltPayload> for TaikoExecutionPayload {
     fn from(value: TaikoBuiltPayload) -> Self {
         let TaikoBuiltPayload { block, .. } = value;
 
-        TaikoExecutionPayload {
+        Self {
             tx_hash: block.header.transactions_root,
             withdrawals_hash: block.header.withdrawals_root.unwrap_or_default(),
             taiko_block: true,
-            payload_inner: ExecutionPayload::V3(block_to_payload_v3(block)),
+            payload_inner: ExecutionPayload::V3(block_to_payload_v3(block).0),
         }
     }
 }

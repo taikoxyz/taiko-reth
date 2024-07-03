@@ -21,7 +21,7 @@ use reth_chainspec::{BASE_MAINNET, BASE_SEPOLIA, OP_MAINNET, OP_SEPOLIA};
 use reth_chainspec::{GOERLI, HOLESKY, MAINNET, SEPOLIA};
 
 #[cfg(feature = "taiko")]
-use reth_primitives::{TAIKO_INTERNAL_L2_A, TAIKO_TESTNET};
+use reth_chainspec::{TAIKO_INTERNAL_L2_A, TAIKO_TESTNET};
 
 #[cfg(feature = "optimism")]
 /// Chains supported by op-reth. First value should be used as the default.
