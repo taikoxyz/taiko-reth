@@ -11,12 +11,7 @@ use reth_primitives::{
 pub struct TaikoEvmConfig;
 
 impl ConfigureEvmEnv for TaikoEvmConfig {
-    type TxMeta = ();
-
-    fn fill_tx_env<T>(tx_env: &mut TxEnv, transaction: T, sender: Address, _meta: ())
-    where
-        T: AsRef<Transaction>,
-    {
+    fn fill_tx_env(tx_env: &mut TxEnv, transaction: &TransactionSigned, sender: Address) {
         fill_tx_env(tx_env, transaction, sender)
     }
 
@@ -44,7 +39,16 @@ impl ConfigureEvmEnv for TaikoEvmConfig {
     }
 }
 
-impl ConfigureEvm for TaikoEvmConfig {}
+impl ConfigureEvm for TaikoEvmConfig {
+    type DefaultExternalContext<'a> = ();
+
+    fn evm<'a, DB: Database + 'a>(
+        &self,
+        db: DB,
+    ) -> reth_revm::Evm<'a, Self::DefaultExternalContext<'a>, DB> {
+        EvmBuilder::default().with_db(db).build()
+    }
+}
 
 #[cfg(test)]
 mod tests {

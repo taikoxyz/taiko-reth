@@ -20,7 +20,8 @@ reth-errors.workspace = true
 reth-provider.workspace = true
 reth-payload-primitives.workspace = true
 reth-ethereum-engine-primitives.workspace = true
-
+reth-chainspec = { workspace = true, optional = true }
+reth-rpc-types-compat = { workspace = true, optional = true }
 # ethereum
 alloy-rlp.workspace = true
 revm-primitives.workspace = true
@@ -46,4 +47,8 @@ serde_json.workspace = true
 
 [features]
 test-utils = []
-taiko = ["reth-primitives/taiko"]
+taiko = [
+    "reth-primitives/taiko",
+    "dep:reth-chainspec",
+    "dep:reth-rpc-types-compat",
+]

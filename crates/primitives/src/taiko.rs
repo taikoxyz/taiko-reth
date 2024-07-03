@@ -14,11 +14,9 @@ pub struct TaikoBlockMetadata {
     pub gas_limit: u64,
     pub timestamp: u64,
     pub mix_hash: B256,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub tx_list: Option<Vec<Bytes>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub highest_block_id: Option<u64>,
-    pub extra_data: Vec<u8>,
+    pub tx_list: Bytes,
+    pub highest_block_id: u64,
+    pub extra_data: Bytes,
 }
 
 /// L1Origin represents a L1Origin of a L2 block.

@@ -8,11 +8,12 @@
 #![cfg_attr(not(test), warn(unused_crate_dependencies))]
 #![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
 
+use reth_chainspec::ChainSpec;
 #[cfg(feature = "taiko")]
 use reth_payload_builder::TaikoExecutionPayload;
+use reth_primitives::SealedBlock;
 #[cfg(feature = "taiko")]
 use reth_primitives::{Block, Header, B256, EMPTY_OMMER_ROOT_HASH};
-use reth_primitives::{ChainSpec, SealedBlock};
 use reth_rpc_types::{engine::MaybeCancunPayloadFields, ExecutionPayload, PayloadError};
 use reth_rpc_types_compat::engine::payload::try_into_block;
 use std::sync::Arc;
@@ -213,9 +214,11 @@ fn create_taiko_block(
             ommers_hash: EMPTY_OMMER_ROOT_HASH,
             difficulty: Default::default(),
             nonce: Default::default(),
+            requests_root: None,
         },
         body: vec![],
         withdrawals: None,
         ommers: Default::default(),
+        requests: None,
     })
 }

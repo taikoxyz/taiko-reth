@@ -15,10 +15,13 @@ use serde::{Deserialize, Serialize};
 #[non_exhaustive]
 pub struct TaikoEngineTypes;
 
-impl EngineTypes for TaikoEngineTypes {
+impl PayloadTypes for TaikoEngineTypes {
+    type BuiltPayload = TaikoBuiltPayload;
     type PayloadAttributes = TaikoPayloadAttributes;
     type PayloadBuilderAttributes = TaikoPayloadBuilderAttributes;
-    type BuiltPayload = TaikoBuiltPayload;
+}
+
+impl EngineTypes for TaikoEngineTypes {
     type ExecutionPayloadV1 = ExecutionPayloadV1;
     type ExecutionPayloadV2 = ExecutionPayloadEnvelopeV2;
     type ExecutionPayloadV3 = TaikoExecutionPayloadEnvelope;
