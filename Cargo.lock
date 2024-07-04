@@ -6435,7 +6435,6 @@ dependencies = [
  "reth-node-ethereum",
  "reth-node-events",
  "reth-node-optimism",
- "reth-node-taiko",
  "reth-optimism-primitives",
  "reth-payload-builder",
  "reth-payload-primitives",
@@ -7250,6 +7249,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "reth-evm-taiko"
+version = "1.0.0"
+dependencies = [
+ "alloy-eips",
+ "alloy-sol-types",
+ "reth-chainspec",
+ "reth-ethereum-consensus",
+ "reth-evm",
+ "reth-execution-types",
+ "reth-primitives",
+ "reth-prune-types",
+ "reth-revm",
+ "reth-testing-utils",
+ "revm-primitives",
+ "secp256k1",
+ "serde_json",
+]
+
+[[package]]
 name = "reth-execution-errors"
 version = "1.0.0"
 dependencies = [
@@ -7795,21 +7813,33 @@ dependencies = [
 name = "reth-node-taiko"
 version = "1.0.0"
 dependencies = [
+ "alloy-genesis",
+ "alloy-primitives",
  "eyre",
+ "futures",
+ "futures-util",
+ "reth",
+ "reth-auto-seal-consensus",
  "reth-basic-payload-builder",
+ "reth-beacon-consensus",
  "reth-chainspec",
+ "reth-consensus",
  "reth-db",
+ "reth-e2e-test-utils",
+ "reth-ethereum-engine-primitives",
+ "reth-ethereum-payload-builder",
+ "reth-evm-ethereum",
+ "reth-exex",
  "reth-network",
  "reth-node-api",
  "reth-node-builder",
+ "reth-node-core",
  "reth-payload-builder",
- "reth-primitives",
  "reth-provider",
- "reth-rpc-types",
- "reth-taiko-payload-builder",
  "reth-tracing",
  "reth-transaction-pool",
- "serde",
+ "serde_json",
+ "tokio",
 ]
 
 [[package]]
@@ -8467,17 +8497,48 @@ dependencies = [
 ]
 
 [[package]]
+name = "reth-taiko-consensus"
+version = "1.0.0"
+dependencies = [
+ "reth-chainspec",
+ "reth-consensus",
+ "reth-consensus-common",
+ "reth-primitives",
+ "tracing",
+]
+
+[[package]]
+name = "reth-taiko-engine-primitives"
+version = "1.0.0"
+dependencies = [
+ "alloy-rlp",
+ "reth-chainspec",
+ "reth-engine-primitives",
+ "reth-payload-primitives",
+ "reth-primitives",
+ "reth-rpc-types",
+ "reth-rpc-types-compat",
+ "revm-primitives",
+ "serde",
+ "serde_json",
+ "sha2 0.10.8",
+]
+
+[[package]]
 name = "reth-taiko-payload-builder"
 version = "1.0.0"
 dependencies = [
  "reth-basic-payload-builder",
+ "reth-errors",
+ "reth-evm",
+ "reth-evm-ethereum",
+ "reth-execution-types",
  "reth-payload-builder",
  "reth-primitives",
  "reth-provider",
  "reth-revm",
  "reth-transaction-pool",
  "revm",
- "thiserror",
  "tracing",
 ]
 

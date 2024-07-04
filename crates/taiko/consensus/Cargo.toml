@@ -1,5 +1,5 @@
 [package]
-name = "reth-ethereum-consensus"
+name = "reth-taiko-consensus"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

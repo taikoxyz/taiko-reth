@@ -61,7 +61,7 @@ reth-node-ethereum.workspace = true
 reth-node-optimism = { workspace = true, optional = true, features = [
     "optimism",
 ] }
-reth-node-taiko = { workspace = true, optional = true }
+# reth-node-taiko = { workspace = true, optional = true }
 reth-node-core.workspace = true
 reth-db-common.workspace = true
 reth-node-builder.workspace = true
@@ -166,7 +166,7 @@ taiko = [
     "reth-payload-builder/taiko",
     "reth-node-core/taiko",
     "dep:reth-taiko-payload-builder",
-    "dep:reth-node-taiko",
+    # "dep:reth-node-taiko",
 ]
 
 # no-op feature flag for switching between the `optimism` and default functionality in CI matrices
