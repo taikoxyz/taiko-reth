@@ -1,3 +1,4 @@
+use reth_chainspec::ChainSpec;
 use reth_node_api::{
     validate_version_specific_fields, AttributesValidationError, EngineApiMessageVersion,
     EngineTypes, PayloadOrAttributes,
@@ -6,7 +7,6 @@ use reth_payload_builder::{
     TaikoBuiltPayload, TaikoExecutionPayloadEnvelope, TaikoPayloadAttributes,
     TaikoPayloadBuilderAttributes,
 };
-use reth_primitives::ChainSpec;
 use reth_rpc_types::{engine::ExecutionPayloadEnvelopeV2, ExecutionPayloadV1};
 use serde::{Deserialize, Serialize};
 
@@ -25,6 +25,7 @@ impl EngineTypes for TaikoEngineTypes {
     type ExecutionPayloadV1 = ExecutionPayloadV1;
     type ExecutionPayloadV2 = ExecutionPayloadEnvelopeV2;
     type ExecutionPayloadV3 = TaikoExecutionPayloadEnvelope;
+    type ExecutionPayloadV4 = TaikoExecutionPayloadEnvelope;
 
     fn validate_version_specific_fields(
         chain_spec: &ChainSpec,

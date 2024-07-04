@@ -287,6 +287,7 @@ impl From<TaikoBuiltPayload> for ExecutionPayloadEnvelopeV3 {
     }
 }
 
+/// Taiko Execution Payload
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TaikoExecutionPayload {
@@ -296,22 +297,25 @@ pub struct TaikoExecutionPayload {
 
     /// Allow passing txHash directly instead of transactions list
     pub tx_hash: B256,
-    /// Allow passing WithdrawalsHash directly instead of withdrawals
+    /// Allow passing withdrawals hash directly instead of withdrawals
     pub withdrawals_hash: B256,
     /// Whether this is a Taiko L2 block, only used by ExecutableDataToBlock
     pub taiko_block: bool,
 }
 
 impl TaikoExecutionPayload {
-    pub fn block_hash(&self) -> B256 {
+    /// Returns the block hash of the payload
+    pub const fn block_hash(&self) -> B256 {
         self.payload_inner.block_hash()
     }
 
-    pub fn block_number(&self) -> u64 {
+    /// Returns the timestamp of the payload
+    pub const fn block_number(&self) -> u64 {
         self.payload_inner.block_number()
     }
 
-    pub fn parent_hash(&self) -> B256 {
+    /// Returns the parent hash of the payload
+    pub const fn parent_hash(&self) -> B256 {
         self.payload_inner.parent_hash()
     }
 }
@@ -327,6 +331,7 @@ impl From<ExecutionPayload> for TaikoExecutionPayload {
     }
 }
 
+/// Taiko Execution Payload Envelope
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TaikoExecutionPayloadEnvelope {
@@ -345,7 +350,7 @@ impl From<TaikoBuiltPayload> for TaikoExecutionPayloadEnvelope {
     fn from(value: TaikoBuiltPayload) -> Self {
         let TaikoBuiltPayload { block, fees, sidecars, .. } = value;
 
-        TaikoExecutionPayloadEnvelope {
+        Self {
             execution_payload: TaikoExecutionPayload {
                 tx_hash: block.header.transactions_root,
                 withdrawals_hash: block.header.withdrawals_root.unwrap_or_default(),
@@ -364,7 +369,7 @@ impl From<TaikoBuiltPayload> for TaikoExecutionPayload {
     fn from(value: TaikoBuiltPayload) -> Self {
         let TaikoBuiltPayload { block, .. } = value;
 
-        TaikoExecutionPayload {
+        Self {
             tx_hash: block.header.transactions_root,
             withdrawals_hash: block.header.withdrawals_root.unwrap_or_default(),
             taiko_block: true,

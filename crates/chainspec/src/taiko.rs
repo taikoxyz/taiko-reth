@@ -75,7 +75,7 @@ impl From<TaikoNamedChain> for Chain {
     }
 }
 
-pub fn get_taiko_genesis(chain: TaikoNamedChain) -> Genesis {
+pub(crate) fn get_taiko_genesis(chain: TaikoNamedChain) -> Genesis {
     let alloc_str = match chain {
         TaikoNamedChain::TaikoInternalL2A => {
             include_str!("../res/genesis/taiko/internal_l2a.json")

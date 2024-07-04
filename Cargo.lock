@@ -7797,6 +7797,7 @@ version = "1.0.0"
 dependencies = [
  "eyre",
  "reth-basic-payload-builder",
+ "reth-chainspec",
  "reth-db",
  "reth-network",
  "reth-node-api",
