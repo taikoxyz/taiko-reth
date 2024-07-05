@@ -2,9 +2,9 @@
 
 use crate::{
     dao_fork::{DAO_HARDFORK_BENEFICIARY, DAO_HARDKFORK_ACCOUNTS},
-    EthEvmConfig,
+    TaikoEvmConfig,
 };
-use reth_chainspec::{ChainSpec, MAINNET};
+use reth_chainspec::{ChainSpec, TAIKO_HEKLA, TAIKO_MAINNET};
 use reth_ethereum_consensus::validate_block_post_execution;
 use reth_evm::{
     execute::{
@@ -20,16 +20,16 @@ use reth_primitives::{
 use reth_prune_types::PruneModes;
 use reth_revm::{
     batch::{BlockBatchRecord, BlockExecutorStats},
-    db::states::bundle_state::BundleRetention,
+    db::{states::bundle_state::BundleRetention, State},
     state_change::{
         apply_beacon_root_contract_call, apply_blockhashes_update,
         apply_withdrawal_requests_contract_call, post_block_balance_increments,
     },
-    Evm, State,
+    Evm, JournaledState,
 };
 use revm_primitives::{
     db::{Database, DatabaseCommit},
-    BlockEnv, CfgEnvWithHandlerCfg, EnvWithHandlerCfg, ResultAndState,
+    Address, BlockEnv, CfgEnvWithHandlerCfg, EnvWithHandlerCfg, HashSet, ResultAndState,
 };
 
 #[cfg(not(feature = "std"))]
@@ -40,39 +40,44 @@ use std::sync::Arc;
 
 /// Provides executors to execute regular ethereum blocks
 #[derive(Debug, Clone)]
-pub struct EthExecutorProvider<EvmConfig = EthEvmConfig> {
+pub struct TaikoExecutorProvider<EvmConfig = TaikoEvmConfig> {
     chain_spec: Arc<ChainSpec>,
     evm_config: EvmConfig,
 }
 
-impl EthExecutorProvider {
+impl TaikoExecutorProvider {
     /// Creates a new default ethereum executor provider.
-    pub fn ethereum(chain_spec: Arc<ChainSpec>) -> Self {
+    pub fn taiko(chain_spec: Arc<ChainSpec>) -> Self {
         Self::new(chain_spec, Default::default())
     }
 
-    /// Returns a new provider for the mainnet.
-    pub fn mainnet() -> Self {
-        Self::ethereum(MAINNET.clone())
+    /// Returns a new provider for the taiko mainnet.
+    pub fn takio_mainnet() -> Self {
+        Self::taiko(TAIKO_MAINNET.clone())
+    }
+
+    /// Returns a new provider for the taiko hekla.
+    pub fn takio_hekla() -> Self {
+        Self::taiko(TAIKO_HEKLA.clone())
     }
 }
 
-impl<EvmConfig> EthExecutorProvider<EvmConfig> {
+impl<EvmConfig> TaikoExecutorProvider<EvmConfig> {
     /// Creates a new executor provider.
     pub const fn new(chain_spec: Arc<ChainSpec>, evm_config: EvmConfig) -> Self {
         Self { chain_spec, evm_config }
     }
 }
 
-impl<EvmConfig> EthExecutorProvider<EvmConfig>
+impl<EvmConfig> TaikoExecutorProvider<EvmConfig>
 where
     EvmConfig: ConfigureEvm,
 {
-    fn eth_executor<DB>(&self, db: DB) -> EthBlockExecutor<EvmConfig, DB>
+    fn taiko_executor<DB>(&self, db: DB) -> TaikoBlockExecutor<EvmConfig, DB>
     where
         DB: Database<Error = ProviderError>,
     {
-        EthBlockExecutor::new(
+        TaikoBlockExecutor::new(
             self.chain_spec.clone(),
             self.evm_config.clone(),
             State::builder().with_database(db).with_bundle_update().without_state_clear().build(),
@@ -80,11 +85,11 @@ where
     }
 }
 
-impl<EvmConfig> BlockExecutorProvider for EthExecutorProvider<EvmConfig>
+impl<EvmConfig> BlockExecutorProvider for TaikoExecutorProvider<EvmConfig>
 where
     EvmConfig: ConfigureEvm,
 {
-    type Executor<DB: Database<Error = ProviderError>> = EthBlockExecutor<EvmConfig, DB>;
+    type Executor<DB: Database<Error = ProviderError>> = TaikoBlockExecutor<EvmConfig, DB>;
 
     type BatchExecutor<DB: Database<Error = ProviderError>> = EthBatchExecutor<EvmConfig, DB>;
 
@@ -92,14 +97,14 @@ where
     where
         DB: Database<Error = ProviderError>,
     {
-        self.eth_executor(db)
+        self.taiko_executor(db)
     }
 
     fn batch_executor<DB>(&self, db: DB, prune_modes: PruneModes) -> Self::BatchExecutor<DB>
     where
         DB: Database<Error = ProviderError>,
     {
-        let executor = self.eth_executor(db);
+        let executor = self.taiko_executor(db);
         EthBatchExecutor {
             executor,
             batch_record: BlockBatchRecord::new(prune_modes),
@@ -110,7 +115,7 @@ where
 
 /// Helper type for the output of executing a block.
 #[derive(Debug, Clone)]
-struct EthExecuteOutput {
+struct TaikoExecuteOutput {
     receipts: Vec<Receipt>,
     requests: Vec<Request>,
     gas_used: u64,
@@ -118,14 +123,14 @@ struct EthExecuteOutput {
 
 /// Helper container type for EVM with chain spec.
 #[derive(Debug, Clone)]
-struct EthEvmExecutor<EvmConfig> {
+struct TaikoEvmExecutor<EvmConfig> {
     /// The chainspec
     chain_spec: Arc<ChainSpec>,
     /// How to create an EVM.
     evm_config: EvmConfig,
 }
 
-impl<EvmConfig> EthEvmExecutor<EvmConfig>
+impl<EvmConfig> TaikoEvmExecutor<EvmConfig>
 where
     EvmConfig: ConfigureEvm,
 {
@@ -143,7 +148,9 @@ where
         &self,
         block: &BlockWithSenders,
         mut evm: Evm<'_, Ext, &mut State<DB>>,
-    ) -> Result<EthExecuteOutput, BlockExecutionError>
+        optimistic: bool,
+        taiko_data: TaikoData,
+    ) -> Result<TaikoExecuteOutput, BlockExecutionError>
     where
         DB: Database<Error = ProviderError>,
     {
@@ -166,11 +173,36 @@ where
         // execute transactions
         let mut cumulative_gas_used = 0;
         let mut receipts = Vec::with_capacity(block.body.len());
-        for (sender, transaction) in block.transactions_with_sender() {
+        let mut valid_transaction_indices = Vec::new();
+        for (idx, (sender, transaction)) in block.transactions_with_sender().enumerate() {
+            let is_anchor = idx == 0;
+
+            // verify the anchor tx
+            if optimistic && is_anchor {
+                crate::anchor::check_anchor_tx(transaction, sender, &block.block, &taiko_data)
+                    .map_err(|e| BlockExecutionError::CanonicalRevert { inner: e.to_string() })?;
+            }
+
+            // If the signature was not valid, the sender address will have been set to zero
+            if *sender == Address::ZERO {
+                // Signature can be invalid if not taiko or not the anchor tx
+                if optimistic && !is_anchor {
+                    // If the signature is not valid, skip the transaction
+                    continue;
+                }
+                // In all other cases, the tx needs to have a valid signature
+                return Err(BlockExecutionError::CanonicalRevert {
+                    inner: "invalid tx".to_string(),
+                });
+            }
+
             // The sum of the transaction’s gas limit, Tg, and the gas utilized in this block prior,
             // must be no greater than the block’s gasLimit.
             let block_available_gas = block.header.gas_limit - cumulative_gas_used;
             if transaction.gas_limit() > block_available_gas {
+                if optimistic && !is_anchor {
+                    continue;
+                }
                 return Err(BlockValidationError::TransactionGasLimitMoreThanAvailableBlockGas {
                     transaction_gas_limit: transaction.gas_limit(),
                     block_available_gas,
@@ -180,14 +212,32 @@ where
 
             EvmConfig::fill_tx_env(evm.tx_mut(), transaction, *sender);
 
+            // Set taiko specific data
+            evm.tx_mut().taiko.is_anchor = is_anchor;
+            // set the treasury address
+            evm.tx_mut().taiko.treasury = taiko_data.l2_contract;
+
             // Execute transaction.
-            let ResultAndState { result, state } = evm.transact().map_err(move |err| {
+            let ResultAndState { result, state } = match evm.transact().map_err(move |err| {
                 // Ensure hash is calculated for error log, if not already done
                 BlockValidationError::EVM {
                     hash: transaction.recalculate_hash(),
                     error: err.into(),
                 }
-            })?;
+            }) {
+                Ok(res) => res,
+                Err(err) => {
+                    // Clear the state for the next tx
+                    evm.context.evm.journaled_state =
+                        JournaledState::new(evm.context.evm.journaled_state.spec, HashSet::new());
+
+                    if optimistic && !is_anchor {
+                        continue;
+                    }
+                    return Err(err.into());
+                }
+            };
+
             evm.db_mut().commit(state);
 
             // append gas used
@@ -207,6 +257,9 @@ where
                     ..Default::default()
                 },
             );
+
+            // Add the tx to the list of valid transactions
+            valid_transaction_indices.push(idx);
         }
 
         let requests = if self.chain_spec.is_prague_active_at_timestamp(block.timestamp) {
@@ -222,7 +275,7 @@ where
             vec![]
         };
 
-        Ok(EthExecuteOutput { receipts, requests, gas_used: cumulative_gas_used })
+        Ok(TaikoExecuteOutput { receipts, requests, gas_used: cumulative_gas_used })
     }
 }
 
@@ -232,17 +285,49 @@ where
 /// - Create a new instance of the executor.
 /// - Execute the block.
 #[derive(Debug)]
-pub struct EthBlockExecutor<EvmConfig, DB> {
+pub struct TaikoBlockExecutor<EvmConfig, DB> {
     /// Chain specific evm config that's used to execute a block.
-    executor: EthEvmExecutor<EvmConfig>,
+    executor: TaikoEvmExecutor<EvmConfig>,
     /// The state to use for execution
     state: State<DB>,
+    /// Allows the execution to continue even when a tx is invalid
+    optimistic: bool,
+    /// Taiko data
+    taiko_data: Option<TaikoData>,
 }
 
-impl<EvmConfig, DB> EthBlockExecutor<EvmConfig, DB> {
+/// Data required to validate a Taiko Block
+#[derive(Clone, Debug, Default)]
+pub struct TaikoData {
+    /// header
+    pub l1_header: Header,
+    /// parent L1 header
+    pub parent_header: Header,
+    /// L2 contract
+    pub l2_contract: Address,
+}
+
+impl<EvmConfig, DB> TaikoBlockExecutor<EvmConfig, DB> {
     /// Creates a new Ethereum block executor.
     pub const fn new(chain_spec: Arc<ChainSpec>, evm_config: EvmConfig, state: State<DB>) -> Self {
-        Self { executor: EthEvmExecutor { chain_spec, evm_config }, state }
+        Self {
+            executor: TaikoEvmExecutor { chain_spec, evm_config },
+            state,
+            optimistic: false,
+            taiko_data: None,
+        }
+    }
+
+    /// Set taiko data
+    pub fn taiko_data(mut self, taiko_data: TaikoData) -> Self {
+        self.taiko_data = Some(taiko_data);
+        self
+    }
+
+    /// Optimistic execution
+    pub const fn optimistic(mut self, optimistic: bool) -> Self {
+        self.optimistic = optimistic;
+        self
     }
 
     #[inline]
@@ -257,7 +342,7 @@ impl<EvmConfig, DB> EthBlockExecutor<EvmConfig, DB> {
     }
 }
 
-impl<EvmConfig, DB> EthBlockExecutor<EvmConfig, DB>
+impl<EvmConfig, DB> TaikoBlockExecutor<EvmConfig, DB>
 where
     EvmConfig: ConfigureEvm,
     DB: Database<Error = ProviderError>,
@@ -291,7 +376,7 @@ where
         &mut self,
         block: &BlockWithSenders,
         total_difficulty: U256,
-    ) -> Result<EthExecuteOutput, BlockExecutionError> {
+    ) -> Result<TaikoExecuteOutput, BlockExecutionError> {
         // 1. prepare state on new block
         self.on_new_block(&block.header);
 
@@ -299,7 +384,12 @@ where
         let env = self.evm_env_for_block(&block.header, total_difficulty);
         let output = {
             let evm = self.executor.evm_config.evm_with_env(&mut self.state, env);
-            self.executor.execute_state_transitions(block, evm)
+            self.executor.execute_state_transitions(
+                block,
+                evm,
+                self.optimistic,
+                self.taiko_data.clone().unwrap(),
+            )
         }?;
 
         // 3. apply post execution changes
@@ -355,7 +445,7 @@ where
     }
 }
 
-impl<EvmConfig, DB> Executor<DB> for EthBlockExecutor<EvmConfig, DB>
+impl<EvmConfig, DB> Executor<DB> for TaikoBlockExecutor<EvmConfig, DB>
 where
     EvmConfig: ConfigureEvm,
     DB: Database<Error = ProviderError>,
@@ -373,7 +463,7 @@ where
     /// State changes are committed to the database.
     fn execute(mut self, input: Self::Input<'_>) -> Result<Self::Output, Self::Error> {
         let BlockExecutionInput { block, total_difficulty } = input;
-        let EthExecuteOutput { receipts, requests, gas_used } =
+        let TaikoExecuteOutput { receipts, requests, gas_used } =
             self.execute_without_verification(block, total_difficulty)?;
 
         // NOTE: we need to merge keep the reverts for the bundle retention
@@ -391,7 +481,7 @@ pub struct EthBatchExecutor<EvmConfig, DB> {
     /// The executor used to execute single blocks
     ///
     /// All state changes are committed to the [State].
-    executor: EthBlockExecutor<EvmConfig, DB>,
+    executor: TaikoBlockExecutor<EvmConfig, DB>,
     /// Keeps track of the batch and records receipts based on the configured prune mode
     batch_record: BlockBatchRecord,
     stats: BlockExecutorStats,
@@ -416,7 +506,7 @@ where
 
     fn execute_and_verify_one(&mut self, input: Self::Input<'_>) -> Result<(), Self::Error> {
         let BlockExecutionInput { block, total_difficulty } = input;
-        let EthExecuteOutput { receipts, requests, gas_used: _ } =
+        let TaikoExecuteOutput { receipts, requests, gas_used: _ } =
             self.executor.execute_without_verification(block, total_difficulty)?;
 
         validate_block_post_execution(block, self.executor.chain_spec(), &receipts, &requests)?;
@@ -517,8 +607,8 @@ mod tests {
         db
     }
 
-    fn executor_provider(chain_spec: Arc<ChainSpec>) -> EthExecutorProvider<EthEvmConfig> {
-        EthExecutorProvider { chain_spec, evm_config: Default::default() }
+    fn executor_provider(chain_spec: Arc<ChainSpec>) -> TaikoExecutorProvider<TaikoEvmConfig> {
+        TaikoExecutorProvider { chain_spec, evm_config: Default::default() }
     }
 
     #[test]

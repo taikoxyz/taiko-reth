@@ -19,7 +19,8 @@ use reth_primitives::{
     revm_primitives::{AnalysisKind, CfgEnvWithHandlerCfg, TxEnv},
     Address, Head, Header, TransactionSigned, U256,
 };
-use reth_revm::{Database, EvmBuilder};
+
+use reth_revm::{taiko::handler_register, Database, EvmBuilder};
 
 pub mod execute;
 
@@ -29,12 +30,14 @@ pub mod dao_fork;
 /// [EIP-6110](https://eips.ethereum.org/EIPS/eip-6110) handling.
 pub mod eip6110;
 
+pub mod anchor;
+
 /// Ethereum-related EVM configuration.
 #[derive(Debug, Clone, Copy, Default)]
 #[non_exhaustive]
-pub struct EthEvmConfig;
+pub struct TaikoEvmConfig;
 
-impl ConfigureEvmEnv for EthEvmConfig {
+impl ConfigureEvmEnv for TaikoEvmConfig {
     fn fill_tx_env(tx_env: &mut TxEnv, transaction: &TransactionSigned, sender: Address) {
         fill_tx_env(tx_env, transaction, sender)
     }
@@ -60,17 +63,21 @@ impl ConfigureEvmEnv for EthEvmConfig {
         cfg_env.perf_analyse_created_bytecodes = AnalysisKind::Analyse;
 
         cfg_env.handler_cfg.spec_id = spec_id;
+        cfg_env.handler_cfg.is_taiko = true;
     }
 }
 
-impl ConfigureEvm for EthEvmConfig {
+impl ConfigureEvm for TaikoEvmConfig {
     type DefaultExternalContext<'a> = ();
 
     fn evm<'a, DB: Database + 'a>(
         &self,
         db: DB,
     ) -> reth_revm::Evm<'a, Self::DefaultExternalContext<'a>, DB> {
-        EvmBuilder::default().with_db(db).build()
+        EvmBuilder::default()
+            .with_db(db)
+            .append_handler_register(handler_register::taiko_handle_register)
+            .build()
     }
 }
 
@@ -88,7 +95,7 @@ mod tests {
         let chain_spec = ChainSpec::default();
         let total_difficulty = U256::ZERO;
 
-        EthEvmConfig::fill_cfg_and_block_env(
+        TaikoEvmConfig::fill_cfg_and_block_env(
             &mut cfg_env,
             &mut block_env,
             &chain_spec,

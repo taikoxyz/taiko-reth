@@ -12,10 +12,10 @@ workspace = true
 
 [dependencies]
 # Reth
-reth-chainspec.workspace = true
+reth-chainspec = { workspace = true, features = ["taiko"] }
 reth-evm.workspace = true
-reth-primitives.workspace = true
-reth-revm.workspace = true
+reth-primitives = { workspace = true, features = ["taiko"] }
+reth-revm = { workspace = true, features = ["taiko"] }
 reth-ethereum-consensus.workspace = true
 reth-prune-types.workspace = true
 reth-execution-types.workspace = true
@@ -26,6 +26,10 @@ revm-primitives.workspace = true
 # Alloy
 alloy-eips.workspace = true
 alloy-sol-types.workspace = true
+
+# Misc
+lazy_static.workspace = true
+anyhow.workspace = true
 
 [dev-dependencies]
 reth-testing-utils.workspace = true
