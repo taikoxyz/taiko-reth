@@ -113,12 +113,6 @@ pub use arbitrary;
 #[cfg(feature = "c-kzg")]
 pub use c_kzg as kzg;
 
-#[cfg(feature = "taiko")]
-mod taiko;
-
-#[cfg(feature = "taiko")]
-pub use taiko::*;
-
 /// Optimism specific re-exports
 #[cfg(feature = "optimism")]
 mod optimism {
