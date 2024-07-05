@@ -411,12 +411,6 @@ tables! {
 
     /// Stores generic chain state info, like the last finalized block.
     table ChainState<Key = ChainStateKey, Value = BlockNumber>;
-
-    /// CHANGE(taiko): Stores L1 origin information.
-    table L1Origins<Key = String, Value = Vec<u8>>;
-
-    /// CHANGE(taiko): Stores latest L1 origin.
-    table HeadL1Origin<Key = String, Value = u64>;
 }
 
 /// Keys for the `ChainState` table.

@@ -256,6 +256,13 @@ where
     Ok(Vec::new())
 }
 
+impl<TX> DatabaseProvider<TX> {
+    /// Pass `DbTx` or `DbTxMut` immutable reference.
+    pub const fn tx_ref(&self) -> &TX {
+        &self.tx
+    }
+}
+
 impl<TX: DbTx> DatabaseProvider<TX> {
     /// Creates a provider with an inner read-only transaction.
     pub const fn new(
@@ -274,11 +281,6 @@ impl<TX: DbTx> DatabaseProvider<TX> {
     /// Pass `DbTx` or `DbTxMut` mutable reference.
     pub fn tx_mut(&mut self) -> &mut TX {
         &mut self.tx
-    }
-
-    /// Pass `DbTx` or `DbTxMut` immutable reference.
-    pub const fn tx_ref(&self) -> &TX {
-        &self.tx
     }
 
     /// Returns a reference to the [`ChainSpec`].

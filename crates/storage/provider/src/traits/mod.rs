@@ -50,8 +50,3 @@ pub use tree_viewer::TreeViewer;
 
 mod finalized_block;
 pub use finalized_block::{FinalizedBlockReader, FinalizedBlockWriter};
-
-#[cfg(feature = "taiko")]
-mod l1_origin;
-#[cfg(feature = "taiko")]
-pub use l1_origin::{L1OriginReader, L1OriginWriter};
