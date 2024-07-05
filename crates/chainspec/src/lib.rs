@@ -18,14 +18,14 @@ pub use spec::{
 #[cfg(feature = "optimism")]
 pub use spec::{BASE_MAINNET, BASE_SEPOLIA, OP_MAINNET, OP_SEPOLIA};
 
+#[cfg(feature = "taiko")]
+pub use spec::{TAIKO_HEKLA, TAIKO_INTERNAL_L2_A, TAIKO_MAINNET, TAIKO_TESTNET};
+
 #[cfg(not(feature = "std"))]
 extern crate alloc;
 
 #[cfg(feature = "taiko")]
 mod taiko;
-
-#[cfg(feature = "taiko")]
-pub use spec::{TAIKO_INTERNAL_L2_A, TAIKO_TESTNET};
 
 mod info;
 

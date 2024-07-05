@@ -327,6 +327,42 @@ pub static TAIKO_TESTNET: Lazy<Arc<ChainSpec>> = Lazy::new(|| {
     .into()
 });
 
+/// The Taiko A7 spec
+#[cfg(feature = "taiko")]
+pub static TAIKO_HEKLA: Lazy<Arc<ChainSpec>> = Lazy::new(|| {
+    ChainSpec {
+        chain: 167009.into(),
+        genesis: get_taiko_genesis(TaikoNamedChain::Hekla),
+        genesis_hash: None,
+        paris_block_and_final_difficulty: None,
+        hardforks: BTreeMap::from([
+            (Hardfork::Shanghai, ForkCondition::Block(0)),
+            (Hardfork::Cancun, ForkCondition::default()),
+        ]),
+        deposit_contract: None,
+        ..Default::default()
+    }
+    .into()
+});
+
+/// The Taiko Mainnet spec
+#[cfg(feature = "taiko")]
+pub static TAIKO_MAINNET: Lazy<Arc<ChainSpec>> = Lazy::new(|| {
+    ChainSpec {
+        chain: 167000.into(),
+        genesis: get_taiko_genesis(TaikoNamedChain::Mainnet),
+        genesis_hash: None,
+        paris_block_and_final_difficulty: None,
+        hardforks: BTreeMap::from([
+            (Hardfork::Shanghai, ForkCondition::Block(0)),
+            (Hardfork::Cancun, ForkCondition::default()),
+        ]),
+        deposit_contract: None,
+        ..Default::default()
+    }
+    .into()
+});
+
 /// A wrapper around [`BaseFeeParams`] that allows for specifying constant or dynamic EIP-1559
 /// parameters based on the active [Hardfork].
 #[derive(Clone, Debug, PartialEq, Eq)]

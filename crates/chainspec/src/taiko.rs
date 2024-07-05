@@ -2,41 +2,40 @@ use std::collections::BTreeMap;
 
 use alloy_chains::Chain;
 use alloy_genesis::{ChainConfig, Genesis, GenesisAccount};
+use once_cell::sync::Lazy;
 use revm_primitives::{Address, Bytes, FixedBytes, U256};
 
-/// Taiko Chain Configuration, sets the chain_id to the internal devnet L2A by default.
-pub fn taiko_base_config() -> ChainConfig {
-    ChainConfig {
-        chain_id: TaikoNamedChain::TaikoInternalL2A as u64,
-        homestead_block: Some(0),
-        dao_fork_block: None,
-        dao_fork_support: false,
-        eip150_block: Some(0),
-        eip150_hash: None,
-        eip155_block: Some(0),
-        eip158_block: Some(0),
-        byzantium_block: Some(0),
-        constantinople_block: Some(0),
-        petersburg_block: Some(0),
-        istanbul_block: Some(0),
-        muir_glacier_block: Some(0),
-        berlin_block: Some(0),
-        london_block: Some(0),
-        arrow_glacier_block: Some(0),
-        gray_glacier_block: Some(0),
-        merge_netsplit_block: None,
-        shanghai_time: Some(0),
-        cancun_time: Some(0),
-        terminal_total_difficulty: Some(U256::ZERO),
-        terminal_total_difficulty_passed: true,
-        ethash: None,
-        clique: None,
-        extra_fields: Default::default(),
-        prague_time: None,
-        parlia: None,
-        deposit_contract_address: None,
-    }
-}
+// Taiko Chain Configuration, sets the chain_id to the internal devnet L2A by default.
+static TAIKO_CHAIN_CONFIG: Lazy<ChainConfig> = Lazy::new(|| ChainConfig {
+    chain_id: TaikoNamedChain::TaikoInternalL2A as u64,
+    homestead_block: Some(0),
+    dao_fork_block: None,
+    dao_fork_support: false,
+    eip150_block: Some(0),
+    eip150_hash: None,
+    eip155_block: Some(0),
+    eip158_block: Some(0),
+    byzantium_block: Some(0),
+    constantinople_block: Some(0),
+    petersburg_block: Some(0),
+    istanbul_block: Some(0),
+    muir_glacier_block: Some(0),
+    berlin_block: Some(0),
+    london_block: Some(0),
+    arrow_glacier_block: Some(0),
+    gray_glacier_block: Some(0),
+    merge_netsplit_block: None,
+    shanghai_time: Some(0),
+    cancun_time: Some(0),
+    terminal_total_difficulty: Some(U256::ZERO),
+    terminal_total_difficulty_passed: true,
+    ethash: None,
+    clique: None,
+    extra_fields: Default::default(),
+    prague_time: None,
+    parlia: None,
+    deposit_contract_address: None,
+});
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, strum::IntoStaticStr)] // Into<&'static str>, AsRef<str>, fmt::Display and serde::Serialize
 #[derive(strum::VariantNames)] // NamedChain::VARIANTS
@@ -51,6 +50,8 @@ pub fn taiko_base_config() -> ChainConfig {
 #[cfg_attr(feature = "serde", serde(rename_all = "snake_case"))]
 #[repr(u64)]
 pub enum TaikoNamedChain {
+    #[cfg_attr(feature = "serde", serde(alias = "mainnet"))]
+    Mainnet = 167000,
     #[cfg_attr(feature = "serde", serde(alias = "taiko-internal-l2a"))]
     TaikoInternalL2A = 167001,
     #[cfg_attr(feature = "serde", serde(alias = "taiko-internal-l2b"))]
@@ -67,6 +68,8 @@ pub enum TaikoNamedChain {
     Jolnir = 167007,
     #[cfg_attr(feature = "serde", serde(alias = "katla"))]
     Katla = 167008,
+    #[cfg_attr(feature = "serde", serde(alias = "hekla"))]
+    Hekla = 167009,
 }
 
 impl From<TaikoNamedChain> for Chain {
@@ -77,6 +80,9 @@ impl From<TaikoNamedChain> for Chain {
 
 pub(crate) fn get_taiko_genesis(chain: TaikoNamedChain) -> Genesis {
     let alloc_str = match chain {
+        TaikoNamedChain::Mainnet => {
+            include_str!("../res/genesis/taiko/mainnet.json")
+        }
         TaikoNamedChain::TaikoInternalL2A => {
             include_str!("../res/genesis/taiko/internal_l2a.json")
         }
@@ -91,11 +97,12 @@ pub(crate) fn get_taiko_genesis(chain: TaikoNamedChain) -> Genesis {
         TaikoNamedChain::Eldfell => include_str!("../res/genesis/taiko/eldfell.json"),
         TaikoNamedChain::Jolnir => include_str!("../res/genesis/taiko/jolnir.json"),
         TaikoNamedChain::Katla => include_str!("../res/genesis/taiko/katla.json"),
+        TaikoNamedChain::Hekla => include_str!("../res/genesis/taiko/hekla.json"),
     };
 
     let alloc: BTreeMap<Address, GenesisAccount> =
         serde_json::from_str(alloc_str).expect("Invalid alloc json");
-    let mut config = taiko_base_config();
+    let mut config = TAIKO_CHAIN_CONFIG.clone();
     config.chain_id = chain as u64;
 
     Genesis {
