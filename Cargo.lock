@@ -493,9 +493,9 @@ dependencies = [
 
 [[package]]
 name = "alloy-serde"
-version = "0.1.2"
+version = "0.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d94da1c0c4e27cc344b05626fe22a89dc6b8b531b9475f3b7691dbf6913e4109"
+checksum = "8913f9e825068d77c516188c221c44f78fd814fce8effe550a783295a2757d19"
 dependencies = [
  "alloy-primitives",
  "arbitrary",
@@ -7254,6 +7254,8 @@ version = "1.0.0"
 dependencies = [
  "alloy-eips",
  "alloy-sol-types",
+ "anyhow",
+ "lazy_static",
  "reth-chainspec",
  "reth-ethereum-consensus",
  "reth-evm",
@@ -8528,18 +8530,52 @@ dependencies = [
 name = "reth-taiko-payload-builder"
 version = "1.0.0"
 dependencies = [
+ "alloy-rlp",
+ "alloy-serde",
  "reth-basic-payload-builder",
+ "reth-chainspec",
  "reth-errors",
  "reth-evm",
  "reth-evm-ethereum",
  "reth-execution-types",
  "reth-payload-builder",
+ "reth-payload-primitives",
  "reth-primitives",
  "reth-provider",
  "reth-revm",
+ "reth-rpc-types",
+ "reth-rpc-types-compat",
+ "reth-taiko-primitives",
  "reth-transaction-pool",
  "revm",
+ "serde",
+ "thiserror",
  "tracing",
+]
+
+[[package]]
+name = "reth-taiko-primitives"
+version = "1.0.0"
+dependencies = [
+ "bytes",
+ "modular-bitfield",
+ "reth-codecs",
+ "reth-db",
+ "reth-db-api",
+ "reth-primitives",
+ "serde",
+]
+
+[[package]]
+name = "reth-taiko-provider"
+version = "1.0.0"
+dependencies = [
+ "auto_impl",
+ "reth-db-api",
+ "reth-primitives",
+ "reth-provider",
+ "reth-storage-errors",
+ "reth-taiko-primitives",
 ]
 
 [[package]]

@@ -31,11 +31,6 @@ members = [
     "crates/ethereum/evm",
     "crates/ethereum/node",
     "crates/ethereum/payload/",
-    "crates/taiko/consensus/",
-    "crates/taiko/engine-primitives/",
-    "crates/taiko/evm",
-    "crates/taiko/node",
-    "crates/taiko/payload/",
     "crates/etl/",
     "crates/evm/",
     "crates/evm/execution-errors",
@@ -132,6 +127,14 @@ members = [
     "examples/txpool-tracing/",
     "testing/ef-tests/",
     "testing/testing-utils",
+    # Taiko additional crates
+    "crates/taiko/consensus/",
+    "crates/taiko/engine-primitives/",
+    "crates/taiko/evm",
+    "crates/taiko/node",
+    "crates/taiko/payload/",
+    "crates/taiko/primitives/",
+    "crates/taiko/storage/",
 ]
 default-members = ["bin/reth"]
 
@@ -350,12 +353,15 @@ reth-trie = { path = "crates/trie/trie" }
 reth-trie-common = { path = "crates/trie/common" }
 reth-trie-parallel = { path = "crates/trie/parallel" }
 
+
+reth-taiko-primitives = { path = "crates/taiko/primitives" }
+reth-taiko-provider = { path = "crates/taiko/storage" }
+
 # revm
 revm = { version = "10.0.0", features = [
     "std",
     "secp256k1",
     "blst",
-    "taiko",
 ], default-features = false }
 revm-primitives = { version = "5.0.0", features = [
     "std",
@@ -438,6 +444,8 @@ sha2 = { version = "0.10", default-features = false }
 paste = "1.0"
 url = "2.3"
 backon = "0.4"
+anyhow = "1.0.86"
+lazy_static = "1.5.0"
 
 # metrics
 metrics = "0.23.0"
