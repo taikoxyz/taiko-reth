@@ -47,8 +47,3 @@ serde_json.workspace = true
 
 [features]
 test-utils = []
-taiko = [
-    "reth-primitives/taiko",
-    "dep:reth-chainspec",
-    "dep:reth-rpc-types-compat",
-]

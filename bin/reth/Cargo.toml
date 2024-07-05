@@ -161,11 +161,6 @@ optimism = [
 ]
 
 taiko = [
-    "reth-primitives/taiko",
-    "reth-beacon-consensus/taiko",
-    "reth-payload-builder/taiko",
-    "reth-node-core/taiko",
-    "dep:reth-taiko-payload-builder",
     # "dep:reth-node-taiko",
 ]
 

@@ -1,5 +1,3 @@
-//! Error type
-
 /// Taiko specific payload building errors.
 #[derive(Debug, thiserror::Error)]
 pub enum TaikoPayloadBuilderError {

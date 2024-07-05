@@ -1,27 +1,20 @@
-use crate::EthPayloadBuilderAttributes;
-use alloy_rlp::Error as DecodeError;
+//! Payload related types
+
 use reth_chainspec::ChainSpec;
+use reth_payload_builder::{EthPayloadBuilderAttributes, PayloadId};
 use reth_payload_primitives::{
     BuiltPayload, EngineApiMessageVersion, EngineObjectValidationError, PayloadBuilderAttributes,
 };
 use reth_primitives::{
     revm::config::revm_spec_by_timestamp_after_merge,
     revm_primitives::{BlobExcessGasAndPrice, BlockEnv, CfgEnv, CfgEnvWithHandlerCfg, SpecId},
-    Address, BlobTransactionSidecar, Header, L1Origin, SealedBlock, TaikoBlockMetadata,
-    Withdrawals, B256, U256,
+    Address, Bytes, Header, SealedBlock, Withdrawals, B256, U256,
 };
-use reth_rpc_types::{
-    engine::{
-        BlobsBundleV1, ExecutionPayloadEnvelopeV2, ExecutionPayloadEnvelopeV3, ExecutionPayloadV1,
-        PayloadAttributes, PayloadId,
-    },
-    ExecutionPayload,
-};
-use reth_rpc_types_compat::engine::payload::{
-    block_to_payload_v1, block_to_payload_v3, convert_block_to_payload_field_v2,
-};
+use reth_rpc_types::{engine::PayloadAttributes, ExecutionPayloadV1, ExecutionPayloadV2};
+use reth_rpc_types_compat::engine::{block_to_payload_v1, payload::block_to_payload_v2};
+use reth_taiko_primitives::L1Origin;
 use serde::{Deserialize, Serialize};
-// use std::sync::Arc;
+use std::convert::Infallible;
 
 /// Taiko Payload Attributes
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -30,10 +23,11 @@ pub struct TaikoPayloadAttributes {
     /// The payload attributes
     #[serde(flatten)]
     pub payload_attributes: PayloadAttributes,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub base_fee_per_gas: Option<u64>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub block_metadata: Option<TaikoBlockMetadata>,
+    /// EIP1559 base fee
+    pub base_fee_per_gas: U256,
+    /// Data from l1 contract
+    pub block_metadata: BlockMetadata,
+    /// l1 anchor information
     pub l1_origin: L1Origin,
 }
 
@@ -59,27 +53,50 @@ impl reth_payload_primitives::PayloadAttributes for TaikoPayloadAttributes {
     }
 }
 
+/// This structure contains the information from l1 contract storage
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BlockMetadata {
+    /// The Keccak 256-bit hash of the parent
+    /// block’s header, in its entirety; formally Hp.
+    pub beneficiary: Address,
+    /// A scalar value equal to the current limit of gas expenditure per block; formally Hl.
+    pub gas_limit: u64,
+    /// Timestamp in l1
+    #[serde(with = "alloy_serde::quantity")]
+    pub timestamp: u64,
+    /// A 256-bit hash which, combined with the
+    /// nonce, proves that a sufficient amount of computation has been carried out on this block;
+    /// formally Hm.
+    pub mix_hash: B256,
+    /// The origin transactions data
+    pub tx_list: Bytes,
+    /// An arbitrary byte array containing data relevant to this block. This must be 32 bytes or
+    /// fewer; formally Hx.
+    pub extra_data: Bytes,
+}
+
 /// Taiko Payload Builder Attributes
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TaikoPayloadBuilderAttributes {
     /// Inner ethereum payload builder attributes
     pub payload_attributes: EthPayloadBuilderAttributes,
     /// The base layer fee per gas
-    pub base_fee_per_gas: Option<u64>,
+    pub base_fee_per_gas: U256,
     /// Taiko specific block metadata
-    pub block_metadata: Option<TaikoBlockMetadata>,
+    pub block_metadata: BlockMetadata,
     /// The L1 origin of the L2 block
     pub l1_origin: L1Origin,
 }
 
 impl PayloadBuilderAttributes for TaikoPayloadBuilderAttributes {
     type RpcPayloadAttributes = TaikoPayloadAttributes;
-    type Error = DecodeError;
+    type Error = Infallible;
 
     /// Creates a new payload builder for the given parent block and the attributes.
     ///
     /// Derives the unique [PayloadId] for the given parent and attributes
-    fn try_new(parent: B256, attributes: TaikoPayloadAttributes) -> Result<Self, DecodeError> {
+    fn try_new(parent: B256, attributes: TaikoPayloadAttributes) -> Result<Self, Infallible> {
         let payload_attributes =
             EthPayloadBuilderAttributes::new(parent, attributes.payload_attributes);
 
@@ -145,29 +162,14 @@ impl PayloadBuilderAttributes for TaikoPayloadBuilderAttributes {
             })
             .map(BlobExcessGasAndPrice::new);
 
-        // calculate basefee based on parent block's gas usage
-        let basefee = U256::from(if let Some(base_fee_per_gas) = &self.base_fee_per_gas {
-            *base_fee_per_gas
-        } else {
-            parent
-                .next_block_base_fee(chain_spec.base_fee_params_at_timestamp(self.timestamp()))
-                .unwrap_or_default()
-        });
-
-        let gas_limit = U256::from(if let Some(block_metadata) = &self.block_metadata {
-            block_metadata.gas_limit
-        } else {
-            parent.gas_limit
-        });
-
         let block_env = BlockEnv {
             number: U256::from(parent.number + 1),
             coinbase: self.suggested_fee_recipient(),
             timestamp: U256::from(self.timestamp()),
             difficulty: U256::ZERO,
             prevrandao: Some(self.prev_randao()),
-            gas_limit,
-            basefee,
+            gas_limit: U256::from(self.block_metadata.gas_limit),
+            basefee: self.base_fee_per_gas,
             // calculate excess gas based on parent block's blob gas usage
             blob_excess_gas_and_price,
         };
@@ -185,25 +187,14 @@ pub struct TaikoBuiltPayload {
     pub(crate) block: SealedBlock,
     /// The fees of the block
     pub(crate) fees: U256,
-    /// The blobs, proofs, and commitments in the block. If the block is pre-cancun, this will be
-    /// empty.
-    pub(crate) sidecars: Vec<BlobTransactionSidecar>,
-    // /// The payload attributes.
-    // pub(crate) attributes: TaikoPayloadBuilderAttributes,
 }
 
 // === impl BuiltPayload ===
 
 impl TaikoBuiltPayload {
     /// Initializes the payload with the given initial block.
-    pub fn new(
-        id: PayloadId,
-        block: SealedBlock,
-        fees: U256,
-        // chain_spec: Arc<ChainSpec>,
-        // attributes: TaikoPayloadBuilderAttributes,
-    ) -> Self {
-        Self { id, block, fees, sidecars: Vec::new() }
+    pub fn new(id: PayloadId, block: SealedBlock, fees: U256) -> Self {
+        Self { id, block, fees }
     }
 
     /// Returns the identifier of the payload.
@@ -219,11 +210,6 @@ impl TaikoBuiltPayload {
     /// Fees of the block
     pub fn fees(&self) -> U256 {
         self.fees
-    }
-
-    /// Adds sidecars to the payload.
-    pub fn extend_sidecars(&mut self, sidecars: Vec<BlobTransactionSidecar>) {
-        self.sidecars.extend(sidecars)
     }
 }
 
@@ -254,79 +240,29 @@ impl From<TaikoBuiltPayload> for ExecutionPayloadV1 {
     }
 }
 
-// V2 engine_getPayloadV2 response
-impl From<TaikoBuiltPayload> for ExecutionPayloadEnvelopeV2 {
-    fn from(value: TaikoBuiltPayload) -> Self {
-        let TaikoBuiltPayload { block, fees, .. } = value;
-
-        ExecutionPayloadEnvelopeV2 {
-            block_value: fees,
-            execution_payload: convert_block_to_payload_field_v2(block),
-        }
-    }
-}
-
-impl From<TaikoBuiltPayload> for ExecutionPayloadEnvelopeV3 {
-    fn from(value: TaikoBuiltPayload) -> Self {
-        let TaikoBuiltPayload { block, fees, sidecars, .. } = value;
-
-        Self {
-            execution_payload: block_to_payload_v3(block).0,
-            block_value: fees,
-            // From the engine API spec:
-            //
-            // > Client software **MAY** use any heuristics to decide whether to set
-            // `shouldOverrideBuilder` flag or not. If client software does not implement any
-            // heuristic this flag **SHOULD** be set to `false`.
-            //
-            // Spec:
-            // <https://github.com/ethereum/execution-apis/blob/fe8e13c288c592ec154ce25c534e26cb7ce0530d/src/engine/cancun.md#specification-2>
-            should_override_builder: false,
-            blobs_bundle: sidecars.into_iter().map(Into::into).collect::<Vec<_>>().into(),
-        }
-    }
-}
-
 /// Taiko Execution Payload
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct TaikoExecutionPayload {
+pub struct TaikoExecutionPayloadV2 {
     /// Inner V3 payload
     #[serde(flatten)]
-    pub payload_inner: ExecutionPayload,
+    pub payload_inner: ExecutionPayloadV2,
 
     /// Allow passing txHash directly instead of transactions list
     pub tx_hash: B256,
     /// Allow passing withdrawals hash directly instead of withdrawals
     pub withdrawals_hash: B256,
     /// Whether this is a Taiko L2 block, only used by ExecutableDataToBlock
-    pub taiko_block: bool,
+    pub _taiko_block: bool,
 }
 
-impl TaikoExecutionPayload {
-    /// Returns the block hash of the payload
-    pub const fn block_hash(&self) -> B256 {
-        self.payload_inner.block_hash()
-    }
-
-    /// Returns the timestamp of the payload
-    pub const fn block_number(&self) -> u64 {
-        self.payload_inner.block_number()
-    }
-
-    /// Returns the parent hash of the payload
-    pub const fn parent_hash(&self) -> B256 {
-        self.payload_inner.parent_hash()
-    }
-}
-
-impl From<ExecutionPayload> for TaikoExecutionPayload {
-    fn from(value: ExecutionPayload) -> Self {
+impl From<ExecutionPayloadV2> for TaikoExecutionPayloadV2 {
+    fn from(value: ExecutionPayloadV2) -> Self {
         Self {
             payload_inner: value,
             tx_hash: B256::default(),
             withdrawals_hash: B256::default(),
-            taiko_block: false,
+            _taiko_block: false,
         }
     }
 }
@@ -334,46 +270,29 @@ impl From<ExecutionPayload> for TaikoExecutionPayload {
 /// Taiko Execution Payload Envelope
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct TaikoExecutionPayloadEnvelope {
+pub struct TaikoExecutionPayloadEnvelopeV2 {
     /// Taiko execution payload
-    pub execution_payload: TaikoExecutionPayload,
+    pub execution_payload: TaikoExecutionPayloadV2,
     /// The expected value to be received by the feeRecipient in wei
     pub block_value: U256,
-    /// The blobs, commitments, and proofs associated with the executed payload.
-    pub blobs_bundle: BlobsBundleV1,
-    /// Introduced in V3, this represents a suggestion from the execution layer if the payload
-    /// should be used instead of an externally provided one.
-    pub should_override_builder: bool,
 }
 
-impl From<TaikoBuiltPayload> for TaikoExecutionPayloadEnvelope {
-    fn from(value: TaikoBuiltPayload) -> Self {
-        let TaikoBuiltPayload { block, fees, sidecars, .. } = value;
-
-        Self {
-            execution_payload: TaikoExecutionPayload {
-                tx_hash: block.header.transactions_root,
-                withdrawals_hash: block.header.withdrawals_root.unwrap_or_default(),
-                taiko_block: true,
-
-                payload_inner: ExecutionPayload::V3(block_to_payload_v3(block).0),
-            },
-            block_value: fees,
-            blobs_bundle: sidecars.into_iter().map(Into::into).collect::<Vec<_>>().into(),
-            should_override_builder: false,
-        }
-    }
-}
-
-impl From<TaikoBuiltPayload> for TaikoExecutionPayload {
+impl From<TaikoBuiltPayload> for TaikoExecutionPayloadV2 {
     fn from(value: TaikoBuiltPayload) -> Self {
         let TaikoBuiltPayload { block, .. } = value;
 
         Self {
             tx_hash: block.header.transactions_root,
             withdrawals_hash: block.header.withdrawals_root.unwrap_or_default(),
-            taiko_block: true,
-            payload_inner: ExecutionPayload::V3(block_to_payload_v3(block).0),
+            _taiko_block: true,
+            payload_inner: block_to_payload_v2(block),
         }
+    }
+}
+
+impl From<TaikoBuiltPayload> for TaikoExecutionPayloadEnvelopeV2 {
+    fn from(value: TaikoBuiltPayload) -> Self {
+        let fees = value.fees;
+        Self { execution_payload: value.into(), block_value: fees }
     }
 }

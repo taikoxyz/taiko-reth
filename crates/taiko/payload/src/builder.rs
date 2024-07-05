@@ -1,18 +1,20 @@
 use crate::{
     consts::{anchor_selector, golden_touch, ANCHOR_GAS_LIMIT, TAIKO_L2_ADDRESS_SUFFIX},
     error::TaikoPayloadBuilderError,
+    payload::{TaikoBuiltPayload, TaikoPayloadBuilderAttributes},
 };
 use reth_basic_payload_builder::*;
+use reth_evm::ConfigureEvm;
 use reth_payload_builder::{
     error::PayloadBuilderError, TaikoBuiltPayload, TaikoPayloadBuilderAttributes,
 };
+
 use reth_primitives::{
     constants::{BEACON_NONCE, EMPTY_RECEIPTS, EMPTY_TRANSACTIONS},
     eip4844::calculate_excess_blob_gas,
     hex::FromHex,
-    proofs,
-    revm::env::tx_env_with_recovered,
-    Address, Block, Header, L1Origin, Receipt, TransactionSigned, EMPTY_OMMER_ROOT_HASH, U256,
+    proofs, Address, Block, Header, L1Origin, Receipt, TransactionSigned, EMPTY_OMMER_ROOT_HASH,
+    U256,
 };
 use reth_provider::StateProviderFactory;
 use reth_revm::database::StateProviderDatabase;
@@ -20,19 +22,30 @@ use reth_transaction_pool::{BestTransactionsAttributes, TransactionPool};
 use revm::{
     db::states::bundle_state::BundleRetention,
     primitives::{EVMError, EnvWithHandlerCfg, ResultAndState},
-    DatabaseCommit, StateBuilder,
+    DatabaseCommit, State,
 };
 use tracing::{debug, trace, warn};
 
 /// Taiko's payload builder
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
-pub struct TaikoPayloadBuilder;
+pub struct TaikoPayloadBuilder<EvmConfig> {
+    /// The type responsible for creating the evm.
+    evm_config: EvmConfig,
+}
+
+impl<EvmConfig> TaikoPayloadBuilder<EvmConfig> {
+    /// `OptimismPayloadBuilder` constructor.
+    pub const fn new(evm_config: EvmConfig) -> Self {
+        Self { evm_config }
+    }
+}
 
 /// Implementation of the [PayloadBuilder] trait for [TaikoPayloadBuilder].
-impl<Pool, Client> PayloadBuilder<Pool, Client> for TaikoPayloadBuilder
+impl<Pool, Client, EvmConfig> PayloadBuilder<Pool, Client> for TaikoPayloadBuilder<EvmConfig>
 where
     Client: StateProviderFactory,
     Pool: TransactionPool,
+    EvmConfig: ConfigureEvm,
 {
     type Attributes = TaikoPayloadBuilderAttributes;
     type BuiltPayload = TaikoBuiltPayload;
@@ -41,7 +54,7 @@ where
         &self,
         args: BuildArguments<Pool, Client, TaikoPayloadBuilderAttributes, TaikoBuiltPayload>,
     ) -> Result<BuildOutcome<TaikoBuiltPayload>, PayloadBuilderError> {
-        default_taiko_payload_builder(self.evm_config.clone(), args)
+        taiko_payload_builder(self.evm_config.clone(), args)
     }
 
     fn build_empty_payload(
@@ -65,8 +78,8 @@ where
                 warn!(target: "payload_builder", parent_hash=%parent_block.hash(), %err, "failed to get state for empty payload");
                 err
             })?;
-        let mut db = StateBuilder::new()
-            .with_database_boxed(Box::new(StateProviderDatabase::new(&state)))
+        let mut db = State::builder()
+            .with_database(StateProviderDatabase::new(&state))
             .with_bundle_update()
             .build();
 
@@ -99,7 +112,7 @@ where
 
         // calculate the state root
         let bundle_state = db.take_bundle();
-        let state_root = state.state_root(&bundle_state).map_err(|err| {
+        let state_root = db.database.state_root(&bundle_state).map_err(|err| {
                 warn!(target: "payload_builder", parent_hash=%parent_block.hash(), %err, "failed to calculate state root for empty payload");
                 err
             })?;
@@ -152,8 +165,6 @@ where
             attributes.payload_attributes.payload_id(),
             sealed_block,
             U256::ZERO,
-            // chain_spec,
-            // attributes,
         ))
     }
 }
@@ -164,10 +175,10 @@ where
 /// and configuration, this function creates a transaction payload. Returns
 /// a result indicating success with the payload or an error in case of failure.
 #[inline]
-pub fn default_taiko_payload_builder<EvmConfig, Pool, Client>(
+pub fn taiko_payload_builder<EvmConfig, Pool, Client>(
     evm_config: EvmConfig,
-    args: BuildArguments<Pool, Client, EthPayloadBuilderAttributes, EthBuiltPayload>,
-) -> Result<BuildOutcome<EthBuiltPayload>, PayloadBuilderError>
+    args: BuildArguments<Pool, Client, TaikoPayloadBuilderAttributes, TaikoBuiltPayload>,
+) -> Result<BuildOutcome<TaikoBuiltPayload>, PayloadBuilderError>
 where
     EvmConfig: ConfigureEvm,
     Client: StateProviderFactory,
@@ -189,18 +200,13 @@ where
         ..
     } = config;
 
-    debug!(target: "payload_builder", id=%attributes.id, parent_hash = ?parent_block.hash(), parent_number = parent_block.number, "building new payload");
+    debug!(target: "payload_builder", id=%attributes.payload_attributes.payload_id(), parent_hash = ?parent_block.hash(), parent_number = parent_block.number, "building new payload");
     let mut cumulative_gas_used = 0;
     let mut sum_blob_gas_used = 0;
     let block_gas_limit: u64 = initialized_block_env.gas_limit.try_into().unwrap_or(u64::MAX);
     let base_fee = initialized_block_env.basefee.to::<u64>();
 
     let mut executed_txs = Vec::new();
-
-    let mut best_txs = pool.best_transactions_with_attributes(BestTransactionsAttributes::new(
-        base_fee,
-        initialized_block_env.get_blob_gasprice().map(|gasprice| gasprice as u64),
-    ));
 
     let mut total_fees = U256::ZERO;
 
@@ -216,20 +222,14 @@ where
         &attributes,
     )?;
 
-    // apply eip-2935 blockhashes update
-    apply_blockhashes_update(
-        &mut db,
-        &chain_spec,
-        initialized_block_env.timestamp.to::<u64>(),
-        block_number,
-        parent_block.hash(),
-    )
-    .map_err(|err| PayloadBuilderError::Internal(err.into()))?;
+    let transactions: Vec<TransactionSigned> =
+        alloy_rlp::Decodable::decode(&mut attributes.block_metadata.tx_list.as_ref())
+            .map_err(PayloadBuilderError::other)?;
 
     let mut receipts = Vec::new();
-    while let Some(pool_tx) = best_txs.next() {
+    for (idx, tx) in transactions.into_iter().enumerate() {
         // ensure we still have capacity for this transaction
-        if cumulative_gas_used + pool_tx.gas_limit() > block_gas_limit {
+        if cumulative_gas_used + tx.gas_limit() > block_gas_limit {
             // we can't fit this transaction into the block, so we need to mark it as invalid
             // which also removes all dependent transaction from the iterator before we can
             // continue

@@ -106,8 +106,6 @@ pub mod error;
 mod events;
 mod metrics;
 mod service;
-#[cfg(feature = "taiko")]
-mod taiko;
 mod traits;
 
 pub mod noop;
