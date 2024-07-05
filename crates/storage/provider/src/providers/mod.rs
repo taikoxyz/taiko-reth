@@ -2,13 +2,11 @@ use crate::{
     AccountReader, BlockHashReader, BlockIdReader, BlockNumReader, BlockReader, BlockReaderIdExt,
     BlockSource, BlockchainTreePendingStateProvider, CanonChainTracker, CanonStateNotifications,
     CanonStateSubscriptions, ChainSpecProvider, ChangeSetReader, DatabaseProviderFactory,
-    EvmEnvProvider, FullExecutionDataProvider, HeaderProvider, ProviderError,
-    PruneCheckpointReader, ReceiptProvider, ReceiptProviderIdExt, RequestsProvider,
+    DatabaseProviderRwFactory, EvmEnvProvider, FullExecutionDataProvider, HeaderProvider,
+    ProviderError, PruneCheckpointReader, ReceiptProvider, ReceiptProviderIdExt, RequestsProvider,
     StageCheckpointReader, StateProviderBox, StateProviderFactory, StaticFileProviderFactory,
     TransactionVariant, TransactionsProvider, TreeViewer, WithdrawalsProvider,
 };
-#[cfg(feature = "taiko")]
-use crate::{L1OriginReader, L1OriginWriter};
 use reth_blockchain_tree_api::{
     error::{CanonicalError, InsertBlockError},
     BlockValidationKind, BlockchainTreeEngine, BlockchainTreeViewer, CanonicalOutcome,
@@ -20,8 +18,6 @@ use reth_db_api::{
     models::{AccountBeforeTx, StoredBlockBodyIndices},
 };
 use reth_evm::ConfigureEvmEnv;
-#[cfg(feature = "taiko")]
-use reth_primitives::L1Origin;
 use reth_primitives::{
     Account, Address, Block, BlockHash, BlockHashOrNumber, BlockId, BlockNumHash, BlockNumber,
     BlockNumberOrTag, BlockWithSenders, Header, Receipt, SealedBlock, SealedBlockWithSenders,
@@ -157,6 +153,15 @@ where
 {
     fn database_provider_ro(&self) -> ProviderResult<DatabaseProviderRO<DB>> {
         self.database.provider()
+    }
+}
+
+impl<DB> DatabaseProviderRwFactory<DB> for BlockchainProvider<DB>
+where
+    DB: Database,
+{
+    fn database_provider_rw(&self) -> ProviderResult<DatabaseProviderRW<DB>> {
+        self.database.provider_rw()
     }
 }
 
@@ -921,33 +926,5 @@ where
     /// Get basic account information.
     fn basic_account(&self, address: Address) -> ProviderResult<Option<Account>> {
         self.database.provider()?.basic_account(address)
-    }
-}
-
-#[cfg(feature = "taiko")]
-impl<DB> L1OriginReader for BlockchainProvider<DB>
-where
-    DB: Database,
-{
-    fn read_l1_origin(&self, block_id: u64) -> ProviderResult<Option<L1Origin>> {
-        self.database.provider()?.read_l1_origin(block_id)
-    }
-
-    fn read_head_l1_origin(&self) -> ProviderResult<Option<u64>> {
-        self.database.provider()?.read_head_l1_origin()
-    }
-}
-
-#[cfg(feature = "taiko")]
-impl<DB> L1OriginWriter for BlockchainProvider<DB>
-where
-    DB: Database,
-{
-    fn insert_l1_origin(&self, block_id: u64, l1_origin: L1Origin) -> ProviderResult<()> {
-        self.database.provider_rw()?.insert_l1_origin(block_id, l1_origin)
-    }
-
-    fn insert_head_l1_origin(&self, block_id: u64) -> ProviderResult<()> {
-        self.database.provider_rw()?.insert_head_l1_origin(block_id)
     }
 }

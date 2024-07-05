@@ -1,4 +1,4 @@
-use crate::DatabaseProviderRO;
+use crate::{DatabaseProviderRO, DatabaseProviderRW};
 use reth_db_api::database::Database;
 use reth_storage_errors::provider::ProviderResult;
 
@@ -6,4 +6,10 @@ use reth_storage_errors::provider::ProviderResult;
 pub trait DatabaseProviderFactory<DB: Database> {
     /// Create new read-only database provider.
     fn database_provider_ro(&self) -> ProviderResult<DatabaseProviderRO<DB>>;
+}
+
+/// Database provider factory.
+pub trait DatabaseProviderRwFactory<DB: Database> {
+    /// Create new read-only database provider.
+    fn database_provider_rw(&self) -> ProviderResult<DatabaseProviderRW<DB>>;
 }
