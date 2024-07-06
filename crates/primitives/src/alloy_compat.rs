@@ -151,8 +151,6 @@ impl TryFrom<alloy_rpc_types::Transaction> for Transaction {
                     value: tx.value,
                     access_list: tx.access_list.ok_or(ConversionError::MissingAccessList)?,
                     input: tx.input,
-                    #[cfg(feature = "taiko")]
-                    is_anchor: false,
                 }))
             }
             Some(TxType::Eip4844) => {

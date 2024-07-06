@@ -47,9 +47,6 @@ serde.workspace = true
 tempfile = { workspace = true, optional = true }
 thiserror-no-std = { workspace = true, default-features = false }
 zstd = { version = "0.13", features = ["experimental"], optional = true }
-roaring = "0.10.2"
-strum.workspace = true
-num_enum = "0.7.2"
 
 # `test-utils` feature
 hash-db = { version = "~0.15", optional = true }
@@ -112,12 +109,8 @@ optimism = [
     "reth-ethereum-forks/optimism",
     "revm-primitives/optimism",
 ]
-taiko = [
-    "reth-chainspec/taiko",
-    "reth-codecs/taiko",
-    "reth-ethereum-forks/taiko",
-    "revm-primitives/taiko",
-]
+
+taiko = ["reth-chainspec/taiko", "revm-primitives/taiko"]
 alloy-compat = ["reth-primitives-traits/alloy-compat", "dep:alloy-rpc-types"]
 std = ["thiserror-no-std/std"]
 test-utils = ["reth-primitives-traits/test-utils"]

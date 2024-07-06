@@ -75,7 +75,6 @@ arbitrary = [
     "reth-primitives/arbitrary",
     "proptest-arbitrary-interop",
 ]
-taiko = ["reth-primitives/taiko"]
 
 [[bench]]
 name = "truncate"

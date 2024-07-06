@@ -450,29 +450,6 @@ impl Transaction {
         matches!(self, Self::Deposit(_))
     }
 
-    /// Returns whether the transaction is an anchor transaction.
-    #[cfg(feature = "taiko")]
-    pub fn is_anchor(&self) -> bool {
-        match self {
-            Self::Eip1559(tx) => tx.is_anchor,
-            Self::Legacy(_) | Self::Eip2930(_) | Self::Eip4844(_) => false,
-            #[cfg(feature = "optimism")]
-            Self::Deposit(_) => false,
-        }
-    }
-
-    /// Marks the transaction as an anchor transaction.
-    #[cfg(feature = "taiko")]
-    pub fn mark_as_anchor(&mut self) -> Result<(), InvalidTransactionError> {
-        match self {
-            Self::Eip1559(tx) => {
-                tx.is_anchor = true;
-                Ok(())
-            }
-            _ => Err(InvalidTransactionError::TxTypeNotSupported),
-        }
-    }
-
     /// This encodes the transaction _without_ the signature, and is only suitable for creating a
     /// hash intended for signing.
     pub fn encode_without_signature(&self, out: &mut dyn bytes::BufMut) {
