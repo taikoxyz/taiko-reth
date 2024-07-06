@@ -54,4 +54,3 @@ assert_matches.workspace = true
 
 [features]
 optimism = ["reth-primitives/optimism"]
-taiko = ["reth-primitives/taiko"]

@@ -51,4 +51,3 @@ alloy = [
     "dep:modular-bitfield",
 ]
 optimism = ["reth-codecs-derive/optimism"]
-taiko = ["reth-codecs-derive/taiko"]

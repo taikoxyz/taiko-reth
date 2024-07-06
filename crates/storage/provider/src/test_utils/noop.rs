@@ -477,25 +477,3 @@ impl PruneCheckpointReader for NoopProvider {
         Ok(None)
     }
 }
-
-#[cfg(feature = "taiko")]
-impl L1OriginReader for NoopProvider {
-    fn read_l1_origin(&self, _block_id: u64) -> ProviderResult<Option<L1Origin>> {
-        Ok(None)
-    }
-
-    fn read_head_l1_origin(&self) -> ProviderResult<Option<u64>> {
-        Ok(None)
-    }
-}
-
-#[cfg(feature = "taiko")]
-impl L1OriginWriter for NoopProvider {
-    fn insert_l1_origin(&self, _block_id: u64, _origin: L1Origin) -> ProviderResult<()> {
-        Ok(())
-    }
-
-    fn insert_head_l1_origin(&self, _block_id: u64) -> ProviderResult<()> {
-        Ok(())
-    }
-}

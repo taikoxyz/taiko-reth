@@ -26,4 +26,3 @@ syn = { workspace = true, features = ["full", "extra-traits"] }
 
 [features]
 optimism = []
-taiko = []
