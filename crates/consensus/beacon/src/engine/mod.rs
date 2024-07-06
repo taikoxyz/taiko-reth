@@ -13,17 +13,17 @@ use reth_network_p2p::{
     sync::{NetworkSyncUpdater, SyncState},
 };
 use reth_payload_builder::PayloadBuilderHandle;
-use reth_payload_primitives::{PayloadAttributes, PayloadBuilderAttributes};
-use reth_payload_validator::ExecutionPayloadValidator;
 #[cfg(feature = "taiko")]
 use reth_payload_builder::{TaikoExecutionPayload, TaikoPayloadAttributes};
+use reth_payload_primitives::{PayloadAttributes, PayloadBuilderAttributes};
+use reth_payload_validator::ExecutionPayloadValidator;
 use reth_primitives::{
     constants::EPOCH_SLOTS, BlockNumHash, BlockNumber, Head, Header, SealedBlock, SealedHeader,
     B256,
 };
 use reth_provider::{
-    BlockIdReader, BlockReader, BlockSource, CanonChainTracker, ChainSpecProvider, L1OriginWriter,
-    ProviderError, StageCheckpointReader,
+    BlockIdReader, BlockReader, BlockSource, CanonChainTracker, ChainSpecProvider, ProviderError,
+    StageCheckpointReader,
 };
 use reth_rpc_types::engine::{
     CancunPayloadFields, ExecutionPayload, ForkchoiceState, PayloadStatus, PayloadStatusEnum,
@@ -167,8 +167,7 @@ where
         + BlockReader
         + BlockIdReader
         + CanonChainTracker
-        + StageCheckpointReader
-        + L1OriginWriter,
+        + StageCheckpointReader,
     EngineT: EngineTypes,
 {
     /// Controls syncing triggered by engine updates.
@@ -230,7 +229,6 @@ where
         + CanonChainTracker
         + StageCheckpointReader
         + ChainSpecProvider
-        + L1OriginWriter
         + 'static,
     Client: HeadersClient + BodiesClient + Clone + Unpin + 'static,
     EngineT: EngineTypes + Unpin + 'static,
@@ -855,8 +853,8 @@ where
         //
         // This ensures that the finalized block is consistent with the head block, i.e. the
         // finalized block is an ancestor of the head block.
-        if !state.finalized_block_hash.is_zero()
-            && !self.blockchain.is_canonical(state.finalized_block_hash)?
+        if !state.finalized_block_hash.is_zero() &&
+            !self.blockchain.is_canonical(state.finalized_block_hash)?
         {
             return Ok(Some(OnForkChoiceUpdated::invalid_state()));
         }
@@ -869,8 +867,8 @@ where
         //
         // This ensures that the safe block is consistent with the head block, i.e. the safe
         // block is an ancestor of the head block.
-        if !state.safe_block_hash.is_zero()
-            && !self.blockchain.is_canonical(state.safe_block_hash)?
+        if !state.safe_block_hash.is_zero() &&
+            !self.blockchain.is_canonical(state.safe_block_hash)?
         {
             return Ok(Some(OnForkChoiceUpdated::invalid_state()));
         }
@@ -1254,8 +1252,8 @@ where
                 latest_valid_hash = Some(block_hash);
                 PayloadStatusEnum::Valid
             }
-            InsertPayloadOk::Inserted(BlockStatus::Disconnected { .. })
-            | InsertPayloadOk::AlreadySeen(BlockStatus::Disconnected { .. }) => {
+            InsertPayloadOk::Inserted(BlockStatus::Disconnected { .. }) |
+            InsertPayloadOk::AlreadySeen(BlockStatus::Disconnected { .. }) => {
                 // check if the block's parent is already marked as invalid
                 if let Some(status) =
                     self.check_invalid_ancestor_with_head(block.parent_hash, block.hash()).map_err(
@@ -1798,7 +1796,6 @@ where
         + CanonChainTracker
         + StageCheckpointReader
         + ChainSpecProvider
-        + L1OriginWriter
         + Unpin
         + 'static,
     EngineT: EngineTypes + Unpin + 'static,

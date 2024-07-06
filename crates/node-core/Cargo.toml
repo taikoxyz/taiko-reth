@@ -109,7 +109,6 @@ optimism = [
     "reth-rpc-types-compat/optimism",
     "reth-beacon-consensus/optimism",
 ]
-taiko = ["reth-primitives/taiko", "dep:reth-payload-builder"]
 
 jemalloc = ["dep:tikv-jemalloc-ctl"]
 

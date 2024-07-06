@@ -343,7 +343,6 @@ reth-static-file = { path = "crates/static-file/static-file" }
 reth-static-file-types = { path = "crates/static-file/types" }
 reth-storage-api = { path = "crates/storage/storage-api" }
 reth-storage-errors = { path = "crates/storage/errors" }
-reth-taiko-payload-builder = { path = "crates/taiko/payload" }
 reth-tasks = { path = "crates/tasks" }
 reth-testing-utils = { path = "testing/testing-utils" }
 reth-tokio-util = { path = "crates/tokio-util" }
@@ -354,9 +353,12 @@ reth-trie-common = { path = "crates/trie/common" }
 reth-trie-parallel = { path = "crates/trie/parallel" }
 
 
-reth-taiko-primitives = { path = "crates/taiko/primitives" }
-reth-taiko-provider = { path = "crates/taiko/storage" }
-
+taiko-reth-primitives = { path = "crates/taiko/primitives" }
+taiko-reth-provider = { path = "crates/taiko/storage" }
+taiko-reth-evm = { path = "crates/taiko/evm" }
+taiko-reth-payload-builder = { path = "crates/taiko/payload" }
+taiko-reth-engine-primitives = { path = "crates/taiko/engine-primitives" }
+taiko-reth-consensus = { path = "crates/taiko/consensus" }
 # revm
 revm = { version = "10.0.0", features = [
     "std",

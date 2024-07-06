@@ -6451,7 +6451,6 @@ dependencies = [
  "reth-stages",
  "reth-static-file",
  "reth-static-file-types",
- "reth-taiko-payload-builder",
  "reth-tasks",
  "reth-tracing",
  "reth-transaction-pool",
@@ -6461,6 +6460,7 @@ dependencies = [
  "serde",
  "serde_json",
  "similar-asserts",
+ "taiko-reth-payload-builder",
  "tempfile",
  "thiserror",
  "tikv-jemallocator",
@@ -7249,27 +7249,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "reth-evm-taiko"
-version = "1.0.0"
-dependencies = [
- "alloy-eips",
- "alloy-sol-types",
- "anyhow",
- "lazy_static",
- "reth-chainspec",
- "reth-ethereum-consensus",
- "reth-evm",
- "reth-execution-types",
- "reth-primitives",
- "reth-prune-types",
- "reth-revm",
- "reth-testing-utils",
- "revm-primitives",
- "secp256k1",
- "serde_json",
-]
-
-[[package]]
 name = "reth-execution-errors"
 version = "1.0.0"
 dependencies = [
@@ -7812,39 +7791,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "reth-node-taiko"
-version = "1.0.0"
-dependencies = [
- "alloy-genesis",
- "alloy-primitives",
- "eyre",
- "futures",
- "futures-util",
- "reth",
- "reth-auto-seal-consensus",
- "reth-basic-payload-builder",
- "reth-beacon-consensus",
- "reth-chainspec",
- "reth-consensus",
- "reth-db",
- "reth-e2e-test-utils",
- "reth-ethereum-engine-primitives",
- "reth-ethereum-payload-builder",
- "reth-evm-ethereum",
- "reth-exex",
- "reth-network",
- "reth-node-api",
- "reth-node-builder",
- "reth-node-core",
- "reth-payload-builder",
- "reth-provider",
- "reth-tracing",
- "reth-transaction-pool",
- "serde_json",
- "tokio",
-]
-
-[[package]]
 name = "reth-optimism-consensus"
 version = "1.0.0"
 dependencies = [
@@ -7887,7 +7833,6 @@ version = "1.0.0"
 name = "reth-payload-builder"
 version = "1.0.0"
 dependencies = [
- "alloy-rlp",
  "futures-util",
  "metrics",
  "reth-chainspec",
@@ -7954,7 +7899,6 @@ dependencies = [
  "derive_more",
  "hash-db",
  "modular-bitfield",
- "num_enum",
  "nybbles",
  "once_cell",
  "plain_hasher",
@@ -7971,11 +7915,9 @@ dependencies = [
  "reth-static-file-types",
  "reth-trie-common",
  "revm-primitives",
- "roaring",
  "secp256k1",
  "serde",
  "serde_json",
- "strum",
  "sucds",
  "tempfile",
  "test-fuzz",
@@ -8496,86 +8438,6 @@ dependencies = [
  "reth-fs-util",
  "reth-primitives",
  "thiserror-no-std",
-]
-
-[[package]]
-name = "reth-taiko-consensus"
-version = "1.0.0"
-dependencies = [
- "reth-chainspec",
- "reth-consensus",
- "reth-consensus-common",
- "reth-primitives",
- "tracing",
-]
-
-[[package]]
-name = "reth-taiko-engine-primitives"
-version = "1.0.0"
-dependencies = [
- "alloy-rlp",
- "reth-chainspec",
- "reth-engine-primitives",
- "reth-payload-primitives",
- "reth-primitives",
- "reth-rpc-types",
- "reth-rpc-types-compat",
- "revm-primitives",
- "serde",
- "serde_json",
- "sha2 0.10.8",
-]
-
-[[package]]
-name = "reth-taiko-payload-builder"
-version = "1.0.0"
-dependencies = [
- "alloy-rlp",
- "alloy-serde",
- "reth-basic-payload-builder",
- "reth-chainspec",
- "reth-errors",
- "reth-evm",
- "reth-evm-ethereum",
- "reth-execution-types",
- "reth-payload-builder",
- "reth-payload-primitives",
- "reth-primitives",
- "reth-provider",
- "reth-revm",
- "reth-rpc-types",
- "reth-rpc-types-compat",
- "reth-taiko-primitives",
- "reth-transaction-pool",
- "revm",
- "serde",
- "thiserror",
- "tracing",
-]
-
-[[package]]
-name = "reth-taiko-primitives"
-version = "1.0.0"
-dependencies = [
- "bytes",
- "modular-bitfield",
- "reth-codecs",
- "reth-db",
- "reth-db-api",
- "reth-primitives",
- "serde",
-]
-
-[[package]]
-name = "reth-taiko-provider"
-version = "1.0.0"
-dependencies = [
- "auto_impl",
- "reth-db-api",
- "reth-primitives",
- "reth-provider",
- "reth-storage-errors",
- "reth-taiko-primitives",
 ]
 
 [[package]]
@@ -9880,6 +9742,121 @@ dependencies = [
  "ntapi",
  "once_cell",
  "windows 0.52.0",
+]
+
+[[package]]
+name = "taiko-reth-consensus"
+version = "1.0.0"
+dependencies = [
+ "reth-chainspec",
+ "reth-consensus",
+ "reth-consensus-common",
+ "reth-primitives",
+ "tracing",
+]
+
+[[package]]
+name = "taiko-reth-engine-primitives"
+version = "1.0.0"
+dependencies = [
+ "alloy-serde",
+ "reth-chainspec",
+ "reth-engine-primitives",
+ "reth-ethereum-engine-primitives",
+ "reth-payload-primitives",
+ "reth-primitives",
+ "reth-rpc-types",
+ "reth-rpc-types-compat",
+ "revm-primitives",
+ "serde",
+ "serde_json",
+ "sha2 0.10.8",
+ "taiko-reth-primitives",
+]
+
+[[package]]
+name = "taiko-reth-evm"
+version = "1.0.0"
+dependencies = [
+ "alloy-eips",
+ "alloy-sol-types",
+ "anyhow",
+ "lazy_static",
+ "reth-chainspec",
+ "reth-evm",
+ "reth-execution-types",
+ "reth-primitives",
+ "reth-prune-types",
+ "reth-revm",
+ "reth-testing-utils",
+ "revm-primitives",
+ "secp256k1",
+ "serde_json",
+ "taiko-reth-consensus",
+]
+
+[[package]]
+name = "taiko-reth-node"
+version = "1.0.0"
+dependencies = [
+ "eyre",
+ "reth-auto-seal-consensus",
+ "reth-basic-payload-builder",
+ "reth-beacon-consensus",
+ "reth-consensus",
+ "reth-network",
+ "reth-node-builder",
+ "reth-payload-builder",
+ "reth-provider",
+ "reth-tracing",
+ "reth-transaction-pool",
+ "taiko-reth-engine-primitives",
+ "taiko-reth-evm",
+ "taiko-reth-payload-builder",
+]
+
+[[package]]
+name = "taiko-reth-payload-builder"
+version = "1.0.0"
+dependencies = [
+ "alloy-rlp",
+ "reth-basic-payload-builder",
+ "reth-errors",
+ "reth-evm",
+ "reth-payload-builder",
+ "reth-primitives",
+ "reth-provider",
+ "reth-revm",
+ "reth-transaction-pool",
+ "taiko-reth-engine-primitives",
+ "taiko-reth-evm",
+ "thiserror",
+ "tracing",
+]
+
+[[package]]
+name = "taiko-reth-primitives"
+version = "1.0.0"
+dependencies = [
+ "bytes",
+ "modular-bitfield",
+ "reth-codecs",
+ "reth-db",
+ "reth-db-api",
+ "reth-primitives",
+ "serde",
+]
+
+[[package]]
+name = "taiko-reth-provider"
+version = "1.0.0"
+dependencies = [
+ "auto_impl",
+ "reth-db-api",
+ "reth-primitives",
+ "reth-provider",
+ "reth-storage-errors",
+ "taiko-reth-primitives",
 ]
 
 [[package]]
