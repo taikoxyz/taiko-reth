@@ -91,7 +91,7 @@ where
 {
     type Executor<DB: Database<Error = ProviderError>> = TaikoBlockExecutor<EvmConfig, DB>;
 
-    type BatchExecutor<DB: Database<Error = ProviderError>> = EthBatchExecutor<EvmConfig, DB>;
+    type BatchExecutor<DB: Database<Error = ProviderError>> = TaikoBatchExecutor<EvmConfig, DB>;
 
     fn executor<DB>(&self, db: DB) -> Self::Executor<DB>
     where
@@ -105,7 +105,7 @@ where
         DB: Database<Error = ProviderError>,
     {
         let executor = self.taiko_executor(db);
-        EthBatchExecutor {
+        TaikoBatchExecutor {
             executor,
             batch_record: BlockBatchRecord::new(prune_modes),
             stats: BlockExecutorStats::default(),
@@ -148,7 +148,6 @@ where
         &self,
         block: &BlockWithSenders,
         mut evm: Evm<'_, Ext, &mut State<DB>>,
-        optimistic: bool,
         taiko_data: TaikoData,
     ) -> Result<TaikoExecuteOutput, BlockExecutionError>
     where
@@ -178,7 +177,7 @@ where
             let is_anchor = idx == 0;
 
             // verify the anchor tx
-            if optimistic && is_anchor {
+            if is_anchor {
                 crate::anchor::check_anchor_tx(transaction, sender, &block.block, &taiko_data)
                     .map_err(|e| BlockExecutionError::CanonicalRevert { inner: e.to_string() })?;
             }
@@ -186,7 +185,7 @@ where
             // If the signature was not valid, the sender address will have been set to zero
             if *sender == Address::ZERO {
                 // Signature can be invalid if not taiko or not the anchor tx
-                if optimistic && !is_anchor {
+                if !is_anchor {
                     // If the signature is not valid, skip the transaction
                     continue;
                 }
@@ -200,7 +199,7 @@ where
             // must be no greater than the block’s gasLimit.
             let block_available_gas = block.header.gas_limit - cumulative_gas_used;
             if transaction.gas_limit() > block_available_gas {
-                if optimistic && !is_anchor {
+                if !is_anchor {
                     continue;
                 }
                 return Err(BlockValidationError::TransactionGasLimitMoreThanAvailableBlockGas {
@@ -227,11 +226,13 @@ where
             }) {
                 Ok(res) => res,
                 Err(err) => {
-                    // Clear the state for the next tx
-                    evm.context.evm.journaled_state =
-                        JournaledState::new(evm.context.evm.journaled_state.spec, HashSet::new());
+                    if !is_anchor {
+                        // Clear the state for the next tx
+                        evm.context.evm.journaled_state = JournaledState::new(
+                            evm.context.evm.journaled_state.spec,
+                            HashSet::new(),
+                        );
 
-                    if optimistic && !is_anchor {
                         continue;
                     }
                     return Err(err.into());
@@ -290,8 +291,6 @@ pub struct TaikoBlockExecutor<EvmConfig, DB> {
     executor: TaikoEvmExecutor<EvmConfig>,
     /// The state to use for execution
     state: State<DB>,
-    /// Allows the execution to continue even when a tx is invalid
-    optimistic: bool,
     /// Taiko data
     taiko_data: Option<TaikoData>,
 }
@@ -310,23 +309,12 @@ pub struct TaikoData {
 impl<EvmConfig, DB> TaikoBlockExecutor<EvmConfig, DB> {
     /// Creates a new Ethereum block executor.
     pub const fn new(chain_spec: Arc<ChainSpec>, evm_config: EvmConfig, state: State<DB>) -> Self {
-        Self {
-            executor: TaikoEvmExecutor { chain_spec, evm_config },
-            state,
-            optimistic: false,
-            taiko_data: None,
-        }
+        Self { executor: TaikoEvmExecutor { chain_spec, evm_config }, state, taiko_data: None }
     }
 
     /// Set taiko data
     pub fn taiko_data(mut self, taiko_data: TaikoData) -> Self {
         self.taiko_data = Some(taiko_data);
-        self
-    }
-
-    /// Optimistic execution
-    pub const fn optimistic(mut self, optimistic: bool) -> Self {
-        self.optimistic = optimistic;
         self
     }
 
@@ -384,12 +372,7 @@ where
         let env = self.evm_env_for_block(&block.header, total_difficulty);
         let output = {
             let evm = self.executor.evm_config.evm_with_env(&mut self.state, env);
-            self.executor.execute_state_transitions(
-                block,
-                evm,
-                self.optimistic,
-                self.taiko_data.clone().unwrap(),
-            )
+            self.executor.execute_state_transitions(block, evm, self.taiko_data.clone().unwrap())
         }?;
 
         // 3. apply post execution changes
@@ -477,7 +460,7 @@ where
 ///
 /// State changes are tracked until the executor is finalized.
 #[derive(Debug)]
-pub struct EthBatchExecutor<EvmConfig, DB> {
+pub struct TaikoBatchExecutor<EvmConfig, DB> {
     /// The executor used to execute single blocks
     ///
     /// All state changes are committed to the [State].
@@ -487,7 +470,7 @@ pub struct EthBatchExecutor<EvmConfig, DB> {
     stats: BlockExecutorStats,
 }
 
-impl<EvmConfig, DB> EthBatchExecutor<EvmConfig, DB> {
+impl<EvmConfig, DB> TaikoBatchExecutor<EvmConfig, DB> {
     /// Returns mutable reference to the state that wraps the underlying database.
     #[allow(unused)]
     fn state_mut(&mut self) -> &mut State<DB> {
@@ -495,7 +478,7 @@ impl<EvmConfig, DB> EthBatchExecutor<EvmConfig, DB> {
     }
 }
 
-impl<EvmConfig, DB> BatchExecutor<DB> for EthBatchExecutor<EvmConfig, DB>
+impl<EvmConfig, DB> BatchExecutor<DB> for TaikoBatchExecutor<EvmConfig, DB>
 where
     EvmConfig: ConfigureEvm,
     DB: Database<Error = ProviderError>,
