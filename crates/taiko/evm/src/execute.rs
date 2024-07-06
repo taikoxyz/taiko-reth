@@ -5,7 +5,6 @@ use crate::{
     TaikoEvmConfig,
 };
 use reth_chainspec::{ChainSpec, TAIKO_HEKLA, TAIKO_MAINNET};
-use reth_ethereum_consensus::validate_block_post_execution;
 use reth_evm::{
     execute::{
         BatchExecutor, BlockExecutionError, BlockExecutionInput, BlockExecutionOutput,
@@ -31,6 +30,7 @@ use revm_primitives::{
     db::{Database, DatabaseCommit},
     Address, BlockEnv, CfgEnvWithHandlerCfg, EnvWithHandlerCfg, HashSet, ResultAndState,
 };
+use taiko_reth_consensus::validate_block_post_execution;
 
 #[cfg(not(feature = "std"))]
 use alloc::{sync::Arc, vec, vec::Vec};

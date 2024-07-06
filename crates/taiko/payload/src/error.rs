@@ -1,8 +1,10 @@
-/// Taiko specific payload building errors.
+//! Error types for the Taiko payload builder.
+
+///Taiko specific payload building errors.
 #[derive(Debug, thiserror::Error)]
 pub enum TaikoPayloadBuilderError {
     /// Thrown when a transaction fails to convert to a
-    /// [reth_primitives::TransactionSignedEcRecovered].
+    /// [`reth_primitives::TransactionSignedEcRecovered`].
     #[error("failed to convert deposit transaction to TransactionSignedEcRecovered")]
     TransactionEcRecoverFailed,
     /// Thrown when the L1 block info could not be parsed from the calldata of the
@@ -27,4 +29,7 @@ pub enum TaikoPayloadBuilderError {
     /// Thrown when a transaction is not able to be decoded from the payload.
     #[error("failed to decode tx")]
     FailedToDecodeTx,
+    /// Thrown when a transaction is not able to be executed as an anchor.
+    #[error("failed to execute anchor")]
+    FailedToExecuteAnchor,
 }

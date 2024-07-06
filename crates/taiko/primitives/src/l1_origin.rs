@@ -1,3 +1,4 @@
+//! The L1Origin module provides the L1Origin struct and the HeadL1Origin table.
 use reth_codecs::{main_codec, Compact};
 use reth_db::{
     table::{Decode, Encode},

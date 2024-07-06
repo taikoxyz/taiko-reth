@@ -1,6 +1,6 @@
 //! Ethereum EVM support
 
 #[doc(inline)]
-pub use reth_evm_ethereum::execute::EthExecutorProvider;
+pub use taiko_reth_evm::execute::TaikoExecutorProvider;
 #[doc(inline)]
-pub use reth_evm_ethereum::EthEvmConfig;
+pub use taiko_reth_evm::TaikoEvmConfig;

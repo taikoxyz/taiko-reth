@@ -1,13 +1,9 @@
 //! Ethereum Node types config.
 
-use crate::{EthEngineTypes, EthEvmConfig};
+use crate::{TaikoEngineTypes, TaikoEvmConfig};
 use reth_auto_seal_consensus::AutoSealConsensus;
 use reth_basic_payload_builder::{BasicPayloadJobGenerator, BasicPayloadJobGeneratorConfig};
 use reth_beacon_consensus::EthBeaconConsensus;
-use reth_ethereum_engine_primitives::{
-    EthBuiltPayload, EthPayloadAttributes, EthPayloadBuilderAttributes,
-};
-use reth_evm_ethereum::execute::EthExecutorProvider;
 use reth_network::NetworkHandle;
 use reth_node_builder::{
     components::{
@@ -25,56 +21,60 @@ use reth_transaction_pool::{
     TransactionValidationTaskExecutor,
 };
 use std::sync::Arc;
+use taiko_reth_engine_primitives::{
+    TaikoBuiltPayload, TaikoPayloadAttributes, TaikoPayloadBuilderAttributes,
+};
+use taiko_reth_evm::execute::TaikoExecutorProvider;
 
 /// Type configuration for a regular Ethereum node.
 #[derive(Debug, Default, Clone, Copy)]
 #[non_exhaustive]
-pub struct EthereumNode;
+pub struct TaikoNode;
 
-impl EthereumNode {
+impl TaikoNode {
     /// Returns a [`ComponentsBuilder`] configured for a regular Ethereum node.
     pub fn components<Node>() -> ComponentsBuilder<
         Node,
-        EthereumPoolBuilder,
-        EthereumPayloadBuilder,
-        EthereumNetworkBuilder,
-        EthereumExecutorBuilder,
-        EthereumConsensusBuilder,
+        TaikoPoolBuilder,
+        TaikoPayloadBuilder,
+        TaikoNetworkBuilder,
+        TaikoExecutorBuilder,
+        TaikoConsensusBuilder,
     >
     where
         Node: FullNodeTypes,
         <Node as NodeTypes>::Engine: PayloadTypes<
-            BuiltPayload = EthBuiltPayload,
-            PayloadAttributes = EthPayloadAttributes,
-            PayloadBuilderAttributes = EthPayloadBuilderAttributes,
+            BuiltPayload = TaikoBuiltPayload,
+            PayloadAttributes = TaikoPayloadAttributes,
+            PayloadBuilderAttributes = TaikoPayloadBuilderAttributes,
         >,
     {
         ComponentsBuilder::default()
             .node_types::<Node>()
-            .pool(EthereumPoolBuilder::default())
-            .payload(EthereumPayloadBuilder::default())
-            .network(EthereumNetworkBuilder::default())
-            .executor(EthereumExecutorBuilder::default())
-            .consensus(EthereumConsensusBuilder::default())
+            .pool(TaikoPoolBuilder::default())
+            .payload(TaikoPayloadBuilder::default())
+            .network(TaikoNetworkBuilder::default())
+            .executor(TaikoExecutorBuilder::default())
+            .consensus(TaikoConsensusBuilder::default())
     }
 }
 
-impl NodeTypes for EthereumNode {
+impl NodeTypes for TaikoNode {
     type Primitives = ();
     type Engine = EthEngineTypes;
 }
 
-impl<N> Node<N> for EthereumNode
+impl<N> Node<N> for TaikoNode
 where
     N: FullNodeTypes<Engine = EthEngineTypes>,
 {
     type ComponentsBuilder = ComponentsBuilder<
         N,
-        EthereumPoolBuilder,
-        EthereumPayloadBuilder,
-        EthereumNetworkBuilder,
-        EthereumExecutorBuilder,
-        EthereumConsensusBuilder,
+        TaikoPoolBuilder,
+        TaikoPayloadBuilder,
+        TaikoNetworkBuilder,
+        TaikoExecutorBuilder,
+        TaikoConsensusBuilder,
     >;
 
     fn components_builder(self) -> Self::ComponentsBuilder {
@@ -85,22 +85,22 @@ where
 /// A regular ethereum evm and executor builder.
 #[derive(Debug, Default, Clone, Copy)]
 #[non_exhaustive]
-pub struct EthereumExecutorBuilder;
+pub struct TaikoExecutorBuilder;
 
-impl<Node> ExecutorBuilder<Node> for EthereumExecutorBuilder
+impl<Node> ExecutorBuilder<Node> for TaikoExecutorBuilder
 where
     Node: FullNodeTypes,
 {
-    type EVM = EthEvmConfig;
-    type Executor = EthExecutorProvider<Self::EVM>;
+    type EVM = TaikoEvmConfig;
+    type Executor = TaikoExecutorProvider<Self::EVM>;
 
     async fn build_evm(
         self,
         ctx: &BuilderContext<Node>,
     ) -> eyre::Result<(Self::EVM, Self::Executor)> {
         let chain_spec = ctx.chain_spec();
-        let evm_config = EthEvmConfig::default();
-        let executor = EthExecutorProvider::new(chain_spec, evm_config);
+        let evm_config = TaikoEvmConfig::default();
+        let executor = TaikoExecutorProvider::new(chain_spec, evm_config);
 
         Ok((evm_config, executor))
     }
@@ -112,11 +112,11 @@ where
 /// config.
 #[derive(Debug, Default, Clone, Copy)]
 #[non_exhaustive]
-pub struct EthereumPoolBuilder {
+pub struct TaikoPoolBuilder {
     // TODO add options for txpool args
 }
 
-impl<Node> PoolBuilder<Node> for EthereumPoolBuilder
+impl<Node> PoolBuilder<Node> for TaikoPoolBuilder
 where
     Node: FullNodeTypes,
 {
@@ -182,16 +182,16 @@ where
 /// A basic ethereum payload service.
 #[derive(Debug, Default, Clone)]
 #[non_exhaustive]
-pub struct EthereumPayloadBuilder;
+pub struct TaikoPayloadBuilder;
 
-impl<Node, Pool> PayloadServiceBuilder<Node, Pool> for EthereumPayloadBuilder
+impl<Node, Pool> PayloadServiceBuilder<Node, Pool> for TaikoPayloadBuilder
 where
     Pool: TransactionPool + Unpin + 'static,
     Node: FullNodeTypes,
     <Node as NodeTypes>::Engine: PayloadTypes<
-        BuiltPayload = EthBuiltPayload,
-        PayloadAttributes = EthPayloadAttributes,
-        PayloadBuilderAttributes = EthPayloadBuilderAttributes,
+        BuiltPayload = TaikoBuiltPayload,
+        PayloadAttributes = TaikoPayloadAttributes,
+        PayloadBuilderAttributes = TaikoPayloadBuilderAttributes,
     >,
 {
     async fn spawn_payload_service(
@@ -199,7 +199,7 @@ where
         ctx: &BuilderContext<Node>,
         pool: Pool,
     ) -> eyre::Result<PayloadBuilderHandle<Node::Engine>> {
-        let payload_builder = reth_ethereum_payload_builder::EthereumPayloadBuilder::default();
+        let payload_builder = taiko_reth_payload_builder::TaikoPayloadBuilder::default();
         let conf = ctx.payload_builder_config();
 
         let payload_job_config = BasicPayloadJobGeneratorConfig::default()
@@ -227,11 +227,11 @@ where
 
 /// A basic ethereum payload service.
 #[derive(Debug, Default, Clone, Copy)]
-pub struct EthereumNetworkBuilder {
+pub struct TaikoNetworkBuilder {
     // TODO add closure to modify network
 }
 
-impl<Node, Pool> NetworkBuilder<Node, Pool> for EthereumNetworkBuilder
+impl<Node, Pool> NetworkBuilder<Node, Pool> for TaikoNetworkBuilder
 where
     Node: FullNodeTypes,
     Pool: TransactionPool + Unpin + 'static,
@@ -250,11 +250,11 @@ where
 
 /// A basic ethereum consensus builder.
 #[derive(Debug, Default, Clone, Copy)]
-pub struct EthereumConsensusBuilder {
+pub struct TaikoConsensusBuilder {
     // TODO add closure to modify consensus
 }
 
-impl<Node> ConsensusBuilder<Node> for EthereumConsensusBuilder
+impl<Node> ConsensusBuilder<Node> for TaikoConsensusBuilder
 where
     Node: FullNodeTypes,
 {

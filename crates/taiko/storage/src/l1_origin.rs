@@ -9,7 +9,7 @@ use reth_provider::{
     DatabaseProviderRwFactory,
 };
 use reth_storage_errors::provider::ProviderResult;
-use reth_taiko_primitives::{HeadL1Origin, HeadL1OriginKey, L1Origin, L1Origins};
+use taiko_reth_primitives::{HeadL1Origin, HeadL1OriginKey, L1Origin, L1Origins};
 
 /// The trait for fetch L1 origin related data.
 #[auto_impl::auto_impl(&, Arc)]

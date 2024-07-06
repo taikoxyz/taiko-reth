@@ -1,5 +1,5 @@
 [package]
-name = "reth-taiko-payload-builder"
+name = "taiko-reth-payload-builder"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -14,31 +14,22 @@ workspace = true
 [dependencies]
 # reth
 reth-primitives.workspace = true
-reth-revm.workspace = true
+reth-revm = { workspace = true, features = ["taiko"] }
 reth-transaction-pool.workspace = true
 reth-provider.workspace = true
 reth-payload-builder.workspace = true
-reth-execution-types.workspace = true
 reth-basic-payload-builder.workspace = true
 reth-evm.workspace = true
-reth-evm-ethereum.workspace = true
 reth-errors.workspace = true
-reth-taiko-primitives.workspace = true
-reth-payload-primitives.workspace = true
-reth-rpc-types.workspace = true
-reth-rpc-types-compat.workspace = true
-reth-chainspec.workspace = true
 
-# ethereum
-revm.workspace = true
+# taiko
+taiko-reth-evm.workspace = true
+taiko-reth-engine-primitives.workspace = true
+
 
 # crypto
 alloy-rlp.workspace = true
 
 # misc
 tracing.workspace = true
-serde = { workspace = true, features = ["derive"] }
 thiserror.workspace = true
-
-
-alloy-serde = "0.1.3"

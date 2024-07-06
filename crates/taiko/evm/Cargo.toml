@@ -1,5 +1,5 @@
 [package]
-name = "reth-evm-taiko"
+name = "taiko-reth-evm"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -15,13 +15,15 @@ workspace = true
 reth-chainspec = { workspace = true, features = ["taiko"] }
 reth-evm.workspace = true
 reth-primitives = { workspace = true, features = ["taiko"] }
-reth-revm = { workspace = true, features = ["taiko"] }
-reth-ethereum-consensus.workspace = true
+reth-revm.workspace = true
 reth-prune-types.workspace = true
 reth-execution-types.workspace = true
 
+# Taiko
+taiko-reth-consensus.workspace = true
+
 # Ethereum
-revm-primitives.workspace = true
+revm-primitives = { workspace = true, features = ["taiko"] }
 
 # Alloy
 alloy-eips.workspace = true
@@ -33,7 +35,7 @@ anyhow.workspace = true
 
 [dev-dependencies]
 reth-testing-utils.workspace = true
-reth-revm = { workspace = true, features = ["test-utils"] }
+reth-revm = { workspace = true, features = ["test-utils", "taiko"] }
 secp256k1.workspace = true
 serde_json.workspace = true
 

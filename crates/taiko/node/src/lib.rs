@@ -8,10 +8,10 @@
 #![cfg_attr(not(test), warn(unused_crate_dependencies))]
 #![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
 
-pub use reth_ethereum_engine_primitives::EthEngineTypes;
+pub use taiko_reth_engine_primitives::TaikoEngineTypes;
 
 pub mod evm;
-pub use evm::{EthEvmConfig, EthExecutorProvider};
+pub use evm::{TaikoEvmConfig, TaikoExecutorProvider};
 
 pub mod node;
-pub use node::EthereumNode;
+pub use node::TaikoNode;

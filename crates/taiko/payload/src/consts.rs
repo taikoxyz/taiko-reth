@@ -1,5 +1,6 @@
+//! Constants used in the Taiko contracts.
 use reth_primitives::{hex::FromHex, keccak256, Address};
-use revm::primitives::FixedBytes;
+use reth_revm::primitives::FixedBytes;
 
 pub fn golden_touch() -> Address {
     Address::from_hex("0x0000777735367b36bC9B61C50022d9D0700dB4Ec").unwrap()

@@ -9,7 +9,10 @@
 #![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
 
 mod payload;
-pub use payload::{EthBuiltPayload, EthPayloadBuilderAttributes};
+pub use payload::{
+    TaikoBuiltPayload, TaikoExecutionPayloadEnvelopeV2, TaikoPayloadAttributes,
+    TaikoPayloadBuilderAttributes,
+};
 use reth_chainspec::ChainSpec;
 use reth_engine_primitives::EngineTypes;
 use reth_payload_primitives::{
@@ -27,24 +30,24 @@ pub use reth_rpc_types::{
 /// The types used in the default mainnet ethereum beacon consensus engine.
 #[derive(Debug, Default, Clone, serde::Deserialize, serde::Serialize)]
 #[non_exhaustive]
-pub struct EthEngineTypes;
+pub struct TaikoEngineTypes;
 
-impl PayloadTypes for EthEngineTypes {
-    type BuiltPayload = EthBuiltPayload;
-    type PayloadAttributes = EthPayloadAttributes;
-    type PayloadBuilderAttributes = EthPayloadBuilderAttributes;
+impl PayloadTypes for TaikoEngineTypes {
+    type BuiltPayload = TaikoBuiltPayload;
+    type PayloadAttributes = TaikoPayloadAttributes;
+    type PayloadBuilderAttributes = TaikoPayloadBuilderAttributes;
 }
 
-impl EngineTypes for EthEngineTypes {
+impl EngineTypes for TaikoEngineTypes {
     type ExecutionPayloadV1 = ExecutionPayloadV1;
-    type ExecutionPayloadV2 = ExecutionPayloadEnvelopeV2;
+    type ExecutionPayloadV2 = TaikoExecutionPayloadEnvelopeV2;
     type ExecutionPayloadV3 = ExecutionPayloadEnvelopeV3;
     type ExecutionPayloadV4 = ExecutionPayloadEnvelopeV4;
 
     fn validate_version_specific_fields(
         chain_spec: &ChainSpec,
         version: EngineApiMessageVersion,
-        payload_or_attrs: PayloadOrAttributes<'_, EthPayloadAttributes>,
+        payload_or_attrs: PayloadOrAttributes<'_, TaikoPayloadAttributes>,
     ) -> Result<(), EngineObjectValidationError> {
         validate_version_specific_fields(chain_spec, version, payload_or_attrs)
     }

@@ -1,29 +1,31 @@
-use crate::{
-    consts::{anchor_selector, golden_touch, ANCHOR_GAS_LIMIT, TAIKO_L2_ADDRESS_SUFFIX},
-    error::TaikoPayloadBuilderError,
-    payload::{TaikoBuiltPayload, TaikoPayloadBuilderAttributes},
-};
+//! Taiko's payload builder module.
+use crate::error::TaikoPayloadBuilderError;
 use reth_basic_payload_builder::*;
+use reth_errors::RethError;
 use reth_evm::ConfigureEvm;
-use reth_payload_builder::{
-    error::PayloadBuilderError, TaikoBuiltPayload, TaikoPayloadBuilderAttributes,
-};
-
+use reth_payload_builder::error::PayloadBuilderError;
 use reth_primitives::{
-    constants::{BEACON_NONCE, EMPTY_RECEIPTS, EMPTY_TRANSACTIONS},
+    constants::{
+        eip4844::MAX_DATA_GAS_PER_BLOCK, BEACON_NONCE, EMPTY_RECEIPTS, EMPTY_TRANSACTIONS,
+    },
     eip4844::calculate_excess_blob_gas,
-    hex::FromHex,
-    proofs, Address, Block, Header, L1Origin, Receipt, TransactionSigned, EMPTY_OMMER_ROOT_HASH,
-    U256,
+    proofs::{self, calculate_requests_root},
+    revm::env::tx_env_with_recovered,
+    Address, Block, Header, Receipt, TransactionSigned, TransactionSignedEcRecovered,
+    EMPTY_OMMER_ROOT_HASH, U256,
 };
-use reth_provider::StateProviderFactory;
-use reth_revm::database::StateProviderDatabase;
-use reth_transaction_pool::{BestTransactionsAttributes, TransactionPool};
-use revm::{
-    db::states::bundle_state::BundleRetention,
-    primitives::{EVMError, EnvWithHandlerCfg, ResultAndState},
-    DatabaseCommit, State,
+use reth_provider::{ExecutionOutcome, StateProviderFactory};
+use reth_revm::{
+    database::StateProviderDatabase,
+    revm::{
+        db::states::{bundle_state::BundleRetention, State},
+        primitives::{EnvWithHandlerCfg, ResultAndState, TxEnv},
+        DatabaseCommit, JournaledState,
+    },
 };
+use reth_transaction_pool::TransactionPool;
+use taiko_reth_engine_primitives::{TaikoBuiltPayload, TaikoPayloadBuilderAttributes};
+use taiko_reth_evm::eip6110::parse_deposits_from_receipts;
 use tracing::{debug, trace, warn};
 
 /// Taiko's payload builder
@@ -31,12 +33,13 @@ use tracing::{debug, trace, warn};
 pub struct TaikoPayloadBuilder<EvmConfig> {
     /// The type responsible for creating the evm.
     evm_config: EvmConfig,
+    treasury: Address,
 }
 
 impl<EvmConfig> TaikoPayloadBuilder<EvmConfig> {
     /// `OptimismPayloadBuilder` constructor.
-    pub const fn new(evm_config: EvmConfig) -> Self {
-        Self { evm_config }
+    pub const fn new(evm_config: EvmConfig, treasury: Address) -> Self {
+        Self { evm_config, treasury }
     }
 }
 
@@ -54,7 +57,7 @@ where
         &self,
         args: BuildArguments<Pool, Client, TaikoPayloadBuilderAttributes, TaikoBuiltPayload>,
     ) -> Result<BuildOutcome<TaikoBuiltPayload>, PayloadBuilderError> {
-        taiko_payload_builder(self.evm_config.clone(), args)
+        taiko_payload_builder(self.evm_config.clone(), self.treasury, args)
     }
 
     fn build_empty_payload(
@@ -177,6 +180,7 @@ where
 #[inline]
 pub fn taiko_payload_builder<EvmConfig, Pool, Client>(
     evm_config: EvmConfig,
+    treasury: Address,
     args: BuildArguments<Pool, Client, TaikoPayloadBuilderAttributes, TaikoBuiltPayload>,
 ) -> Result<BuildOutcome<TaikoBuiltPayload>, PayloadBuilderError>
 where
@@ -184,7 +188,7 @@ where
     Client: StateProviderFactory,
     Pool: TransactionPool,
 {
-    let BuildArguments { client, pool, mut cached_reads, config, cancel, best_payload } = args;
+    let BuildArguments { client, mut cached_reads, config, pool, cancel, .. } = args;
 
     let state_provider = client.state_by_block_hash(config.parent_block.hash())?;
     let state = StateProviderDatabase::new(state_provider);
@@ -224,16 +228,19 @@ where
 
     let transactions: Vec<TransactionSigned> =
         alloy_rlp::Decodable::decode(&mut attributes.block_metadata.tx_list.as_ref())
-            .map_err(PayloadBuilderError::other)?;
+            .map_err(|_| PayloadBuilderError::other(TaikoPayloadBuilderError::FailedToDecodeTx))?;
 
     let mut receipts = Vec::new();
     for (idx, tx) in transactions.into_iter().enumerate() {
+        let is_anchor = idx == 0;
+
         // ensure we still have capacity for this transaction
         if cumulative_gas_used + tx.gas_limit() > block_gas_limit {
-            // we can't fit this transaction into the block, so we need to mark it as invalid
-            // which also removes all dependent transaction from the iterator before we can
-            // continue
-            best_txs.mark_invalid(&pool_tx);
+            if is_anchor {
+                return Err(PayloadBuilderError::other(
+                    TaikoPayloadBuilderError::FailedToExecuteAnchor,
+                ));
+            }
             continue
         }
 
@@ -242,10 +249,6 @@ where
             return Ok(BuildOutcome::Cancelled)
         }
 
-        // convert tx to a signed transaction
-        let tx = pool_tx.to_recovered_transaction();
-
-        // There's only limited amount of blob space available per block, so we need to check if
         // the EIP-4844 can still fit in the block
         if let Some(blob_tx) = tx.transaction.as_eip4844() {
             let tx_blob_gas = blob_tx.blob_gas();
@@ -255,15 +258,34 @@ where
                 // the iterator. This is similar to the gas limit condition
                 // for regular transactions above.
                 trace!(target: "payload_builder", tx=?tx.hash, ?sum_blob_gas_used, ?tx_blob_gas, "skipping blob transaction because it would exceed the max data gas per block");
-                best_txs.mark_invalid(&pool_tx);
+                // anchor tx can't be a blob tx
                 continue
             }
         }
 
+        let tx = match tx.try_into_ecrecovered().map_err(|_| {
+            PayloadBuilderError::other(TaikoPayloadBuilderError::TransactionEcRecoverFailed)
+        }) {
+            Ok(tx) => tx,
+            Err(err) => {
+                if is_anchor {
+                    return Err(err)
+                } else {
+                    continue
+                }
+            }
+        };
+
+        let taiko_tx_env_with_recovered = |tx: &TransactionSignedEcRecovered| -> TxEnv {
+            let mut tx_env = tx_env_with_recovered(tx);
+            tx_env.taiko.is_anchor = is_anchor;
+            tx_env.taiko.treasury = treasury;
+            tx_env
+        };
         let env = EnvWithHandlerCfg::new_with_cfg_env(
             initialized_cfg.clone(),
             initialized_block_env.clone(),
-            tx_env_with_recovered(&tx),
+            taiko_tx_env_with_recovered(&tx),
         );
 
         // Configure the environment for the block.
@@ -272,25 +294,15 @@ where
         let ResultAndState { result, state } = match evm.transact() {
             Ok(res) => res,
             Err(err) => {
-                match err {
-                    EVMError::Transaction(err) => {
-                        if matches!(err, InvalidTransaction::NonceTooLow { .. }) {
-                            // if the nonce is too low, we can skip this transaction
-                            trace!(target: "payload_builder", %err, ?tx, "skipping nonce too low transaction");
-                        } else {
-                            // if the transaction is invalid, we can skip it and all of its
-                            // descendants
-                            trace!(target: "payload_builder", %err, ?tx, "skipping invalid transaction and its descendants");
-                            best_txs.mark_invalid(&pool_tx);
-                        }
-
-                        continue
-                    }
-                    err => {
-                        // this is an error that we should treat as fatal for this attempt
-                        return Err(PayloadBuilderError::EvmExecutionError(err))
-                    }
+                if !is_anchor {
+                    // Clear the state for the next tx
+                    evm.context.evm.journaled_state = JournaledState::new(
+                        evm.context.evm.journaled_state.spec,
+                        Default::default(),
+                    );
+                    continue
                 }
+                return Err(PayloadBuilderError::EvmExecutionError(err))
             }
         };
         // drop evm so db is released.
@@ -302,11 +314,6 @@ where
         if let Some(blob_tx) = tx.transaction.as_eip4844() {
             let tx_blob_gas = blob_tx.blob_gas();
             sum_blob_gas_used += tx_blob_gas;
-
-            // if we've reached the max data gas per block, we can skip blob txs entirely
-            if sum_blob_gas_used == MAX_DATA_GAS_PER_BLOCK {
-                best_txs.skip_blobs();
-            }
         }
 
         let gas_used = result.gas_used();
@@ -334,15 +341,9 @@ where
         executed_txs.push(tx.into_signed());
     }
 
-    // check if we have a better block
-    if !is_better_payload(best_payload.as_ref(), total_fees) {
-        // can skip building the block
-        return Ok(BuildOutcome::Aborted { fees: total_fees, cached_reads })
-    }
-
     // calculate the requests and the requests root
     let (requests, requests_root) = if chain_spec
-        .is_prague_active_at_timestamp(attributes.timestamp)
+        .is_prague_active_at_timestamp(attributes.payload_attributes.timestamp)
     {
         let deposit_requests = parse_deposits_from_receipts(&chain_spec, receipts.iter().flatten())
             .map_err(|err| PayloadBuilderError::Internal(RethError::Execution(err.into())))?;
@@ -359,8 +360,12 @@ where
         (None, None)
     };
 
-    let WithdrawalsOutcome { withdrawals_root, withdrawals } =
-        commit_withdrawals(&mut db, &chain_spec, attributes.timestamp, attributes.withdrawals)?;
+    let WithdrawalsOutcome { withdrawals_root, withdrawals } = commit_withdrawals(
+        &mut db,
+        &chain_spec,
+        attributes.payload_attributes.timestamp,
+        attributes.payload_attributes.withdrawals,
+    )?;
 
     // merge all transitions into bundle state, this would apply the withdrawal balance changes
     // and 4788 contract call
@@ -391,7 +396,7 @@ where
     let mut blob_gas_used = None;
 
     // only determine cancun fields when active
-    if chain_spec.is_cancun_active_at_timestamp(attributes.timestamp) {
+    if chain_spec.is_cancun_active_at_timestamp(attributes.payload_attributes.timestamp) {
         // grab the blob sidecars from the executed txs
         blob_sidecars = pool.get_all_blobs_exact(
             executed_txs.iter().filter(|tx| tx.is_eip4844()).map(|tx| tx.hash).collect(),
@@ -419,8 +424,8 @@ where
         receipts_root,
         withdrawals_root,
         logs_bloom,
-        timestamp: attributes.timestamp,
-        mix_hash: attributes.prev_randao,
+        timestamp: attributes.payload_attributes.timestamp,
+        mix_hash: attributes.payload_attributes.prev_randao,
         nonce: BEACON_NONCE,
         base_fee_per_gas: Some(base_fee),
         number: parent_block.number + 1,
@@ -428,7 +433,7 @@ where
         difficulty: U256::ZERO,
         gas_used: cumulative_gas_used,
         extra_data,
-        parent_beacon_block_root: attributes.parent_beacon_block_root,
+        parent_beacon_block_root: attributes.payload_attributes.parent_beacon_block_root,
         blob_gas_used,
         excess_blob_gas,
         requests_root,
@@ -440,59 +445,11 @@ where
     let sealed_block = block.seal_slow();
     debug!(target: "payload_builder", ?sealed_block, "sealed built block");
 
-    let mut payload = EthBuiltPayload::new(attributes.id, sealed_block, total_fees);
+    let mut payload =
+        TaikoBuiltPayload::new(attributes.payload_attributes.id, sealed_block, total_fees);
 
     // extend the payload with the blob sidecars from the executed txs
     payload.extend_sidecars(blob_sidecars);
 
     Ok(BuildOutcome::Better { payload, cached_reads })
-}
-
-fn get_taiko_l2_address(chain_id: u64) -> Address {
-    let prefix = chain_id.to_string();
-    let zeros = "0".repeat(Address::len_bytes() * 2 - prefix.len() - TAIKO_L2_ADDRESS_SUFFIX.len());
-    Address::from_hex(&format!("0x{prefix}{zeros}{TAIKO_L2_ADDRESS_SUFFIX}")).unwrap()
-}
-
-/// Checks if the given transaction is a valid TaikoL2.anchor transaction.
-fn validate_anchor_tx(tx: &TransactionSigned, header: &Header) -> bool {
-    if !tx.is_eip1559() {
-        return false;
-    }
-
-    let Some(to) = tx.to() else {
-        return false;
-    };
-
-    let Some(chain_id) = tx.chain_id() else {
-        return false;
-    };
-
-    if to != get_taiko_l2_address(chain_id) {
-        return false;
-    }
-
-    if !tx.input().starts_with(&anchor_selector().to_vec()) {
-        return false;
-    }
-
-    if !tx.value().is_zero() {
-        return false;
-    }
-
-    if tx.gas_limit() != ANCHOR_GAS_LIMIT {
-        return false;
-    }
-
-    if let Some(base_fee_per_gas) = header.base_fee_per_gas {
-        if tx.max_fee_per_gas() != base_fee_per_gas as u128 {
-            return false;
-        }
-    }
-
-    let Some(signer) = tx.recover_signer() else {
-        return false;
-    };
-
-    signer == golden_touch()
 }

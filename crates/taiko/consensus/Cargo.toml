@@ -1,5 +1,5 @@
 [package]
-name = "reth-taiko-consensus"
+name = "taiko-reth-consensus"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -12,9 +12,9 @@ workspace = true
 
 [dependencies]
 # reth
-reth-chainspec.workspace = true
+reth-chainspec = { workspace = true, features = ["taiko"] }
 reth-consensus-common.workspace = true
-reth-primitives.workspace = true
+reth-primitives = { workspace = true, features = ["taiko"] }
 reth-consensus.workspace = true
 
 tracing.workspace = true

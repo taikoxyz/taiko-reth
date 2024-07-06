@@ -1,5 +1,5 @@
 [package]
-name = "reth-taiko-primitives"
+name = "taiko-reth-primitives"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
