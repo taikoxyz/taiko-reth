@@ -1,6 +1,9 @@
 //! Taiko's payload builder module.
+use std::sync::Arc;
+
 use crate::error::TaikoPayloadBuilderError;
 use reth_basic_payload_builder::*;
+use reth_chainspec::ChainSpec;
 use reth_errors::RethError;
 use reth_evm::ConfigureEvm;
 use reth_payload_builder::error::PayloadBuilderError;
@@ -11,7 +14,7 @@ use reth_primitives::{
     eip4844::calculate_excess_blob_gas,
     proofs::{self, calculate_requests_root},
     revm::env::tx_env_with_recovered,
-    Address, Block, Header, Receipt, TransactionSigned, TransactionSignedEcRecovered,
+    Address, Block, Header, Receipt, TransactionSigned, TransactionSignedEcRecovered, TxKind,
     EMPTY_OMMER_ROOT_HASH, U256,
 };
 use reth_provider::{ExecutionOutcome, StateProviderFactory};
@@ -25,7 +28,12 @@ use reth_revm::{
 };
 use reth_transaction_pool::TransactionPool;
 use taiko_reth_engine_primitives::{TaikoBuiltPayload, TaikoPayloadBuilderAttributes};
-use taiko_reth_evm::eip6110::parse_deposits_from_receipts;
+use taiko_reth_evm::{
+    anchor::{check_anchor_signature, ANCHOR_GAS_LIMIT, GOLDEN_TOUCH_ACCOUNT},
+    eip6110::parse_deposits_from_receipts,
+};
+use taiko_reth_primitives::L1Origin;
+use taiko_reth_provider::l1_origin::L1OriginWriter;
 use tracing::{debug, trace, warn};
 
 /// Taiko's payload builder
@@ -46,7 +54,7 @@ impl<EvmConfig> TaikoPayloadBuilder<EvmConfig> {
 /// Implementation of the [`PayloadBuilder`] trait for [`TaikoPayloadBuilder`].
 impl<Pool, Client, EvmConfig> PayloadBuilder<Pool, Client> for TaikoPayloadBuilder<EvmConfig>
 where
-    Client: StateProviderFactory,
+    Client: StateProviderFactory + L1OriginWriter,
     Pool: TransactionPool,
     EvmConfig: ConfigureEvm,
 {
@@ -185,7 +193,7 @@ pub fn taiko_payload_builder<EvmConfig, Pool, Client>(
 ) -> Result<BuildOutcome<TaikoBuiltPayload>, PayloadBuilderError>
 where
     EvmConfig: ConfigureEvm,
-    Client: StateProviderFactory,
+    Client: StateProviderFactory + L1OriginWriter,
     Pool: TransactionPool,
 {
     let BuildArguments { client, mut cached_reads, config, pool, cancel, .. } = args;
@@ -275,6 +283,18 @@ where
                 }
             }
         };
+
+        if is_anchor {
+            check_anchor_tx(
+                &tx,
+                tx.signer(),
+                attributes.base_fee_per_gas.try_into().unwrap(),
+                &chain_spec,
+            )
+            .map_err(|_| {
+                PayloadBuilderError::other(TaikoPayloadBuilderError::InvalidAnchorTransaction)
+            })?;
+        }
 
         let taiko_tx_env_with_recovered = |tx: &TransactionSignedEcRecovered| -> TxEnv {
             let mut tx_env = tx_env_with_recovered(tx);
@@ -443,6 +463,18 @@ where
     let block = Block { header, body: executed_txs, ommers: vec![], withdrawals, requests };
 
     let sealed_block = block.seal_slow();
+
+    // L1Origin **MUST NOT** be nil, it's a required field in PayloadAttributesV1.
+    let l1_origin = L1Origin {
+        // Set the block hash before inserting the L1Origin into database.
+        l2_block_hash: sealed_block.hash(),
+        ..attributes.l1_origin.clone()
+    };
+    // Write L1Origin.
+    client.save_l1_origin(sealed_block.number, l1_origin)?;
+    // Write the head L1Origin.
+    client.save_head_l1_origin(sealed_block.number)?;
+
     debug!(target: "payload_builder", ?sealed_block, "sealed built block");
 
     let mut payload =
@@ -452,4 +484,32 @@ where
     payload.extend_sidecars(blob_sidecars);
 
     Ok(BuildOutcome::Better { payload, cached_reads })
+}
+
+/// Verifies the anchor tx correctness
+fn check_anchor_tx(
+    tx: &TransactionSigned,
+    from: Address,
+    base_fee_per_gas: u128,
+    chain_spec: &Arc<ChainSpec>,
+) -> anyhow::Result<()> {
+    use anyhow::{anyhow, ensure, Context};
+    let anchor = tx.as_eip1559().context(anyhow!("anchor tx is not an EIP1559 tx"))?;
+
+    // Check the signature
+    check_anchor_signature(tx).context(anyhow!("failed to check anchor signature"))?;
+
+    // Extract the `to` address
+    let TxKind::Call(to) = anchor.to else { panic!("anchor tx not a smart contract call") };
+    // Check that the L2 contract is being called
+    ensure!(to == chain_spec.l2_contract.unwrap(), "anchor transaction to mismatch");
+    // Check that it's from the golden touch address
+    ensure!(from == *GOLDEN_TOUCH_ACCOUNT, "anchor transaction from mismatch");
+    // Tx can't have any ETH attached
+    ensure!(anchor.value == U256::from(0), "anchor transaction value mismatch");
+    // Tx needs to have the expected gas limit
+    ensure!(anchor.gas_limit == ANCHOR_GAS_LIMIT, "anchor transaction gas price mismatch");
+    // Check needs to have the base fee set to the block base fee
+    ensure!(anchor.max_fee_per_gas == base_fee_per_gas, "anchor transaction gas mismatch");
+    Ok(())
 }

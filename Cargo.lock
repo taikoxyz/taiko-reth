@@ -9818,7 +9818,9 @@ name = "taiko-reth-payload-builder"
 version = "1.0.0"
 dependencies = [
  "alloy-rlp",
+ "anyhow",
  "reth-basic-payload-builder",
+ "reth-chainspec",
  "reth-errors",
  "reth-evm",
  "reth-payload-builder",
@@ -9828,6 +9830,8 @@ dependencies = [
  "reth-transaction-pool",
  "taiko-reth-engine-primitives",
  "taiko-reth-evm",
+ "taiko-reth-primitives",
+ "taiko-reth-provider",
  "thiserror",
  "tracing",
 ]

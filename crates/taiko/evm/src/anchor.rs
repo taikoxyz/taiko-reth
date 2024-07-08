@@ -26,7 +26,7 @@ lazy_static! {
 }
 
 /// check the anchor signature with fixed K value
-fn check_anchor_signature(anchor: &TransactionSigned) -> Result<()> {
+pub fn check_anchor_signature(anchor: &TransactionSigned) -> Result<()> {
     let sign = anchor.signature();
     if sign.r == *GX1 {
         return Ok(());
