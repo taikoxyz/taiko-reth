@@ -128,7 +128,3 @@ mod optimism {
 
 #[cfg(feature = "optimism")]
 pub use optimism::*;
-
-/// Taiko specific re-exports
-#[cfg(feature = "taiko")]
-pub use reth_chainspec::{TAIKO_INTERNAL_L2_A, TAIKO_TESTNET};
