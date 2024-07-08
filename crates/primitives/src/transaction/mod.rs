@@ -388,7 +388,7 @@ impl Transaction {
 
         // Check if max_fee_per_gas is less than base_fee
         if max_fee_per_gas < base_fee {
-            return None;
+            return None
         }
 
         // Calculate the difference between max_fee_per_gas and base_fee
@@ -773,7 +773,7 @@ impl TransactionSignedNoHash {
         // `from` address.
         #[cfg(feature = "optimism")]
         if let Transaction::Deposit(TxDeposit { from, .. }) = self.transaction {
-            return Some(from);
+            return Some(from)
         }
 
         let signature_hash = self.signature_hash();
@@ -802,7 +802,7 @@ impl TransactionSignedNoHash {
         #[cfg(feature = "optimism")]
         {
             if let Transaction::Deposit(TxDeposit { from, .. }) = self.transaction {
-                return Some(from);
+                return Some(from)
             }
 
             // pre bedrock system transactions were sent from the zero address as legacy
@@ -810,7 +810,7 @@ impl TransactionSignedNoHash {
             //
             // NOTE: this is very hacky and only relevant for op-mainnet pre bedrock
             if self.is_legacy() && self.signature == Signature::optimism_deposit_tx_signature() {
-                return Some(Address::ZERO);
+                return Some(Address::ZERO)
             }
         }
 
@@ -1027,7 +1027,7 @@ impl TransactionSigned {
         // `from` address.
         #[cfg(feature = "optimism")]
         if let Transaction::Deposit(TxDeposit { from, .. }) = self.transaction {
-            return Some(from);
+            return Some(from)
         }
         let signature_hash = self.signature_hash();
         self.signature.recover_signer(signature_hash)
@@ -1217,7 +1217,7 @@ impl TransactionSigned {
         let transaction_payload_len = header.payload_length;
 
         if transaction_payload_len > remaining_len {
-            return Err(RlpError::InputTooShort);
+            return Err(RlpError::InputTooShort)
         }
 
         let mut transaction = TxLegacy {
@@ -1280,7 +1280,7 @@ impl TransactionSigned {
         // decode the list header for the rest of the transaction
         let header = Header::decode(data)?;
         if !header.list {
-            return Err(RlpError::Custom("typed tx fields must be encoded as a list"));
+            return Err(RlpError::Custom("typed tx fields must be encoded as a list"))
         }
 
         let remaining_len = data.len();
@@ -1290,7 +1290,7 @@ impl TransactionSigned {
 
         // decode common fields
         let Ok(tx_type) = TxType::try_from(tx_type) else {
-            return Err(RlpError::Custom("unsupported typed transaction type"));
+            return Err(RlpError::Custom("unsupported typed transaction type"))
         };
 
         let transaction = match tx_type {
@@ -1314,7 +1314,7 @@ impl TransactionSigned {
 
         let bytes_consumed = remaining_len - data.len();
         if bytes_consumed != header.payload_length {
-            return Err(RlpError::UnexpectedLength);
+            return Err(RlpError::UnexpectedLength)
         }
 
         let hash = keccak256(&original_encoding_without_header[..tx_length]);
@@ -1449,7 +1449,7 @@ impl Decodable for TransactionSigned {
             // string Header with payload_length of 1, we need to make sure this check is only
             // performed for transactions with a string header
             if bytes_consumed != header.payload_length && original_encoding[0] > EMPTY_STRING_CODE {
-                return Err(RlpError::UnexpectedLength);
+                return Err(RlpError::UnexpectedLength)
             }
 
             Ok(tx)
@@ -1787,8 +1787,6 @@ mod tests {
             value: U256::from(3000000000000000000u64),
             input: Default::default(),
             access_list: Default::default(),
-            #[cfg(feature = "taiko")]
-            is_anchor: false,
         });
         let signature = Signature {
             odd_y_parity: true,

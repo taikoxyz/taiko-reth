@@ -31,17 +31,17 @@ pub struct Receipt {
     pub cumulative_gas_used: u64,
     /// Log send from contracts.
     pub logs: Vec<Log>,
-    // /// Deposit nonce for Optimism deposit transactions
-    // #[cfg(feature = "optimism")]
-    // pub deposit_nonce: Option<u64>,
-    // /// Deposit receipt version for Optimism deposit transactions
-    // ///
-    // ///
-    // /// The deposit receipt version was introduced in Canyon to indicate an update to how
-    // /// receipt hashes should be computed when set. The state transition process
-    // /// ensures this is only set for post-Canyon deposit transactions.
-    // #[cfg(feature = "optimism")]
-    // pub deposit_receipt_version: Option<u64>,
+    /// Deposit nonce for Optimism deposit transactions
+    #[cfg(feature = "optimism")]
+    pub deposit_nonce: Option<u64>,
+    /// Deposit receipt version for Optimism deposit transactions
+    ///
+    ///
+    /// The deposit receipt version was introduced in Canyon to indicate an update to how
+    /// receipt hashes should be computed when set. The state transition process
+    /// ensures this is only set for post-Canyon deposit transactions.
+    #[cfg(feature = "optimism")]
+    pub deposit_receipt_version: Option<u64>,
 }
 
 impl Receipt {
