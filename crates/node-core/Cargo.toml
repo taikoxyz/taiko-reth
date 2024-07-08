@@ -41,7 +41,6 @@ reth-prune-types.workspace = true
 reth-stages-types.workspace = true
 
 # taiko
-taiko-reth-payload-builder = { workspace = true, optional = true }
 taiko-reth-engine-primitives = { workspace = true, optional = true }
 
 # ethereum
@@ -118,7 +117,6 @@ taiko = [
     "reth-primitives/taiko",
     "reth-chainspec/taiko",
     "reth-beacon-consensus/taiko",
-    "dep:taiko-reth-payload-builder",
     "dep:taiko-reth-engine-primitives",
 ]
 

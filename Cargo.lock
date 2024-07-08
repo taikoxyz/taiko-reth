@@ -7687,7 +7687,6 @@ dependencies = [
  "serde_json",
  "shellexpand",
  "taiko-reth-engine-primitives",
- "taiko-reth-payload-builder",
  "thiserror",
  "tikv-jemalloc-ctl",
  "tokio",
