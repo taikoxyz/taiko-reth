@@ -27,5 +27,4 @@ alloy-eips.workspace = true
 
 [features]
 optimism = ["dep:reth-chainspec"]
-taiko = ["dep:reth-chainspec"]
 serde = ["dep:serde", "reth-trie/serde", "revm/serde"]
