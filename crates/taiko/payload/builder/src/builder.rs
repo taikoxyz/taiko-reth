@@ -31,23 +31,29 @@ use taiko_reth_engine_primitives::{TaikoBuiltPayload, TaikoPayloadBuilderAttribu
 use taiko_reth_evm::{
     anchor::{check_anchor_signature, ANCHOR_GAS_LIMIT, GOLDEN_TOUCH_ACCOUNT},
     eip6110::parse_deposits_from_receipts,
+    TaikoEvmConfig,
 };
 use taiko_reth_primitives::L1Origin;
 use taiko_reth_provider::L1OriginWriter;
 use tracing::{debug, trace, warn};
 
 /// Taiko's payload builder
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
-pub struct TaikoPayloadBuilder<EvmConfig> {
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TaikoPayloadBuilder<EvmConfig = TaikoEvmConfig> {
     /// The type responsible for creating the evm.
     evm_config: EvmConfig,
-    treasury: Address,
 }
 
 impl<EvmConfig> TaikoPayloadBuilder<EvmConfig> {
     /// `OptimismPayloadBuilder` constructor.
-    pub const fn new(evm_config: EvmConfig, treasury: Address) -> Self {
-        Self { evm_config, treasury }
+    pub const fn new(evm_config: EvmConfig) -> Self {
+        Self { evm_config }
+    }
+}
+
+impl Default for TaikoPayloadBuilder {
+    fn default() -> Self {
+        Self::new(TaikoEvmConfig::default())
     }
 }
 
@@ -65,7 +71,7 @@ where
         &self,
         args: BuildArguments<Pool, Client, TaikoPayloadBuilderAttributes, TaikoBuiltPayload>,
     ) -> Result<BuildOutcome<TaikoBuiltPayload>, PayloadBuilderError> {
-        taiko_payload_builder(self.evm_config.clone(), self.treasury, args)
+        taiko_payload_builder(self.evm_config.clone(), args)
     }
 
     fn build_empty_payload(
@@ -188,7 +194,6 @@ where
 #[inline]
 pub fn taiko_payload_builder<EvmConfig, Pool, Client>(
     evm_config: EvmConfig,
-    treasury: Address,
     args: BuildArguments<Pool, Client, TaikoPayloadBuilderAttributes, TaikoBuiltPayload>,
 ) -> Result<BuildOutcome<TaikoBuiltPayload>, PayloadBuilderError>
 where
@@ -299,7 +304,7 @@ where
         let taiko_tx_env_with_recovered = |tx: &TransactionSignedEcRecovered| -> TxEnv {
             let mut tx_env = tx_env_with_recovered(tx);
             tx_env.taiko.is_anchor = is_anchor;
-            tx_env.taiko.treasury = treasury;
+            tx_env.taiko.treasury = chain_spec.l2_contract.unwrap();
             tx_env
         };
         let env = EnvWithHandlerCfg::new_with_cfg_env(

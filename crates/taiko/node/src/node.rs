@@ -61,12 +61,12 @@ impl TaikoNode {
 
 impl NodeTypes for TaikoNode {
     type Primitives = ();
-    type Engine = EthEngineTypes;
+    type Engine = TaikoEngineTypes;
 }
 
 impl<N> Node<N> for TaikoNode
 where
-    N: FullNodeTypes<Engine = EthEngineTypes>,
+    N: FullNodeTypes<Engine = TaikoEngineTypes>,
 {
     type ComponentsBuilder = ComponentsBuilder<
         N,

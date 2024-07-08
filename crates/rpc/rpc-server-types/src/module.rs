@@ -256,6 +256,7 @@ pub enum RethRpcModule {
     /// `ots_` module
     Ots,
     /// `taiko_` module
+    #[cfg(feature = "taiko")]
     Taiko,
     /// For single non-standard `eth_` namespace call `eth_callBundle`
     ///
@@ -311,6 +312,8 @@ impl FromStr for RethRpcModule {
             "reth" => Self::Reth,
             "ots" => Self::Ots,
             "eth-call-bundle" | "eth_callBundle" => Self::EthCallBundle,
+            #[cfg(feature = "taiko")]
+            "taiko" => Self::Taiko,
             _ => return Err(ParseError::VariantNotFound),
         })
     }

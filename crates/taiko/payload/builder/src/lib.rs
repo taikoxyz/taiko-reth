@@ -9,4 +9,5 @@
 #![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
 #![allow(clippy::useless_let_if_seq)]
 pub mod builder;
+pub use builder::*;
 pub mod error;

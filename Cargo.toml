@@ -361,6 +361,7 @@ taiko-reth-payload-builder = { path = "crates/taiko/payload/builder" }
 taiko-reth-payload-validator = { path = "crates/taiko/payload/validator" }
 taiko-reth-engine-primitives = { path = "crates/taiko/engine-primitives" }
 taiko-reth-consensus = { path = "crates/taiko/consensus" }
+taiko-reth-node = { path = "crates/taiko/node" }
 # revm
 revm = { version = "10.0.0", features = [
     "std",

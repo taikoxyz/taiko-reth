@@ -177,6 +177,8 @@ use reth_provider::{
     AccountReader, BlockReader, BlockReaderIdExt, CanonStateSubscriptions, ChainSpecProvider,
     ChangeSetReader, EvmEnvProvider, StateProviderFactory,
 };
+#[cfg(feature = "taiko")]
+use reth_rpc::TaikoApi;
 use reth_rpc::{
     eth::{cache::EthStateCache, traits::RawTransactionForwarder, EthBundle},
     AdminApi, DebugApi, EngineEthApi, EthApi, EthSubscriptionIdProvider, NetApi, OtterscanApi,
@@ -194,6 +196,8 @@ use std::{
     sync::Arc,
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
+#[cfg(feature = "taiko")]
+use taiko_reth_provider::L1OriginReader;
 use tower_http::cors::CorsLayer;
 use tracing::{instrument, trace};
 
@@ -237,15 +241,7 @@ pub async fn launch<Provider, Pool, Network, Tasks, Events, EvmConfig>(
     evm_config: EvmConfig,
 ) -> Result<RpcServerHandle, RpcError>
 where
-    Provider: BlockReaderIdExt
-        + AccountReader
-        + StateProviderFactory
-        + EvmEnvProvider
-        + ChainSpecProvider
-        + ChangeSetReader
-        + Clone
-        + Unpin
-        + 'static,
+    Provider: ProviderExt,
     Pool: TransactionPool + Clone + 'static,
     Network: NetworkInfo + Peers + Clone + 'static,
     Tasks: TaskSpawner + Clone + 'static,
@@ -428,15 +424,7 @@ impl<Provider, Pool, Network, Tasks, Events, EvmConfig>
 impl<Provider, Pool, Network, Tasks, Events, EvmConfig>
     RpcModuleBuilder<Provider, Pool, Network, Tasks, Events, EvmConfig>
 where
-    Provider: BlockReaderIdExt
-        + AccountReader
-        + StateProviderFactory
-        + EvmEnvProvider
-        + ChainSpecProvider
-        + ChangeSetReader
-        + Clone
-        + Unpin
-        + 'static,
+    Provider: ProviderExt,
     Pool: TransactionPool + Clone + 'static,
     Network: NetworkInfo + Peers + Clone + 'static,
     Tasks: TaskSpawner + Clone + 'static,
@@ -750,18 +738,72 @@ where
     }
 }
 
+/// A helper type that holds the transport specific modules.
+#[cfg(not(feature = "taiko"))]
+pub trait ProviderExt:
+    BlockReaderIdExt
+    + AccountReader
+    + StateProviderFactory
+    + EvmEnvProvider
+    + ChainSpecProvider
+    + ChangeSetReader
+    + Clone
+    + Unpin
+    + 'static
+{
+}
+
+#[cfg(not(feature = "taiko"))]
+impl<
+        T: BlockReaderIdExt
+            + AccountReader
+            + StateProviderFactory
+            + EvmEnvProvider
+            + ChainSpecProvider
+            + ChangeSetReader
+            + Clone
+            + Unpin
+            + 'static,
+    > ProviderExt for T
+{
+}
+
+/// A helper type that holds the transport specific modules.
+#[cfg(feature = "taiko")]
+pub trait ProviderExt:
+    BlockReaderIdExt
+    + AccountReader
+    + StateProviderFactory
+    + EvmEnvProvider
+    + L1OriginReader
+    + ChainSpecProvider
+    + ChangeSetReader
+    + Clone
+    + Unpin
+    + 'static
+{
+}
+
+#[cfg(feature = "taiko")]
+impl<
+        T: BlockReaderIdExt
+            + AccountReader
+            + StateProviderFactory
+            + EvmEnvProvider
+            + L1OriginReader
+            + ChainSpecProvider
+            + ChangeSetReader
+            + Clone
+            + Unpin
+            + 'static,
+    > ProviderExt for T
+{
+}
+
 impl<Provider, Pool, Network, Tasks, Events, EvmConfig>
     RethModuleRegistry<Provider, Pool, Network, Tasks, Events, EvmConfig>
 where
-    Provider: BlockReaderIdExt
-        + AccountReader
-        + StateProviderFactory
-        + EvmEnvProvider
-        + ChainSpecProvider
-        + ChangeSetReader
-        + Clone
-        + Unpin
-        + 'static,
+    Provider: ProviderExt,
     Pool: TransactionPool + Clone + 'static,
     Network: NetworkInfo + Peers + Clone + 'static,
     Tasks: TaskSpawner + Clone + 'static,
@@ -977,6 +1019,7 @@ where
                                 .into_rpc()
                                 .into()
                         }
+                        #[cfg(feature = "taiko")]
                         RethRpcModule::Taiko => {
                             TaikoApi::new(self.provider.clone(), self.pool.clone())
                                 .into_rpc()

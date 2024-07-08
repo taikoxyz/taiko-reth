@@ -78,4 +78,4 @@ backon.workspace = true
 tempfile.workspace = true
 
 [features]
-taiko = ["reth-rpc/taiko"]
+taiko = ["reth-rpc/taiko", "reth-node-core/taiko", "reth-node-api/taiko"]

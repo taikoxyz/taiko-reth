@@ -6460,7 +6460,9 @@ dependencies = [
  "serde",
  "serde_json",
  "similar-asserts",
+ "taiko-reth-node",
  "taiko-reth-payload-builder",
+ "taiko-reth-payload-validator",
  "tempfile",
  "thiserror",
  "tikv-jemallocator",
@@ -7575,6 +7577,7 @@ dependencies = [
  "reth-provider",
  "reth-tasks",
  "reth-transaction-pool",
+ "taiko-reth-provider",
 ]
 
 [[package]]
@@ -8187,6 +8190,7 @@ dependencies = [
  "reth-transaction-pool",
  "serde",
  "serde_json",
+ "taiko-reth-provider",
  "thiserror",
  "tokio",
  "tower",

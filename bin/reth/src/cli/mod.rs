@@ -8,7 +8,7 @@ use crate::{
     commands::{
         config_cmd, db, debug_cmd, dump_genesis, import, init_cmd, init_state,
         node::{self, NoArgs},
-        p2p, recover, stage, t8n, test_vectors,
+        p2p, recover, stage, test_vectors,
     },
     version::{LONG_VERSION, SHORT_VERSION},
 };
@@ -160,7 +160,7 @@ impl<Ext: clap::Args + fmt::Debug> Cli<Ext> {
             Commands::Db(command) => runner.run_blocking_until_ctrl_c(command.execute()),
             Commands::Stage(command) => runner.run_command_until_exit(|ctx| command.execute(ctx)),
             Commands::P2P(command) => runner.run_until_ctrl_c(command.execute()),
-            Commands::T8n(command) => runner.run_until_ctrl_c(command.execute()),
+            // Commands::T8n(command) => runner.run_until_ctrl_c(command.execute()),
             Commands::TestVectors(command) => runner.run_until_ctrl_c(command.execute()),
             Commands::Config(command) => runner.run_until_ctrl_c(command.execute()),
             Commands::Debug(command) => runner.run_command_until_exit(|ctx| command.execute(ctx)),
@@ -216,8 +216,8 @@ pub enum Commands<Ext: clap::Args + fmt::Debug = NoArgs> {
     ///
     /// Equivalent of Geth's `./evm t8n` utility, and should be used to confirm
     /// equivalence of behavior between Geth and Reth executors.
-    #[command(name = "t8n")]
-    T8n(t8n::Command),
+    // #[command(name = "t8n")]
+    // T8n(t8n::Command),
     /// Generate Test Vectors
     #[command(name = "test-vectors")]
     TestVectors(test_vectors::Command),

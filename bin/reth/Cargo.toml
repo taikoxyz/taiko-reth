@@ -70,6 +70,8 @@ reth-prune-types.workspace = true
 
 # taiko
 taiko-reth-payload-builder = { workspace = true, optional = true }
+taiko-reth-payload-validator = { workspace = true, optional = true }
+taiko-reth-node = { workspace = true, optional = true }
 
 # crypto
 alloy-rlp.workspace = true
@@ -162,7 +164,11 @@ optimism = [
 ]
 
 taiko = [
-    # "dep:reth-node-taiko",
+    "dep:taiko-reth-payload-validator",
+    "reth-primitives/taiko",
+    "reth-revm/taiko",
+    "reth-node-builder/taiko",
+    "dep:taiko-reth-node",
 ]
 
 # no-op feature flag for switching between the `optimism` and default functionality in CI matrices
