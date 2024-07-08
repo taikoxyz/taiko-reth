@@ -101,4 +101,8 @@ optimism = [
     "reth-revm/optimism",
 ]
 
-taiko = ["reth-primitives/taiko", "reth-revm/taiko"]
+taiko = [
+    "reth-primitives/taiko",
+    "reth-revm/taiko",
+    "reth-rpc-engine-api/taiko",
+]

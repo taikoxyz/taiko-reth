@@ -7,14 +7,16 @@ use crate::{
 use futures::TryFutureExt;
 use reth_engine_primitives::EngineTypes;
 use reth_errors::RethResult;
+#[cfg(not(feature = "taiko"))]
+use reth_rpc_types::engine::ExecutionPayload;
 use reth_rpc_types::engine::{
-    CancunPayloadFields, ExecutionPayload, ForkchoiceState, ForkchoiceUpdated, PayloadStatus,
+    CancunPayloadFields, ForkchoiceState, ForkchoiceUpdated, PayloadStatus,
 };
 use reth_tokio_util::{EventSender, EventStream};
 use tokio::sync::{mpsc::UnboundedSender, oneshot};
 
 #[cfg(feature = "taiko")]
-use reth_payload_builder::TaikoExecutionPayload;
+use taiko_reth_engine_primitives::TaikoExecutionPayload;
 
 /// A _shareable_ beacon consensus frontend type. Used to interact with the spawned beacon consensus
 /// engine task.

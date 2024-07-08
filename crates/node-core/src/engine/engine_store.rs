@@ -3,13 +3,10 @@
 use futures::{Stream, StreamExt};
 use reth_beacon_consensus::BeaconEngineMessage;
 use reth_engine_primitives::EngineTypes;
-#[cfg(feature = "taiko")]
-use reth_payload_builder::TaikoExecutionPayload;
 use reth_fs_util as fs;
-use reth_rpc_types::{
-    engine::{CancunPayloadFields, ForkchoiceState},
-    ExecutionPayload,
-};
+use reth_rpc_types::engine::{CancunPayloadFields, ForkchoiceState};
+#[cfg(not(feature = "taiko"))]
+use reth_rpc_types::ExecutionPayload;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::BTreeMap,
@@ -18,6 +15,8 @@ use std::{
     task::{ready, Context, Poll},
     time::SystemTime,
 };
+#[cfg(feature = "taiko")]
+use taiko_reth_engine_primitives::TaikoExecutionPayload;
 use tracing::*;
 
 /// A message from the engine API that has been stored to disk.
@@ -36,6 +35,7 @@ pub enum StoredEngineApiMessage<Attributes> {
         /// The [`ExecutionPayload`] sent in the persisted call.
         #[cfg(not(feature = "taiko"))]
         payload: ExecutionPayload,
+        /// The [`TaikoExecutionPayload`] sent in the persisted call.
         #[cfg(feature = "taiko")]
         payload: TaikoExecutionPayload,
         /// The Cancun-specific fields sent in the persisted call, if any.

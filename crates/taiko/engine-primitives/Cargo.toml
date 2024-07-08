@@ -18,7 +18,6 @@ reth-engine-primitives.workspace = true
 reth-payload-primitives.workspace = true
 reth-rpc-types.workspace = true
 reth-rpc-types-compat.workspace = true
-revm-primitives.workspace = true
 
 # taiko
 taiko-reth-primitives.workspace = true
@@ -26,7 +25,6 @@ reth-ethereum-engine-primitives.workspace = true
 
 # misc
 serde.workspace = true
-sha2.workspace = true
 alloy-serde = "0.1.3"
 
 [dev-dependencies]

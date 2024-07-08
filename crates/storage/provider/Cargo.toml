@@ -53,7 +53,6 @@ pin-project.workspace = true
 parking_lot.workspace = true
 dashmap = { workspace = true, features = ["inline"] }
 strum.workspace = true
-serde_json.workspace = true
 
 # test-utils
 alloy-rlp = { workspace = true, optional = true }

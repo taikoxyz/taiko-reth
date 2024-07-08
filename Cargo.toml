@@ -132,7 +132,8 @@ members = [
     "crates/taiko/engine-primitives/",
     "crates/taiko/evm",
     "crates/taiko/node",
-    "crates/taiko/payload/",
+    "crates/taiko/payload/builder",
+    "crates/taiko/payload/validator",
     "crates/taiko/primitives/",
     "crates/taiko/storage/",
 ]
@@ -356,7 +357,8 @@ reth-trie-parallel = { path = "crates/trie/parallel" }
 taiko-reth-primitives = { path = "crates/taiko/primitives" }
 taiko-reth-provider = { path = "crates/taiko/storage" }
 taiko-reth-evm = { path = "crates/taiko/evm" }
-taiko-reth-payload-builder = { path = "crates/taiko/payload" }
+taiko-reth-payload-builder = { path = "crates/taiko/payload/builder" }
+taiko-reth-payload-validator = { path = "crates/taiko/payload/validator" }
 taiko-reth-engine-primitives = { path = "crates/taiko/engine-primitives" }
 taiko-reth-consensus = { path = "crates/taiko/consensus" }
 # revm

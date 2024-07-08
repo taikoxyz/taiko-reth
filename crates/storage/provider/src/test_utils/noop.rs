@@ -6,13 +6,9 @@ use crate::{
     StateProviderFactory, StateRootProvider, TransactionVariant, TransactionsProvider,
     WithdrawalsProvider,
 };
-#[cfg(feature = "taiko")]
-use crate::{L1OriginReader, L1OriginWriter};
 use reth_chainspec::{ChainInfo, ChainSpec, MAINNET};
 use reth_db_api::models::{AccountBeforeTx, StoredBlockBodyIndices};
 use reth_evm::ConfigureEvmEnv;
-#[cfg(feature = "taiko")]
-use reth_primitives::L1Origin;
 use reth_primitives::{
     Account, Address, Block, BlockHash, BlockHashOrNumber, BlockId, BlockNumber, BlockWithSenders,
     Bytecode, Header, Receipt, SealedBlock, SealedBlockWithSenders, SealedHeader, StorageKey,

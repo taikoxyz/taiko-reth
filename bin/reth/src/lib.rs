@@ -38,7 +38,7 @@ pub mod utils;
 pub mod payload {
     pub use reth_payload_builder::*;
     pub use reth_payload_primitives::*;
-    pub use reth_payload_validator::ExecutionPayloadValidator;
+    pub use reth_payload_validator::TaikoExecutionPayloadValidator;
 }
 
 /// Re-exported from `reth_node_api`.

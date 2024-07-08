@@ -6562,6 +6562,8 @@ dependencies = [
  "reth-tokio-util",
  "reth-tracing",
  "schnellru",
+ "taiko-reth-engine-primitives",
+ "taiko-reth-payload-validator",
  "thiserror",
  "tokio",
  "tokio-stream",
@@ -7682,6 +7684,8 @@ dependencies = [
  "serde",
  "serde_json",
  "shellexpand",
+ "taiko-reth-engine-primitives",
+ "taiko-reth-payload-builder",
  "thiserror",
  "tikv-jemalloc-ctl",
  "tokio",
@@ -7846,10 +7850,7 @@ dependencies = [
  "reth-rpc-types-compat",
  "reth-transaction-pool",
  "revm",
- "revm-primitives",
- "serde",
  "serde_json",
- "sha2 0.10.8",
  "thiserror",
  "tokio",
  "tokio-stream",
@@ -7875,7 +7876,6 @@ name = "reth-payload-validator"
 version = "1.0.0"
 dependencies = [
  "reth-chainspec",
- "reth-payload-builder",
  "reth-primitives",
  "reth-rpc-types",
  "reth-rpc-types-compat",
@@ -7990,7 +7990,6 @@ dependencies = [
  "reth-testing-utils",
  "reth-trie",
  "revm",
- "serde_json",
  "strum",
  "tempfile",
  "tokio",
@@ -8223,6 +8222,7 @@ dependencies = [
  "reth-testing-utils",
  "reth-tokio-util",
  "serde",
+ "taiko-reth-engine-primitives",
  "thiserror",
  "tokio",
  "tracing",
@@ -9767,10 +9767,8 @@ dependencies = [
  "reth-primitives",
  "reth-rpc-types",
  "reth-rpc-types-compat",
- "revm-primitives",
  "serde",
  "serde_json",
- "sha2 0.10.8",
  "taiko-reth-primitives",
 ]
 
@@ -9832,6 +9830,17 @@ dependencies = [
  "taiko-reth-evm",
  "thiserror",
  "tracing",
+]
+
+[[package]]
+name = "taiko-reth-payload-validator"
+version = "1.0.0"
+dependencies = [
+ "reth-chainspec",
+ "reth-primitives",
+ "reth-rpc-types",
+ "reth-rpc-types-compat",
+ "taiko-reth-engine-primitives",
 ]
 
 [[package]]

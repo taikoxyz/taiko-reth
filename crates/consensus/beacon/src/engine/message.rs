@@ -3,17 +3,19 @@ use futures::{future::Either, FutureExt};
 use reth_engine_primitives::EngineTypes;
 use reth_errors::RethResult;
 use reth_payload_builder::error::PayloadBuilderError;
-#[cfg(feature = "taiko")]
-use reth_payload_builder::TaikoExecutionPayload;
+#[cfg(not(feature = "taiko"))]
+use reth_rpc_types::engine::ExecutionPayload;
 use reth_rpc_types::engine::{
-    CancunPayloadFields, ExecutionPayload, ForkChoiceUpdateResult, ForkchoiceState,
-    ForkchoiceUpdateError, ForkchoiceUpdated, PayloadId, PayloadStatus, PayloadStatusEnum,
+    CancunPayloadFields, ForkChoiceUpdateResult, ForkchoiceState, ForkchoiceUpdateError,
+    ForkchoiceUpdated, PayloadId, PayloadStatus, PayloadStatusEnum,
 };
 use std::{
     future::Future,
     pin::Pin,
     task::{ready, Context, Poll},
 };
+#[cfg(feature = "taiko")]
+use taiko_reth_engine_primitives::TaikoExecutionPayload;
 use tokio::sync::oneshot;
 
 /// Represents the outcome of forkchoice update.
@@ -146,6 +148,7 @@ pub enum BeaconEngineMessage<Engine: EngineTypes> {
         /// The execution payload received by Engine API.
         #[cfg(not(feature = "taiko"))]
         payload: ExecutionPayload,
+        /// The execution payload received by Engine API.
         #[cfg(feature = "taiko")]
         payload: TaikoExecutionPayload,
         /// The cancun-related newPayload fields, if any.

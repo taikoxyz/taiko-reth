@@ -14,7 +14,7 @@ use reth_primitives::{
 };
 use reth_rpc_types::{
     engine::{PayloadAttributes, PayloadId},
-    BlobTransactionSidecar, ExecutionPayloadV1, ExecutionPayloadV2,
+    BlobTransactionSidecar, ExecutionPayload, ExecutionPayloadV1, ExecutionPayloadV2,
 };
 use reth_rpc_types_compat::engine::{
     block_to_payload_v1,
@@ -260,8 +260,8 @@ impl From<TaikoBuiltPayload> for ExecutionPayloadEnvelopeV3 {
     fn from(value: TaikoBuiltPayload) -> Self {
         let TaikoBuiltPayload { block, fees, sidecars, .. } = value;
 
-        ExecutionPayloadEnvelopeV3 {
-            execution_payload: block_to_payload_v3(block.clone()).0,
+        Self {
+            execution_payload: block_to_payload_v3(block).0,
             block_value: fees,
             // From the engine API spec:
             //
@@ -281,8 +281,8 @@ impl From<TaikoBuiltPayload> for ExecutionPayloadEnvelopeV4 {
     fn from(value: TaikoBuiltPayload) -> Self {
         let TaikoBuiltPayload { block, fees, sidecars, .. } = value;
 
-        ExecutionPayloadEnvelopeV4 {
-            execution_payload: block_to_payload_v4(block.clone()),
+        Self {
+            execution_payload: block_to_payload_v4(block),
             block_value: fees,
             // From the engine API spec:
             //
@@ -310,7 +310,7 @@ pub struct TaikoExecutionPayloadV2 {
     pub tx_hash: B256,
     /// Allow passing withdrawals hash directly instead of withdrawals
     pub withdrawals_hash: B256,
-    /// Whether this is a Taiko L2 block, only used by ExecutableDataToBlock
+    /// Whether this is a Taiko L2 block, only used by `ExecutableDataToBlock`
     pub _taiko_block: bool,
 }
 
@@ -352,5 +352,49 @@ impl From<TaikoBuiltPayload> for TaikoExecutionPayloadEnvelopeV2 {
     fn from(value: TaikoBuiltPayload) -> Self {
         let fees = value.fees;
         Self { execution_payload: value.into(), block_value: fees }
+    }
+}
+
+/// An tiako execution payload
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TaikoExecutionPayload {
+    /// Inner V3 payload
+    #[serde(flatten)]
+    pub payload_inner: ExecutionPayload,
+
+    /// Allow passing txHash directly instead of transactions list
+    pub tx_hash: B256,
+    /// Allow passing `WithdrawalsHash` directly instead of withdrawals
+    pub withdrawals_hash: B256,
+    /// Whether this is a Taiko L2 block, only used by `ExecutableDataToBlock`
+    pub taiko_block: bool,
+}
+
+impl TaikoExecutionPayload {
+    /// Returns the block hash
+    pub const fn block_hash(&self) -> B256 {
+        self.payload_inner.block_hash()
+    }
+
+    /// Returns the block number
+    pub const fn block_number(&self) -> u64 {
+        self.payload_inner.block_number()
+    }
+
+    /// Returns the parent hash
+    pub const fn parent_hash(&self) -> B256 {
+        self.payload_inner.parent_hash()
+    }
+}
+
+impl From<ExecutionPayload> for TaikoExecutionPayload {
+    fn from(value: ExecutionPayload) -> Self {
+        Self {
+            payload_inner: value,
+            tx_hash: B256::default(),
+            withdrawals_hash: B256::default(),
+            taiko_block: false,
+        }
     }
 }

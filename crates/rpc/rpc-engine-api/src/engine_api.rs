@@ -24,6 +24,8 @@ use reth_rpc_types_compat::engine::payload::{
 use reth_storage_api::{BlockReader, HeaderProvider, StateProviderFactory};
 use reth_tasks::TaskSpawner;
 use std::{sync::Arc, time::Instant};
+#[cfg(feature = "taiko")]
+use taiko_reth_engine_primitives::TaikoExecutionPayload;
 use tokio::sync::oneshot;
 use tracing::{trace, warn};
 
@@ -190,6 +192,8 @@ where
 
         let cancun_fields = CancunPayloadFields { versioned_hashes, parent_beacon_block_root };
 
+        #[cfg(feature = "taiko")]
+        let payload = TaikoExecutionPayload::from(payload);
         Ok(self.inner.beacon_consensus.new_payload(payload, Some(cancun_fields)).await?)
     }
 

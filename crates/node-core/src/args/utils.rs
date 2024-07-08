@@ -18,10 +18,10 @@ use reth_chainspec::DEV;
 use reth_chainspec::{BASE_MAINNET, BASE_SEPOLIA, OP_MAINNET, OP_SEPOLIA};
 
 #[cfg(not(any(feature = "optimism", feature = "taiko")))]
-use reth_primitives::{GOERLI, HOLESKY, MAINNET, SEPOLIA};
+use reth_chainspec::{GOERLI, HOLESKY, MAINNET, SEPOLIA};
 
 #[cfg(feature = "taiko")]
-use reth_primitives::{TAIKO_INTERNAL_L2_A, TAIKO_TESTNET};
+use reth_chainspec::{TAIKO_HEKLA, TAIKO_INTERNAL_L2_A, TAIKO_MAINNET, TAIKO_TESTNET};
 
 #[cfg(feature = "optimism")]
 /// Chains supported by op-reth. First value should be used as the default.
@@ -31,7 +31,7 @@ pub const SUPPORTED_CHAINS: &[&str] = &["optimism", "optimism-sepolia", "base", 
 pub const SUPPORTED_CHAINS: &[&str] = &["mainnet", "sepolia", "goerli", "holesky", "dev"];
 #[cfg(feature = "taiko")]
 /// Chains supported by taiko-reth. First value should be used as default.
-pub const SUPPORTED_CHAINS: &[&str] = &["testnet", "internal_devnet_a"];
+pub const SUPPORTED_CHAINS: &[&str] = &["testnet", "internal_devnet_a", "mainnet", "hekla"];
 
 /// Helper to parse a [Duration] from seconds
 pub fn parse_duration_from_secs(arg: &str) -> eyre::Result<Duration, std::num::ParseIntError> {
@@ -65,9 +65,28 @@ pub fn chain_spec_value_parser(s: &str) -> eyre::Result<Arc<ChainSpec>, eyre::Er
         "testnet" => TAIKO_TESTNET.clone(),
         #[cfg(feature = "taiko")]
         "internal_devnet_a" => TAIKO_INTERNAL_L2_A.clone(),
+        #[cfg(feature = "taiko")]
+        "hekla" => TAIKO_HEKLA.clone(),
+        #[cfg(feature = "taiko")]
+        "mainnet" => TAIKO_MAINNET.clone(),
         _ => {
-            let raw = fs::read_to_string(PathBuf::from(shellexpand::full(s)?.into_owned()))?;
-            serde_json::from_str(&raw)?
+            // try to read json from path first
+            let raw = match fs::read_to_string(PathBuf::from(shellexpand::full(s)?.into_owned())) {
+                Ok(raw) => raw,
+                Err(io_err) => {
+                    // valid json may start with "\n", but must contain "{"
+                    if s.contains('{') {
+                        s.to_string()
+                    } else {
+                        return Err(io_err.into()) // assume invalid path
+                    }
+                }
+            };
+
+            // both serialized Genesis and ChainSpec structs supported
+            let genesis: Genesis = serde_json::from_str(&raw)?;
+
+            Arc::new(genesis.into())
         }
     })
 }

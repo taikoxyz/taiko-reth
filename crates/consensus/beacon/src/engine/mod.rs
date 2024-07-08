@@ -13,9 +13,8 @@ use reth_network_p2p::{
     sync::{NetworkSyncUpdater, SyncState},
 };
 use reth_payload_builder::PayloadBuilderHandle;
-#[cfg(feature = "taiko")]
-use reth_payload_builder::{TaikoExecutionPayload, TaikoPayloadAttributes};
 use reth_payload_primitives::{PayloadAttributes, PayloadBuilderAttributes};
+#[cfg(not(feature = "taiko"))]
 use reth_payload_validator::ExecutionPayloadValidator;
 use reth_primitives::{
     constants::EPOCH_SLOTS, BlockNumHash, BlockNumber, Head, Header, SealedBlock, SealedHeader,
@@ -25,9 +24,10 @@ use reth_provider::{
     BlockIdReader, BlockReader, BlockSource, CanonChainTracker, ChainSpecProvider, ProviderError,
     StageCheckpointReader,
 };
+#[cfg(not(feature = "taiko"))]
+use reth_rpc_types::engine::ExecutionPayload;
 use reth_rpc_types::engine::{
-    CancunPayloadFields, ExecutionPayload, ForkchoiceState, PayloadStatus, PayloadStatusEnum,
-    PayloadValidationError,
+    CancunPayloadFields, ForkchoiceState, PayloadStatus, PayloadStatusEnum, PayloadValidationError,
 };
 use reth_stages_api::{ControlFlow, Pipeline, PipelineTarget, StageId};
 use reth_tasks::TaskSpawner;
@@ -38,6 +38,10 @@ use std::{
     task::{Context, Poll},
     time::{Duration, Instant},
 };
+#[cfg(feature = "taiko")]
+use taiko_reth_engine_primitives::TaikoExecutionPayload;
+#[cfg(feature = "taiko")]
+use taiko_reth_payload_validator::TaikoExecutionPayloadValidator;
 use tokio::sync::{
     mpsc::{self, UnboundedSender},
     oneshot,
@@ -184,8 +188,11 @@ where
     forkchoice_state_tracker: ForkchoiceStateTracker,
     /// The payload store.
     payload_builder: PayloadBuilderHandle<EngineT>,
+    #[cfg(not(feature = "taiko"))]
     /// Validator for execution payloads
     payload_validator: ExecutionPayloadValidator,
+    #[cfg(feature = "taiko")]
+    payload_validator: TaikoExecutionPayloadValidator,
     /// Current blockchain tree action.
     blockchain_tree_action: Option<BlockchainTreeAction<EngineT>>,
     /// Pending forkchoice update.
@@ -304,7 +311,10 @@ where
         );
         let mut this = Self {
             sync,
+            #[cfg(not(feature = "taiko"))]
             payload_validator: ExecutionPayloadValidator::new(blockchain.chain_spec()),
+            #[cfg(feature = "taiko")]
+            payload_validator: TaikoExecutionPayloadValidator::new(blockchain.chain_spec()),
             blockchain,
             sync_state_updater,
             engine_message_stream,
