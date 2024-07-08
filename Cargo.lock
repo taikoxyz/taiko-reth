@@ -8112,6 +8112,8 @@ dependencies = [
  "secp256k1",
  "serde",
  "serde_json",
+ "taiko-reth-primitives",
+ "taiko-reth-provider",
  "tempfile",
  "thiserror",
  "tokio",
@@ -8133,6 +8135,7 @@ dependencies = [
  "reth-rpc-types",
  "serde",
  "serde_json",
+ "taiko-reth-primitives",
 ]
 
 [[package]]

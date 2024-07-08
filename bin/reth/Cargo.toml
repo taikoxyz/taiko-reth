@@ -60,7 +60,6 @@ reth-node-ethereum.workspace = true
 reth-node-optimism = { workspace = true, optional = true, features = [
     "optimism",
 ] }
-# reth-node-taiko = { workspace = true, optional = true }
 reth-node-core.workspace = true
 reth-db-common.workspace = true
 reth-node-builder.workspace = true

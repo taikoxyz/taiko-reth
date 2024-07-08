@@ -34,6 +34,10 @@ reth-execution-types.workspace = true
 
 reth-evm-optimism = { workspace = true, optional = true }
 
+# taiko
+taiko-reth-provider = { workspace = true, optional = true }
+taiko-reth-primitives = { workspace = true, optional = true }
+
 # eth
 alloy-rlp.workspace = true
 alloy-dyn-abi = { workspace = true, features = ["eip712"] }
@@ -104,5 +108,8 @@ optimism = [
 taiko = [
     "reth-primitives/taiko",
     "reth-revm/taiko",
+    "reth-rpc-api/taiko",
     "reth-rpc-engine-api/taiko",
+    "dep:taiko-reth-provider",
+    "dep:taiko-reth-primitives",
 ]

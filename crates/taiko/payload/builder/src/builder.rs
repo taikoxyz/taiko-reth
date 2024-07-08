@@ -33,7 +33,7 @@ use taiko_reth_evm::{
     eip6110::parse_deposits_from_receipts,
 };
 use taiko_reth_primitives::L1Origin;
-use taiko_reth_provider::l1_origin::L1OriginWriter;
+use taiko_reth_provider::L1OriginWriter;
 use tracing::{debug, trace, warn};
 
 /// Taiko's payload builder
