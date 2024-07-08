@@ -35,60 +35,8 @@ pub const SUPPORTED_CHAINS: &[&str] = &["testnet", "internal_devnet_a", "mainnet
 
 /// Helper to parse a [Duration] from seconds
 pub fn parse_duration_from_secs(arg: &str) -> eyre::Result<Duration, std::num::ParseIntError> {
-    let seconds = arg.parse()?;
+    let seconds: u64 = arg.parse()?;
     Ok(Duration::from_secs(seconds))
-}
-
-/// Clap value parser for [`ChainSpec`]s that takes either a built-in chainspec or the path
-/// to a custom one.
-pub fn chain_spec_value_parser(s: &str) -> eyre::Result<Arc<ChainSpec>, eyre::Error> {
-    Ok(match s {
-        #[cfg(not(any(feature = "optimism", feature = "taiko")))]
-        "mainnet" => MAINNET.clone(),
-        #[cfg(not(any(feature = "optimism", feature = "taiko")))]
-        "goerli" => GOERLI.clone(),
-        #[cfg(not(any(feature = "optimism", feature = "taiko")))]
-        "sepolia" => SEPOLIA.clone(),
-        #[cfg(not(any(feature = "optimism", feature = "taiko")))]
-        "holesky" => HOLESKY.clone(),
-        #[cfg(not(any(feature = "optimism", feature = "taiko")))]
-        "dev" => DEV.clone(),
-        #[cfg(feature = "optimism")]
-        "optimism" => OP_MAINNET.clone(),
-        #[cfg(feature = "optimism")]
-        "optimism_sepolia" | "optimism-sepolia" => OP_SEPOLIA.clone(),
-        #[cfg(feature = "optimism")]
-        "base" => BASE_MAINNET.clone(),
-        #[cfg(feature = "optimism")]
-        "base_sepolia" | "base-sepolia" => BASE_SEPOLIA.clone(),
-        #[cfg(feature = "taiko")]
-        "testnet" => TAIKO_TESTNET.clone(),
-        #[cfg(feature = "taiko")]
-        "internal_devnet_a" => TAIKO_INTERNAL_L2_A.clone(),
-        #[cfg(feature = "taiko")]
-        "hekla" => TAIKO_HEKLA.clone(),
-        #[cfg(feature = "taiko")]
-        "mainnet" => TAIKO_MAINNET.clone(),
-        _ => {
-            // try to read json from path first
-            let raw = match fs::read_to_string(PathBuf::from(shellexpand::full(s)?.into_owned())) {
-                Ok(raw) => raw,
-                Err(io_err) => {
-                    // valid json may start with "\n", but must contain "{"
-                    if s.contains('{') {
-                        s.to_string()
-                    } else {
-                        return Err(io_err.into()) // assume invalid path
-                    }
-                }
-            };
-
-            // both serialized Genesis and ChainSpec structs supported
-            let genesis: Genesis = serde_json::from_str(&raw)?;
-
-            Arc::new(genesis.into())
-        }
-    })
 }
 
 /// The help info for the --chain flag
@@ -123,6 +71,10 @@ pub fn chain_value_parser(s: &str) -> eyre::Result<Arc<ChainSpec>, eyre::Error> 
         "testnet" => TAIKO_TESTNET.clone(),
         #[cfg(feature = "taiko")]
         "internal_devnet_a" => TAIKO_INTERNAL_L2_A.clone(),
+        #[cfg(feature = "taiko")]
+        "hekla" => TAIKO_HEKLA.clone(),
+        #[cfg(feature = "taiko")]
+        "mainnet" => TAIKO_MAINNET.clone(),
         _ => {
             // try to read json from path first
             let raw = match fs::read_to_string(PathBuf::from(shellexpand::full(s)?.into_owned())) {
@@ -132,7 +84,7 @@ pub fn chain_value_parser(s: &str) -> eyre::Result<Arc<ChainSpec>, eyre::Error> 
                     if s.contains('{') {
                         s.to_string()
                     } else {
-                        return Err(io_err.into()); // assume invalid path
+                        return Err(io_err.into()) // assume invalid path
                     }
                 }
             };
