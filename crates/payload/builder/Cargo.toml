@@ -22,8 +22,6 @@ reth-payload-primitives.workspace = true
 reth-ethereum-engine-primitives.workspace = true
 reth-chainspec = { workspace = true, optional = true }
 reth-rpc-types-compat = { workspace = true, optional = true }
-# ethereum
-revm-primitives.workspace = true
 
 # async
 tokio = { workspace = true, features = ["sync"] }
@@ -36,9 +34,7 @@ metrics.workspace = true
 
 # misc
 thiserror.workspace = true
-sha2 = { version = "0.10", default-features = false }
 tracing.workspace = true
-serde = { workspace = true, features = ["derive"] }
 
 [dev-dependencies]
 revm.workspace = true
