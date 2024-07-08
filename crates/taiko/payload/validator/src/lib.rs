@@ -9,19 +9,20 @@
 #![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
 
 use reth_chainspec::ChainSpec;
-use reth_primitives::SealedBlock;
-use reth_rpc_types::{engine::MaybeCancunPayloadFields, ExecutionPayload, PayloadError};
+use reth_primitives::{Block, Header, SealedBlock, B256, EMPTY_OMMER_ROOT_HASH};
+use reth_rpc_types::{engine::MaybeCancunPayloadFields, PayloadError};
 use reth_rpc_types_compat::engine::payload::try_into_block;
 use std::sync::Arc;
+use taiko_reth_engine_primitives::TaikoExecutionPayload;
 
 /// Execution payload validator.;
 #[derive(Clone, Debug)]
-pub struct ExecutionPayloadValidator {
+pub struct TaikoExecutionPayloadValidator {
     /// Chain spec to validate against.
     chain_spec: Arc<ChainSpec>,
 }
 
-impl ExecutionPayloadValidator {
+impl TaikoExecutionPayloadValidator {
     /// Create a new validator.
     pub const fn new(chain_spec: Arc<ChainSpec>) -> Self {
         Self { chain_spec }
@@ -104,14 +105,22 @@ impl ExecutionPayloadValidator {
     /// <https://github.com/ethereum/execution-apis/blob/fe8e13c288c592ec154ce25c534e26cb7ce0530d/src/engine/cancun.md#specification>
     pub fn ensure_well_formed_payload(
         &self,
-        payload: ExecutionPayload,
+        payload: TaikoExecutionPayload,
         cancun_fields: MaybeCancunPayloadFields,
     ) -> Result<SealedBlock, PayloadError> {
         let expected_hash = payload.block_hash();
 
         // First parse the block
-        let sealed_block =
-            try_into_block(payload, cancun_fields.parent_beacon_block_root())?.seal_slow();
+        let sealed_block = if payload.payload_inner.as_v1().transactions.is_empty() &&
+            (payload.payload_inner.withdrawals().is_none() ||
+                payload.payload_inner.withdrawals().is_some_and(|w| w.is_empty()))
+        {
+            create_taiko_block(payload, cancun_fields.parent_beacon_block_root())?.seal_slow()
+        } else {
+            try_into_block(payload.payload_inner, cancun_fields.parent_beacon_block_root())?
+                .seal_slow()
+        };
+
         // Ensure the hash included in the payload matches the block hash
         if expected_hash != sealed_block.hash() {
             return Err(PayloadError::BlockHash {
@@ -163,4 +172,44 @@ impl ExecutionPayloadValidator {
 
         Ok(sealed_block)
     }
+}
+
+fn create_taiko_block(
+    payload: TaikoExecutionPayload,
+    parent_beacon_block_root: Option<B256>,
+) -> Result<Block, PayloadError> {
+    Ok(Block {
+        header: Header {
+            parent_hash: payload.payload_inner.parent_hash(),
+            beneficiary: payload.payload_inner.as_v1().fee_recipient,
+            state_root: payload.payload_inner.as_v1().state_root,
+            transactions_root: payload.tx_hash,
+            receipts_root: payload.payload_inner.as_v1().receipts_root,
+            withdrawals_root: Some(payload.withdrawals_hash),
+            logs_bloom: payload.payload_inner.as_v1().logs_bloom,
+            number: payload.payload_inner.block_number(),
+            gas_limit: payload.payload_inner.as_v1().gas_limit,
+            gas_used: payload.payload_inner.as_v1().gas_used,
+            timestamp: payload.payload_inner.timestamp(),
+            mix_hash: payload.payload_inner.prev_randao(),
+            base_fee_per_gas: Some(
+                payload.payload_inner.as_v1().base_fee_per_gas.try_into().map_err(|_| {
+                    PayloadError::BaseFee(payload.payload_inner.as_v1().base_fee_per_gas)
+                })?,
+            ),
+            blob_gas_used: None,
+            excess_blob_gas: None,
+            parent_beacon_block_root,
+            extra_data: payload.payload_inner.as_v1().extra_data.clone(),
+            // Defaults
+            ommers_hash: EMPTY_OMMER_ROOT_HASH,
+            difficulty: Default::default(),
+            nonce: Default::default(),
+            requests_root: None,
+        },
+        body: vec![],
+        withdrawals: None,
+        ommers: Default::default(),
+        requests: None,
+    })
 }

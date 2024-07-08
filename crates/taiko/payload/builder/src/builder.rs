@@ -43,7 +43,7 @@ impl<EvmConfig> TaikoPayloadBuilder<EvmConfig> {
     }
 }
 
-/// Implementation of the [PayloadBuilder] trait for [TaikoPayloadBuilder].
+/// Implementation of the [`PayloadBuilder`] trait for [`TaikoPayloadBuilder`].
 impl<Pool, Client, EvmConfig> PayloadBuilder<Pool, Client> for TaikoPayloadBuilder<EvmConfig>
 where
     Client: StateProviderFactory,
