@@ -85,7 +85,7 @@ pub fn check_anchor_tx(
     check_anchor_signature(tx).context(anyhow!("failed to check anchor signature"))?;
 
     // Extract the `to` address
-    let TxKind::Call(to) = anchor.to else { panic!("anchor tx not a smart contract call") };
+    let TxKind::Call(to) = anchor.to else { bail!("anchor tx not a smart contract call") };
     // Check that it's from the golden touch address
     ensure!(*from == *GOLDEN_TOUCH_ACCOUNT, "anchor transaction from mismatch");
     // Check that the L2 contract is being called

@@ -498,14 +498,14 @@ fn check_anchor_tx(
     base_fee_per_gas: u128,
     chain_spec: &Arc<ChainSpec>,
 ) -> anyhow::Result<()> {
-    use anyhow::{anyhow, ensure, Context};
+    use anyhow::{anyhow, bail, ensure, Context};
     let anchor = tx.as_eip1559().context(anyhow!("anchor tx is not an EIP1559 tx"))?;
 
     // Check the signature
     check_anchor_signature(tx).context(anyhow!("failed to check anchor signature"))?;
 
     // Extract the `to` address
-    let TxKind::Call(to) = anchor.to else { panic!("anchor tx not a smart contract call") };
+    let TxKind::Call(to) = anchor.to else { bail!("anchor tx not a smart contract call") };
     // Check that the L2 contract is being called
     ensure!(to == chain_spec.l2_contract.unwrap(), "anchor transaction to mismatch");
     // Check that it's from the golden touch address
