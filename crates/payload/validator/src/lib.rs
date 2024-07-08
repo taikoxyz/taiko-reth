@@ -14,7 +14,7 @@ use reth_rpc_types::{engine::MaybeCancunPayloadFields, ExecutionPayload, Payload
 use reth_rpc_types_compat::engine::payload::try_into_block;
 use std::sync::Arc;
 
-/// Execution payload validator.;
+/// Execution payload validator.
 #[derive(Clone, Debug)]
 pub struct ExecutionPayloadValidator {
     /// Chain spec to validate against.
@@ -59,20 +59,20 @@ impl ExecutionPayloadValidator {
         if let Some(versioned_hashes) = cancun_fields.versioned_hashes() {
             if num_blob_versioned_hashes != versioned_hashes.len() {
                 // Number of blob versioned hashes does not match
-                return Err(PayloadError::InvalidVersionedHashes);
+                return Err(PayloadError::InvalidVersionedHashes)
             }
             // we can use `zip` safely here because we already compared their length
             for (payload_versioned_hash, block_versioned_hash) in
                 versioned_hashes.iter().zip(sealed_block.blob_versioned_hashes_iter())
             {
                 if payload_versioned_hash != block_versioned_hash {
-                    return Err(PayloadError::InvalidVersionedHashes);
+                    return Err(PayloadError::InvalidVersionedHashes)
                 }
             }
         } else {
             // No Cancun fields, if block includes any blobs, this is an error
             if num_blob_versioned_hashes > 0 {
-                return Err(PayloadError::InvalidVersionedHashes);
+                return Err(PayloadError::InvalidVersionedHashes)
             }
         }
 
@@ -117,7 +117,7 @@ impl ExecutionPayloadValidator {
             return Err(PayloadError::BlockHash {
                 execution: sealed_block.hash(),
                 consensus: expected_hash,
-            });
+            })
         }
 
         if self.is_cancun_active_at_timestamp(sealed_block.timestamp) {
