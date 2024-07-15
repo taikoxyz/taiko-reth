@@ -48,7 +48,7 @@ Paste one PK and ADDR pair from anvil output to .env file and set the correct co
 Run script:
 
 ```shell
-$ forge script --rpc-url  http://127.0.0.1:52178 scripts/DeployL1Locally.s.sol -vvvv --broadcast --private-key <YOUR_PRIVATE_KEY> --legacy
+$ forge script --rpc-url http://127.0.0.1:YOUR_PORT scripts/DeployL1Locally.s.sol -vvvv --broadcast --private-key <YOUR_PRIVATE_KEY> --legacy
 ```
 
 Important: <YOUR_PRIVATE_KEY> shall be the same PK as you set in the ENV file.
