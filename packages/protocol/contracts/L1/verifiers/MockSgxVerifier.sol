@@ -138,8 +138,8 @@ contract MockSgxVerifier is EssentialContract, IVerifier {
     /// @inheritdoc IVerifier
     /* MODIFIED- TO RETURN TRUE WITHOUT REAL VERIFICATION!!! */
     function verifyProof(
-        TaikoData.Transition calldata, /*transition*/
         bytes32, /*blockMetaHash*/
+        bytes32, /*newStateHashTransition*/
         address, /*prover*/
         bytes calldata /*proof*/
     )

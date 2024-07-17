@@ -9,7 +9,7 @@ pragma solidity ^0.8.20;
 import "../../common/AddressResolver.sol";
 import "../../libs/LibAddress.sol";
 import "../TaikoData.sol";
-import "../BasedOperator.sol";
+import "../TaikoL1.sol";
 
 /// @title ProverPayment
 /// @notice A library for handling block proposals in the Taiko protocol.
@@ -25,7 +25,7 @@ contract ProverPayment {
         bytes signature;
     }
 
-    BasedOperator public operator;
+    TaikoL1 public taikoL1;
 
     mapping(address => uint256) public balances;
 
@@ -47,15 +47,14 @@ contract ProverPayment {
         // Decode the assignment data
         ProverAssignment memory assignment = abi.decode(proverAssignment, (ProverAssignment));
 
-        // Subtract prover bond from the prover
-        balances[assignment.prover] -= operator.PROVER_BOND();
+        // // Subtract prover bond from the prover
+        // balances[assignment.prover] -= taikoL1.PROVER_BOND();
 
-        // Propose the block
-        _blocks = operator.proposeBlock{ value: operator.PROVER_BOND() }(
-            data, txLists, assignment.prover
-        );
+        // // Propose the block
+        // _blocks =
+        //     taikoL1.proposeBlock{ value: taikoL1.PROVER_BOND() }(data, txLists, assignment.prover);
 
-        uint64 highestl2BlockNumber = _blocks[_blocks.length-1].l2BlockNumber;
+        uint64 highestl2BlockNumber = _blocks[_blocks.length - 1].l2BlockNumber;
 
         // Hash the assignment with the blobHash, this hash will be signed by
         // the prover, therefore, we add a string as a prefix.

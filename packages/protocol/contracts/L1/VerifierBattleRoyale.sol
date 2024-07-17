@@ -29,7 +29,7 @@ contract VerifierBattleRoyale is EssentialContract {
     /// @dev Struct representing transition to be proven.
     struct ProofData {
         IVerifier verifier;
-        TaikoData.Transition transition; // This differs from BasedOperator ! Mainly because of
+        bytes32 newStatHashTransitionHash; // This differs from BasedOperator ! Mainly because of
             // transition comparison for the battle!!
         bytes proof;
     }
@@ -68,8 +68,8 @@ contract VerifierBattleRoyale is EssentialContract {
             IVerifier verifier = proofBatch.proofs[i].verifier;
             require(verifierRegistry.isVerifier(address(verifier)), "invalid verifier");
             verifier.verifyProof(
-                proofBatch.proofs[i].transition,
                 keccak256(abi.encode(proofBatch.blockMetadata)),
+                proofBatch.proofs[i].newStatHashTransitionHash,
                 proofBatch.prover,
                 proofBatch.proofs[i].proof
             );
@@ -83,13 +83,7 @@ contract VerifierBattleRoyale is EssentialContract {
                 "verifiers not the same"
             );
 
-            TaikoData.Transition memory transitionA = proofBatch.proofs[0].transition;
-            TaikoData.Transition memory transitionB = proofBatch.proofs[1].transition;
-            require(
-                transitionA.parentBlockHash == transitionB.parentBlockHash,
-                "parentHash not the same"
-            );
-            require(transitionA.blockHash != transitionB.blockHash, "blockhash the same");
+            require(proofBatch.proofs[0].newStatHashTransitionHash != proofBatch.proofs[1].newStatHashTransitionHash, "blockhash the same");
         } else if (proofBatch.proofs.length == 3) {
             /* Multiple verifiers in a consensus show that another verifier is faulty */
 
@@ -107,17 +101,18 @@ contract VerifierBattleRoyale is EssentialContract {
             // Reference proofs need to be placed first in the array, the faulty proof is listed
             // last
             for (uint256 i = 0; i < proofBatch.proofs.length - 1; i++) {
-                TaikoData.Transition memory transitionA = proofBatch.proofs[i].transition;
-                TaikoData.Transition memory transitionB = proofBatch.proofs[i + 1].transition;
-                require(
-                    transitionA.parentBlockHash == transitionB.parentBlockHash,
-                    "parentHash not the same"
-                );
-                if (i < proofBatch.proofs.length - 2) {
-                    require(transitionA.blockHash == transitionB.blockHash, "blockhash the same");
-                } else {
-                    require(transitionA.blockHash != transitionB.blockHash, "blockhash the same");
-                }
+                bytes32 transitionA = proofBatch.proofs[i].newStatHashTransitionHash;
+                bytes32 transitionB = proofBatch.proofs[i + 1].newStatHashTransitionHash;
+                // Need to figure out this part later
+                // require(
+                //     transitionA.parentBlockHash == transitionB.parentBlockHash,
+                //     "parentHash not the same"
+                // );
+                // if (i < proofBatch.proofs.length - 2) {
+                //     require(transitionA.blockHash == transitionB.blockHash, "blockhash the same");
+                // } else {
+                //     require(transitionA.blockHash != transitionB.blockHash, "blockhash the same");
+                // }
             }
         } else {
             revert("unsupported claim");

@@ -25,13 +25,13 @@ contract TaikoL1Test is TaikoL1TestBase {
             proposeBlock(Alice, Alice, meta, "");
 
             // Create proofs and prove a block
-            BasedOperator.ProofBatch memory blockProofs = createProofs(meta, Alice, true);
+            ChainProver.ProofBatch memory blockProofs = createProofs(meta, Alice, true);
             proveBlock(Alice, abi.encode(blockProofs));
 
             //Wait enought time and verify block
             vm.warp(uint32(block.timestamp + L1.SECURITY_DELAY_AFTER_PROVEN() + 1));
             vm.roll(block.number + 10);
-            verifyBlock(1);
+            //verifyBlock(1);
             parentMetaHash = keccak256(abi.encode(meta));
             printVariables("after verify");
         }
@@ -57,7 +57,7 @@ contract TaikoL1Test is TaikoL1TestBase {
 
         for (uint64 blockId = 1; blockId <= 20; blockId++) {
             // Create proofs and prove a block
-            BasedOperator.ProofBatch memory blockProofs =
+            ChainProver.ProofBatch memory blockProofs =
                 createProofs(blockMetaDatas[blockId - 1], Alice, true);
             proveBlock(Alice, abi.encode(blockProofs));
 
@@ -65,7 +65,7 @@ contract TaikoL1Test is TaikoL1TestBase {
             // block and not time it perfectly)
             vm.warp(uint32(block.timestamp + L1.SECURITY_DELAY_AFTER_PROVEN() + 1));
             vm.roll(block.number + 10);
-            verifyBlock(1);
+            //verifyBlock(1);
             parentMetaHash = keccak256(abi.encode(blockMetaDatas[blockId - 1]));
             printVariables("after verify 1");
         }

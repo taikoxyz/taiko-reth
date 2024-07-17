@@ -18,9 +18,9 @@ import "../contracts/tokenvault/ERC721Vault.sol";
 import "../contracts/tokenvault/ERC1155Vault.sol";
 
 import "../contracts/tko/TaikoToken.sol";
-import "../contracts/L1/BasedOperator.sol";
 import "../contracts/L1/VerifierRegistry.sol";
 import "../contracts/L1/verifiers/MockSgxVerifier.sol";
+import "../contracts/L1/ChainProver.sol";
 /*import "../contracts/L1/TaikoL1.sol";
 import "../contracts/L1/verifiers/GuardianVerifier.sol";
 import "../contracts/L1/verifiers/PseZkVerifier.sol";

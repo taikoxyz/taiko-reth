@@ -4,7 +4,7 @@ pragma solidity 0.8.24;
 import "@openzeppelin/contracts/utils/Strings.sol";
 
 import "../contracts/L1/TaikoL1.sol";
-import "../contracts/L1/BasedOperator.sol";
+import "../contracts/L1/ChainProver.sol";
 import "../contracts/L1/VerifierRegistry.sol";
 import "../contracts/tko/TaikoToken.sol";
 import "../contracts/L1/provers/GuardianProver.sol";
@@ -266,11 +266,11 @@ contract DeployL1OnAnvil is DeployCapability {
             registerTo: rollupAddressManager
         });
 
-        /* Deploy BasedOperator */
+        /* Deploy ChainProver */
         deployProxy({
-                name: "operator",
-                impl: address(new BasedOperator()),
-                data: abi.encodeCall(BasedOperator.init, (MAINNET_CONTRACT_OWNER, rollupAddressManager)),
+                name: "chain_prover",
+                impl: address(new ChainProver()),
+                data: abi.encodeCall(ChainProver.init, (MAINNET_CONTRACT_OWNER, rollupAddressManager)),
                 registerTo: rollupAddressManager
         });
 

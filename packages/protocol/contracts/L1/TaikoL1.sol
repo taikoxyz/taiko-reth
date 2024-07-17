@@ -8,6 +8,7 @@ pragma solidity ^0.8.20;
 
 import "../common/EssentialContract.sol";
 import "./TaikoErrors.sol";
+import "./preconfs/ISequencerRegistry.sol";
 import "./TaikoEvents.sol";
 
 /// @title TaikoL1
@@ -52,19 +53,47 @@ contract TaikoL1 is EssentialContract, TaikoEvents, TaikoErrors {
         emit BlockVerified({ blockId: 0, blockHash: _genesisBlockHash });
     }
 
-    /// Proposes a Taiko L2 block.
-    /// @param data Block parameters, currently an encoded BlockMetadata object.
-    /// @param txList txList data if calldata is used for DA.
-    /// @return _block The metadata of the proposed L2 block.
+    /// @dev Proposes multiple Taiko L2 blocks.
     function proposeBlock(
-        bytes calldata data,
-        bytes calldata txList
+        bytes[] calldata data,
+        bytes[] calldata txLists
     )
         external
         payable
         nonReentrant
         whenNotPaused
-        onlyFromNamed("operator")
+        returns (TaikoData.BlockMetadata[] memory _blocks)
+    {
+        if (txLists.length != 0) {
+            require(data.length == txLists.length, "mismatched params length");
+        }
+
+        _blocks = new TaikoData.BlockMetadata[](data.length);
+        for (uint256 i = 0; i < data.length; i++) {
+            if (txLists.length != 0) {
+                // If calldata, then pass forward the calldata
+                _blocks[i] =_proposeBlock(data[i], txLists[i]);
+            } else {
+                // Blob otherwise
+                _blocks[i] = _proposeBlock(data[i], bytes(""));
+            }
+
+            // Check if we have whitelisted proposers
+            if (!_isProposerPermitted(_blocks[i])) {
+                revert L1_INVALID_PROPOSER();
+            }
+        }
+    }
+
+    /// Proposes a Taiko L2 block.
+    /// @param data Block parameters, currently an encoded BlockMetadata object.
+    /// @param txList txList data if calldata is used for DA.
+    /// @return _block The metadata of the proposed L2 block.
+    function _proposeBlock(
+        bytes calldata data,
+        bytes memory txList
+    )
+        private
         returns (
             TaikoData.BlockMetadata memory _block
         )
@@ -78,7 +107,7 @@ contract TaikoL1 is EssentialContract, TaikoEvents, TaikoErrors {
         // TODO(Brecht): needs to be more configurable for preconfirmations
         require(_block.l1Hash == blockhash(_block.l1StateBlockNumber), "INVALID_L1_BLOCKHASH");
         require(_block.blockHash != 0x0, "INVALID_L2_BLOCKHASH");
-        require(_block.difficulty == block.prevrandao, "INVALID_DIFFICULTY");
+        //require(_block.difficulty == block.prevrandao, "INVALID_DIFFICULTY");
         // Verify misc data
         require(_block.gasLimit == config.blockMaxGasLimit, "INVALID_GAS_LIMIT");
 
@@ -100,7 +129,7 @@ contract TaikoL1 is EssentialContract, TaikoEvents, TaikoErrors {
 
         // Check that the tx length is non-zero and within the supported range
         require(
-            _block.txListByteSize == 0 || _block.txListByteSize > config.blockMaxTxListBytes,
+            _block.txListByteSize != 0 || _block.txListByteSize < config.blockMaxTxListBytes,
             "invalid txlist size"
         );
 
@@ -132,141 +161,37 @@ contract TaikoL1 is EssentialContract, TaikoEvents, TaikoErrors {
             revert L1_INVALID_TIMESTAMP();
         }
 
-        // Create the block that will be stored onchain
-        TaikoData.Block memory blk = TaikoData.Block({
-            blockHash: _block.blockHash,
-            metaHash: keccak256(data),
-            blockId: state.numBlocks,
-            timestamp: _block.timestamp,
-            l1StateBlockNumber: _block.l1StateBlockNumber
-        });
+        // So basically we do not store these anymore!
 
-        // Store the block
-        state.blocks[state.numBlocks] = blk;
+        // // Create the block that will be stored onchain
+        // TaikoData.Block memory blk = TaikoData.Block({
+        //     blockHash: _block.blockHash,
+        //     metaHash: keccak256(data),
+        //     blockId: state.numBlocks,
+        //     timestamp: _block.timestamp,
+        //     l1StateBlockNumber: _block.l1StateBlockNumber
+        // });
 
-        // Store the passed in block hash as is
-        state.transitions[blk.blockId][_block.parentBlockHash].blockHash = _block.blockHash;
-        // Big enough number so that we are sure we don't hit that deadline in the future.
-        state.transitions[blk.blockId][_block.parentBlockHash].verifiableAfter = type(uint64).max;
+        // // Store the block
+        // state.blocks[state.numBlocks] = blk;
 
-        // Increment the counter (cursor) by 1.
-        state.numBlocks++;
+        // // Store the passed in block hash as is
+        // state.transitions[blk.blockId][_block.parentBlockHash].blockHash = _block.blockHash;
+        // // Big enough number so that we are sure we don't hit that deadline in the future.
+        // state.transitions[blk.blockId][_block.parentBlockHash].verifiableAfter = type(uint64).max;
+
+        // // Increment the counter (cursor) by 1.
+        // state.numBlocks++;
 
         emit BlockProposed({ blockId: _block.l2BlockNumber, meta: _block });
-    }
-
-    /// @notice Proves or contests a block transition.
-    /// @param _block The block to prove
-    /// @param transition The transition
-    /// @param prover The prover
-    function proveBlock(
-        TaikoData.BlockMetadata memory _block,
-        TaikoData.Transition memory transition,
-        address prover
-    )
-        external
-        nonReentrant
-        whenNotPaused
-        onlyFromNamed("operator")
-    {
-        // Check that the block has been proposed but has not yet been verified.
-        if (
-            _block.l2BlockNumber <= state.lastVerifiedBlockId
-                || _block.l2BlockNumber >= state.numBlocks
-        ) {
-            revert L1_INVALID_BLOCK_ID();
-        }
-
-        TaikoData.Block storage blk = state.blocks[_block.l2BlockNumber];
-
-        // Make sure the correct block was proven
-        if (blk.metaHash != keccak256(abi.encode(_block))) {
-            revert L1_INCORRECT_BLOCK();
-        }
-
-        // Store the transition
-        TaikoData.TransitionState storage storedTransition =
-            state.transitions[_block.l2BlockNumber][transition.parentBlockHash];
-        storedTransition.blockHash = transition.blockHash;
-        storedTransition.prover = prover;
-        storedTransition.verifiableAfter = uint32(block.timestamp + SECURITY_DELAY_AFTER_PROVEN);
-        storedTransition.isProven = true;
-
-        emit TransitionProved({ blockId: _block.l2BlockNumber, tran: transition, prover: prover });
-    }
-
-    /// @notice Verifies up to N blocks.
-    /// @param maxBlocksToVerify Max number of blocks to verify.
-    function verifyBlocks(uint256 maxBlocksToVerify)
-        external
-        nonReentrant
-        whenNotPaused
-        onlyFromNamed("operator")
-    {
-        // Get the last verified blockhash
-        TaikoData.Block storage blk = state.blocks[state.lastVerifiedBlockId];
-        bytes32 blockHash = blk.blockHash;
-        uint256 blockId = uint256(state.lastVerifiedBlockId) + 1;
-        uint256 numBlocksVerified;
-
-        while (blockId < state.numBlocks && numBlocksVerified < maxBlocksToVerify) {
-            blk = state.blocks[blockId];
-            // Check if the timestamp is older than required
-            if (
-                block
-                    // Genesis is already verified with initialization so if we do not allow to set
-                    // blockHash = bytes32(0), then we can remove the bytes32(0) check.
-                    /*state.transitions[blockId][blockHash].blockHash == bytes32(0)
-                    || */
-                    .timestamp < state.transitions[blockId][blockHash].verifiableAfter
-            ) {
-                break;
-            }
-            // Copy the blockhash to the block
-            blk.blockHash = state.transitions[blockId][blockHash].blockHash;
-            // Update latest block hash
-            blockHash = blk.blockHash;
-
-            emit BlockVerified({ blockId: blockId, blockHash: blockHash });
-
-            ++blockId;
-            ++numBlocksVerified;
-        }
-
-        if (numBlocksVerified > 0) {
-            uint64 lastVerifiedBlockId = state.lastVerifiedBlockId + uint64(numBlocksVerified);
-            // Update protocol level state variables
-            state.lastVerifiedBlockId = lastVerifiedBlockId;
-        }
-    }
-
-    /// @notice Pause block proving.
-    /// @param toPause True if paused.
-    function pauseProving(bool toPause) external onlyOwner {
-        require(state.provingPaused != toPause, "pauzing unchanged");
-        state.provingPaused = toPause;
-        if (!toPause) {
-            state.lastUnpausedAt = uint64(block.timestamp);
-        }
-        emit ProvingPaused(toPause);
     }
 
     /// @notice Gets the details of a block.
     /// @param blockId Index of the block.
     /// @return blk The block.
     function getBlock(uint64 blockId) public view returns (TaikoData.Block memory) {
+        //Todo (Brecht): we needed for some things like: BlockMetadata, used when parentBlock() was needed etc.
         return state.blocks[blockId];
-    }
-
-    function getTransition(
-        uint64 blockId,
-        bytes32 parentHash
-    )
-        public
-        view
-        returns (TaikoData.TransitionState memory)
-    {
-        return state.transitions[blockId][parentHash];
     }
 
     function getLastVerifiedBlockId() public view returns (uint256) {
@@ -298,6 +223,28 @@ contract TaikoL1 is EssentialContract, TaikoEvents, TaikoErrors {
                 || config.blockMaxTxListBytes > 128 * 1024 // calldata up to 128K
         ) return false;
 
+        return true;
+    }
+
+        // Additinal proposer rules
+    function _isProposerPermitted(TaikoData.BlockMetadata memory _block) private returns (bool) {
+        if (_block.l2BlockNumber == 1) {
+            // Only proposer_one can propose the first block after genesis
+            address proposerOne = resolve("proposer_one", true);
+            if (proposerOne != address(0) && msg.sender != proposerOne) {
+                return false;
+            }
+        }
+
+        // If there's a sequencer registry, check if the block can be proposed by the current
+        // proposer
+        ISequencerRegistry sequencerRegistry =
+            ISequencerRegistry(resolve("sequencer_registry", true));
+        if (sequencerRegistry != ISequencerRegistry(address(0))) {
+            if (!sequencerRegistry.isEligibleSigner(msg.sender)) {
+                return false;
+            }
+        }
         return true;
     }
 }

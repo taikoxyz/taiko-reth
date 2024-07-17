@@ -24,8 +24,8 @@ contract GuardianVerifier is EssentialContract, IVerifier {
 
     /// @inheritdoc IVerifier
     function verifyProof(
-        TaikoData.Transition calldata, /*transition*/
         bytes32, /*blockMetaHash*/
+        bytes32, /*newStateHashTransition*/
         address prover,
         bytes calldata /*proof*/
     )

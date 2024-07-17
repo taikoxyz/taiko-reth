@@ -18,8 +18,8 @@ interface IVerifier {
     // use.
     // See the taiko-mono used interface below this function signature.
     function verifyProof(
-        TaikoData.Transition calldata transition,
         bytes32 blockMetaHash, //We dont need to post the full BlockMetadata struct
+        bytes32 newStateHashTransition, // keccak(keccak(current_l1_blockhash, current_root), keccak(new_l1_blockhash, new_root))
         address prover,
         bytes calldata proof
     )
