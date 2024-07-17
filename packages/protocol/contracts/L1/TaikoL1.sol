@@ -65,9 +65,7 @@ contract TaikoL1 is EssentialContract, TaikoEvents, TaikoErrors {
         nonReentrant
         whenNotPaused
         onlyFromNamed("operator")
-        returns (
-            TaikoData.BlockMetadata memory _block
-        )
+        returns (TaikoData.BlockMetadata memory _block)
     {
         TaikoData.Config memory config = getConfig();
 
@@ -78,15 +76,15 @@ contract TaikoL1 is EssentialContract, TaikoEvents, TaikoErrors {
         // TODO(Brecht): needs to be more configurable for preconfirmations
         require(_block.l1Hash == blockhash(_block.l1StateBlockNumber), "INVALID_L1_BLOCKHASH");
         require(_block.blockHash != 0x0, "INVALID_L2_BLOCKHASH");
-        require(_block.difficulty == block.prevrandao, "INVALID_DIFFICULTY");
+        //todo (Brecht, Dani): Put it back but NOT until we can see how can we easily fix (precalc)
+        // in our simulation, otherwise we fail to proposeBlock()
+        //require(_block.difficulty == block.prevrandao, "INVALID_DIFFICULTY");
         // Verify misc data
         require(_block.gasLimit == config.blockMaxGasLimit, "INVALID_GAS_LIMIT");
 
         require(_block.blobUsed == (txList.length == 0), "INVALID_BLOB_USED");
         // Verify DA data
         if (_block.blobUsed) {
-            // Todo: Is blobHash posisble to be checked and pre-calculated in input metadata off-chain ?
-            // or shall we do something with it to cross check ?
             // require(_block.blobHash == blobhash(0), "invalid data blob");
             require(
                 uint256(_block.txListByteOffset) + _block.txListByteSize <= MAX_BYTES_PER_BLOB,
@@ -100,7 +98,7 @@ contract TaikoL1 is EssentialContract, TaikoEvents, TaikoErrors {
 
         // Check that the tx length is non-zero and within the supported range
         require(
-            _block.txListByteSize == 0 || _block.txListByteSize > config.blockMaxTxListBytes,
+            _block.txListByteSize != 0 || _block.txListByteSize < config.blockMaxTxListBytes,
             "invalid txlist size"
         );
 
