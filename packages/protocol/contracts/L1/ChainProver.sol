@@ -6,12 +6,8 @@
 
 pragma solidity ^0.8.20;
 
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "../common/AddressResolver.sol";
 import "../common/EssentialContract.sol";
 import "../libs/LibAddress.sol";
-import "./preconfs/ISequencerRegistry.sol";
-import "./TaikoL1.sol";
 import "./TaikoData.sol";
 import "./TaikoErrors.sol";
 import "./VerifierRegistry.sol";
@@ -31,18 +27,13 @@ contract ChainProver is EssentialContract, TaikoErrors {
 
     /// @dev Struct representing transition to be proven.
     struct ProofBatch {
-        TaikoData.BlockMetadata blockMetadata;
+        TaikoData.BlockMetadata blockMetadata; //Maybe needed (?)
         bytes32 newStateHash; // keccak(new_l1_blockhash, new_root))
         ProofData[] proofs;
         address prover;
     }
 
-    // Not needed for now
-    // uint256 public constant PROVER_BOND = 1 ether / 10;
-    // uint256 public constant MAX_GAS_PROVER_PAYMENT = 50_000;
-    // uint256 public constant MAX_BLOCKS_TO_VERIFY = 5;
-    // uint256 public constant PROVING_WINDOW = 1 hours;
-
+    // New, and only state var
     bytes32 public currentStateHash; //keccak(l1_blockhash, root)
 
     function init(address _owner, address _addressManager) external initializer {
@@ -58,7 +49,6 @@ contract ChainProver is EssentialContract, TaikoErrors {
         ProofBatch memory proofBatch = abi.decode(data, (ProofBatch));
 
         VerifierRegistry verifierRegistry = VerifierRegistry(resolve("verifier_registry", false));
-        TaikoL1 taiko = TaikoL1(resolve("taiko", false));
         // Verify the proofs
         uint160 prevVerifier = uint160(0);
         for (uint256 i = 0; i < proofBatch.proofs.length; i++) {
