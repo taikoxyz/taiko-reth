@@ -29,13 +29,15 @@ contract VerifierBattleRoyale is EssentialContract {
     /// @dev Struct representing transition to be proven.
     struct ProofData {
         IVerifier verifier;
-        bytes32 newStatHashTransitionHash; // This differs from BasedOperator ! Mainly because of
-            // transition comparison for the battle!!
+        bytes32 postRoot; // post root from this hashing: keccak(new_l1_blockhash, new_root)
         bytes proof;
     }
 
     struct ProofBatch {
-        TaikoData.BlockMetadata blockMetadata;
+        bytes32 preTransitionHash; //(l1BlockHash and root) // This has to be same for all
+            // proofData, and we need to prove that we can achieve different post state -> which
+            // should not be allowed.
+        bytes32 postL1BlockHash;
         ProofData[] proofs;
         address prover;
     }
@@ -67,23 +69,34 @@ contract VerifierBattleRoyale is EssentialContract {
         for (uint256 i = 0; i < proofBatch.proofs.length; i++) {
             IVerifier verifier = proofBatch.proofs[i].verifier;
             require(verifierRegistry.isVerifier(address(verifier)), "invalid verifier");
+
+            bytes32 transitionToBeVerified = keccak256(
+                abi.encode(
+                    proofBatch.preTransitionHash,
+                    keccak256(abi.encode(proofBatch.postL1BlockHash, proofBatch.proofs[i].postRoot))
+                )
+            );
+
             verifier.verifyProof(
-                keccak256(abi.encode(proofBatch.blockMetadata)),
-                proofBatch.proofs[i].newStatHashTransitionHash,
-                proofBatch.prover,
-                proofBatch.proofs[i].proof
+                transitionToBeVerified, proofBatch.prover, proofBatch.proofs[i].proof
             );
         }
 
         if (proofBatch.proofs.length == 2) {
             /* Same verifier, same block, but different blockhashes/signalroots */
-
             require(
                 proofBatch.proofs[0].verifier == proofBatch.proofs[1].verifier,
                 "verifiers not the same"
             );
+            require(
+                address(proofBatch.proofs[0].verifier) == brokenVerifier,
+                "incorrect broken verifier address"
+            );
 
-            require(proofBatch.proofs[0].newStatHashTransitionHash != proofBatch.proofs[1].newStatHashTransitionHash, "blockhash the same");
+            require(
+                proofBatch.proofs[0].postRoot != proofBatch.proofs[1].postRoot,
+                "post state is the same"
+            );
         } else if (proofBatch.proofs.length == 3) {
             /* Multiple verifiers in a consensus show that another verifier is faulty */
 
@@ -100,20 +113,21 @@ contract VerifierBattleRoyale is EssentialContract {
 
             // Reference proofs need to be placed first in the array, the faulty proof is listed
             // last
-            for (uint256 i = 0; i < proofBatch.proofs.length - 1; i++) {
-                bytes32 transitionA = proofBatch.proofs[i].newStatHashTransitionHash;
-                bytes32 transitionB = proofBatch.proofs[i + 1].newStatHashTransitionHash;
-                // Need to figure out this part later
-                // require(
-                //     transitionA.parentBlockHash == transitionB.parentBlockHash,
-                //     "parentHash not the same"
-                // );
-                // if (i < proofBatch.proofs.length - 2) {
-                //     require(transitionA.blockHash == transitionB.blockHash, "blockhash the same");
-                // } else {
-                //     require(transitionA.blockHash != transitionB.blockHash, "blockhash the same");
-                // }
-            }
+            require(
+                proofBatch.proofs[0].postRoot == proofBatch.proofs[1].postRoot, "incorrect order"
+            );
+            require(
+                proofBatch.proofs[1].postRoot != proofBatch.proofs[2].postRoot, "incorrect order"
+            );
+
+            //require also that brokenVerifier is the same as the 3rd's verifier address
+            require(
+                proofBatch.proofs[1].postRoot != proofBatch.proofs[2].postRoot, "incorrect order"
+            );
+            require(
+                address(proofBatch.proofs[1].verifier) == brokenVerifier,
+                "incorrect broken verifier address"
+            );
         } else {
             revert("unsupported claim");
         }

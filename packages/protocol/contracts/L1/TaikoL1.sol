@@ -72,14 +72,14 @@ contract TaikoL1 is EssentialContract, TaikoEvents, TaikoErrors {
         for (uint256 i = 0; i < data.length; i++) {
             if (txLists.length != 0) {
                 // If calldata, then pass forward the calldata
-                _blocks[i] =_proposeBlock(data[i], txLists[i]);
+                _blocks[i] = _proposeBlock(data[i], txLists[i]);
             } else {
                 // Blob otherwise
                 _blocks[i] = _proposeBlock(data[i], bytes(""));
             }
 
             // Check if we have whitelisted proposers
-            if (!_isProposerPermitted(_blocks[i])) {
+            if (!_isProposerPermitted()) {
                 revert L1_INVALID_PROPOSER();
             }
         }
@@ -94,9 +94,7 @@ contract TaikoL1 is EssentialContract, TaikoEvents, TaikoErrors {
         bytes memory txList
     )
         private
-        returns (
-            TaikoData.BlockMetadata memory _block
-        )
+        returns (TaikoData.BlockMetadata memory _block)
     {
         TaikoData.Config memory config = getConfig();
 
@@ -114,7 +112,8 @@ contract TaikoL1 is EssentialContract, TaikoEvents, TaikoErrors {
         require(_block.blobUsed == (txList.length == 0), "INVALID_BLOB_USED");
         // Verify DA data
         if (_block.blobUsed) {
-            // Todo: Is blobHash posisble to be checked and pre-calculated in input metadata off-chain ?
+            // Todo: Is blobHash posisble to be checked and pre-calculated in input metadata
+            // off-chain ?
             // or shall we do something with it to cross check ?
             // require(_block.blobHash == blobhash(0), "invalid data blob");
             require(
@@ -128,11 +127,13 @@ contract TaikoL1 is EssentialContract, TaikoEvents, TaikoErrors {
         }
 
         // Check that the tx length is non-zero and within the supported range
-        require(
-            _block.txListByteSize != 0 || _block.txListByteSize < config.blockMaxTxListBytes,
-            "invalid txlist size"
-        );
+        require(_block.txListByteSize <= config.blockMaxTxListBytes, "invalid txlist size");
 
+        // Also since we dont write into storage this check is hard to do here + the
+        // parentBlock.l1StateBlockNumber too for the preconfs (checking the 4 epoch window)
+        // I just guess, but also during proving we can see if this condition is
+        // fulfilled OR not, and then resulting in an empty block (+slashing of the
+        // proposer/preconfer) ?
         TaikoData.Block storage parentBlock = state.blocks[(state.numBlocks - 1)];
 
         require(_block.parentMetaHash == parentBlock.metaHash, "invalid parentMetaHash");
@@ -142,6 +143,7 @@ contract TaikoL1 is EssentialContract, TaikoEvents, TaikoErrors {
         // We only allow the L1 block to be 4 epochs old.
         // The other constraint is that the L1 block number needs to be larger than or equal the one
         // in the previous L2 block.
+
         if (
             _block.l1StateBlockNumber + 128 < block.number
                 || _block.l1StateBlockNumber >= block.number
@@ -161,52 +163,20 @@ contract TaikoL1 is EssentialContract, TaikoEvents, TaikoErrors {
             revert L1_INVALID_TIMESTAMP();
         }
 
-        // So basically we do not store these anymore!
-
-        // // Create the block that will be stored onchain
-        // TaikoData.Block memory blk = TaikoData.Block({
-        //     blockHash: _block.blockHash,
-        //     metaHash: keccak256(data),
-        //     blockId: state.numBlocks,
-        //     timestamp: _block.timestamp,
-        //     l1StateBlockNumber: _block.l1StateBlockNumber
-        // });
-
-        // // Store the block
-        // state.blocks[state.numBlocks] = blk;
-
-        // // Store the passed in block hash as is
-        // state.transitions[blk.blockId][_block.parentBlockHash].blockHash = _block.blockHash;
-        // // Big enough number so that we are sure we don't hit that deadline in the future.
-        // state.transitions[blk.blockId][_block.parentBlockHash].verifiableAfter = type(uint64).max;
-
-        // // Increment the counter (cursor) by 1.
-        // state.numBlocks++;
-
         emit BlockProposed({ blockId: _block.l2BlockNumber, meta: _block });
     }
 
-    /// @notice Gets the details of a block.
-    /// @param blockId Index of the block.
-    /// @return blk The block.
-    function getBlock(uint64 blockId) public view returns (TaikoData.Block memory) {
-        //Todo (Brecht): we needed for some things like: BlockMetadata, used when parentBlock() was needed etc.
-        return state.blocks[blockId];
-    }
-
-    function getLastVerifiedBlockId() public view returns (uint256) {
-        return uint256(state.lastVerifiedBlockId);
-    }
-
-    function getNumOfBlocks() public view returns (uint256) {
-        return uint256(state.numBlocks);
-    }
+    // These will be unknown in the smart contract
+    // Maybe possible to extract with ChainProver, but not directly from here.
+    // function getBlock(uint64 blockId) {}
+    // function getLastVerifiedBlockId() {}
+    // function getNumOfBlocks() {}
 
     /// @notice Gets the configuration of the TaikoL1 contract.
     /// @return Config struct containing configuration parameters.
     function getConfig() public view virtual returns (TaikoData.Config memory) {
         return TaikoData.Config({
-            chainId: 167_008,
+            chainId: 167_008, //Maybe use a range or just thro this shit away.
             // Limited by the PSE zkEVM circuits.
             blockMaxGasLimit: 15_000_000,
             // Each go-ethereum transaction has a size limit of 128KB,
@@ -226,16 +196,8 @@ contract TaikoL1 is EssentialContract, TaikoEvents, TaikoErrors {
         return true;
     }
 
-        // Additinal proposer rules
-    function _isProposerPermitted(TaikoData.BlockMetadata memory _block) private returns (bool) {
-        if (_block.l2BlockNumber == 1) {
-            // Only proposer_one can propose the first block after genesis
-            address proposerOne = resolve("proposer_one", true);
-            if (proposerOne != address(0) && msg.sender != proposerOne) {
-                return false;
-            }
-        }
-
+    // Additinal proposer rules
+    function _isProposerPermitted() private returns (bool) {
         // If there's a sequencer registry, check if the block can be proposed by the current
         // proposer
         ISequencerRegistry sequencerRegistry =

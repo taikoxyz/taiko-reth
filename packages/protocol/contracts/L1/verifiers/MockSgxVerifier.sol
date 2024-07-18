@@ -136,10 +136,9 @@ contract MockSgxVerifier is EssentialContract, IVerifier {
     }
 
     /// @inheritdoc IVerifier
-    /* MODIFIED- TO RETURN TRUE WITHOUT REAL VERIFICATION!!! */
+    /* MODIFIED - TO RETURN TRUE WITHOUT REAL VERIFICATION!!! */
     function verifyProof(
-        bytes32, /*blockMetaHash*/
-        bytes32, /*newStateHashTransition*/
+        bytes32, /*transitionHash*/
         address, /*prover*/
         bytes calldata /*proof*/
     )

@@ -4,7 +4,7 @@ pragma solidity ^0.8.20;
 import "./TaikoL1TestBase.sol";
 
 contract TaikoL1Test is TaikoL1TestBase {
-    function deployTaikoL1(address addressManager) internal override returns (TaikoL1) {
+    function deployTaikoL1() internal override returns (TaikoL1) {
         return
             TaikoL1(payable(deployProxy({ name: "taiko", impl: address(new TaikoL1()), data: "" })));
     }
@@ -18,14 +18,22 @@ contract TaikoL1Test is TaikoL1TestBase {
         vm.warp(block.timestamp + 12);
 
         bytes32 parentMetaHash;
+        bytes32 parentBlockHash = GENESIS_BLOCK_HASH;
         for (uint64 blockId = 1; blockId <= 20; blockId++) {
             printVariables("before propose & prove & verify");
             // Create metadata and propose the block
-            meta = createBlockMetaData(Alice, blockId, 1, true);
-            proposeBlock(Alice, Alice, meta, "");
+            meta = createBlockMetaData(Alice, blockId, 1, true, parentMetaHash, parentBlockHash);
+            proposeBlock(Alice, meta, "");
+
+            //Save arent data for next block iteration
+            parentMetaHash = keccak256(abi.encode(meta));
+            parentBlockHash = meta.blockHash;
 
             // Create proofs and prove a block
-            ChainProver.ProofBatch memory blockProofs = createProofs(meta, Alice, true);
+            bytes32 newRoot = randBytes32(); // Currently does not matter what do we feed as newRoot
+                // as verification is mocked!!
+            ChainProver.ProofBatch memory blockProofs =
+                createProofs(uint64(block.number), newRoot, Alice, true);
             proveBlock(Alice, abi.encode(blockProofs));
 
             //Wait enought time and verify block
@@ -46,19 +54,28 @@ contract TaikoL1Test is TaikoL1TestBase {
         vm.warp(block.timestamp + 12);
 
         bytes32 parentMetaHash;
+        bytes32 parentBlockHash = GENESIS_BLOCK_HASH;
         for (uint64 blockId = 1; blockId <= 20; blockId++) {
             printVariables("before propose & prove & verify");
             // Create metadata and propose the block
-            blockMetaDatas[blockId - 1] = createBlockMetaData(Alice, blockId, 1, true);
-            proposeBlock(Alice, Alice, blockMetaDatas[blockId - 1], "");
+            blockMetaDatas[blockId - 1] =
+                createBlockMetaData(Alice, blockId, 1, true, parentMetaHash, parentBlockHash);
+
+            proposeBlock(Alice, blockMetaDatas[blockId - 1], "");
+
+            //Save arent data for next block iteration
+            parentMetaHash = keccak256(abi.encode(blockMetaDatas[blockId - 1]));
+            parentBlockHash = blockMetaDatas[blockId - 1].blockHash;
+
             vm.roll(block.number + 1);
             vm.warp(block.timestamp + 12);
         }
 
         for (uint64 blockId = 1; blockId <= 20; blockId++) {
-            // Create proofs and prove a block
+            bytes32 newRoot = randBytes32(); // Currently does not matter what do we feed as newRoot
+                // as verification is mocked!!
             ChainProver.ProofBatch memory blockProofs =
-                createProofs(blockMetaDatas[blockId - 1], Alice, true);
+                createProofs(uint64(block.number), newRoot, Alice, true);
             proveBlock(Alice, abi.encode(blockProofs));
 
             //Wait enought time and verify block (currently we simply just "wait enough" from latest
@@ -79,12 +96,14 @@ contract TaikoL1Test is TaikoL1TestBase {
         vm.roll(block.number + 1);
         vm.warp(block.timestamp + 12);
 
+        bytes32 parentMetaHash;
+        bytes32 parentBlockHash = GENESIS_BLOCK_HASH;
         // Create metadata and propose the block 129 blocks later only
-        meta = createBlockMetaData(Alice, 1, 1, true);
+        meta = createBlockMetaData(Alice, 1, 1, true, parentMetaHash, parentBlockHash);
         vm.roll(block.number + 129);
         vm.warp(block.timestamp + 129 * 12);
 
-        proposeBlock(Alice, Alice, meta, TaikoErrors.L1_INVALID_L1_STATE_BLOCK.selector);
+        proposeBlock(Alice, meta, TaikoErrors.L1_INVALID_L1_STATE_BLOCK.selector);
     }
 
     function test_print_genesis_hash() external pure {

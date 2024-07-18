@@ -52,7 +52,8 @@ contract ProverPayment {
 
         // // Propose the block
         // _blocks =
-        //     taikoL1.proposeBlock{ value: taikoL1.PROVER_BOND() }(data, txLists, assignment.prover);
+        //     taikoL1.proposeBlock{ value: taikoL1.PROVER_BOND() }(data, txLists,
+        // assignment.prover);
 
         uint64 highestl2BlockNumber = _blocks[_blocks.length - 1].l2BlockNumber;
 

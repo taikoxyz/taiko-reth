@@ -18,7 +18,6 @@ import "./verifiers/IVerifier.sol";
 contract ChainProver is EssentialContract, TaikoErrors {
     using LibAddress for address;
 
-
     /// @dev Struct representing transition to be proven.
     struct ProofData {
         IVerifier verifier;
@@ -27,14 +26,16 @@ contract ChainProver is EssentialContract, TaikoErrors {
 
     /// @dev Struct representing transition to be proven.
     struct ProofBatch {
-        TaikoData.BlockMetadata blockMetadata; //Maybe needed (?)
-        bytes32 newStateHash; // keccak(new_l1_blockhash, new_root))
+        // These 2 keccak(new_l1_blockhash, new_root)) will be the new state (hash)
+        // and the transition hash it the old and the new, hashed together.
+        uint64 newL1BlockNumber; // Which L1 block is "covered" (proved) with this transaction
+        bytes32 newL1Root; // The new root hash
         ProofData[] proofs;
         address prover;
     }
 
     // New, and only state var
-    bytes32 public currentStateHash; //keccak(l1_blockhash, root)
+    bytes32 public currentStateHash; //equals to: keccak(newL1BlockNumber, newL1Root)
 
     function init(address _owner, address _addressManager) external initializer {
         if (_addressManager == address(0)) {
@@ -43,10 +44,13 @@ contract ChainProver is EssentialContract, TaikoErrors {
         __Essential_init(_owner, _addressManager);
     }
 
-    /// @dev Proposes a Taiko L2 block.
-    function proveBlock(bytes calldata data) external nonReentrant whenNotPaused {
+    /// @dev Proves up until a specific L1 block
+    function prove(bytes calldata data) external nonReentrant whenNotPaused {
         // Decode the block data
         ProofBatch memory proofBatch = abi.decode(data, (ProofBatch));
+        // This is hwo we get the transition hash
+        bytes32 l1BlockHash = blockhash(proofBatch.newL1BlockNumber);
+        bytes32 newStateHash = keccak256(abi.encode(l1BlockHash, proofBatch.newL1Root));
 
         VerifierRegistry verifierRegistry = VerifierRegistry(resolve("verifier_registry", false));
         // Verify the proofs
@@ -61,8 +65,7 @@ contract ChainProver is EssentialContract, TaikoErrors {
             require(verifierRegistry.isVerifier(address(verifier)), "invalid verifier");
             // Verify the proof
             verifier.verifyProof(
-                keccak256(abi.encode(proofBatch.blockMetadata)), //Maybe block metadata (?) also an input ?
-                keccak256(abi.encode(currentStateHash, proofBatch.newStateHash)),
+                keccak256(abi.encode(currentStateHash, newStateHash)),
                 proofBatch.prover,
                 proofBatch.proofs[i].proof
             );
@@ -73,10 +76,8 @@ contract ChainProver is EssentialContract, TaikoErrors {
         // Can use some custom logic here. but let's keep it simple
         require(proofBatch.proofs.length >= 3, "insufficient number of proofs");
 
-        currentStateHash = proofBatch.newStateHash;
-
-       //todo(@Brecht) How do we detect (or poison) verifiers or allow the chain to be corrected if the proof verifiers are buggy ?
-
-
+        currentStateHash = newStateHash;
+        //todo(@Brecht, @Dani) If somebody still gets an invalid proof through, we have to have
+        // another safety mechanisms! (e.g.: guardians, etc.)
     }
 }

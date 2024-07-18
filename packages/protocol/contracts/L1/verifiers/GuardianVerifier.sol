@@ -24,8 +24,7 @@ contract GuardianVerifier is EssentialContract, IVerifier {
 
     /// @inheritdoc IVerifier
     function verifyProof(
-        bytes32, /*blockMetaHash*/
-        bytes32, /*newStateHashTransition*/
+        bytes32, /*transitionHash*/
         address prover,
         bytes calldata /*proof*/
     )

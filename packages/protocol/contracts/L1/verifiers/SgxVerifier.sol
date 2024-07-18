@@ -137,8 +137,7 @@ contract SgxVerifier is EssentialContract, IVerifier {
 
     /// @inheritdoc IVerifier
     function verifyProof(
-        bytes32 blockMetaHash,
-        bytes32 newStateHashTransitionHash,
+        bytes32 transitionHash,
         address prover,
         bytes calldata proof
     )
@@ -149,7 +148,7 @@ contract SgxVerifier is EssentialContract, IVerifier {
         // 4 bytes + 20 bytes + 65 bytes (signature) = 89
         if (proof.length != 89) revert SGX_INVALID_PROOF();
 
-        //uint32 id = uint32(bytes4(proof[:4])); // StackTooDepp error so used this in-place
+        uint32 id = uint32(bytes4(proof[:4]));
         address newInstance = address(bytes20(proof[4:24]));
         bytes memory signature = proof[24:];
 
@@ -157,15 +156,15 @@ contract SgxVerifier is EssentialContract, IVerifier {
 
         address oldInstance = ECDSA.recover(
             LibPublicInput.hashPublicInputs(
-                newStateHashTransitionHash, address(this), newInstance, prover, blockMetaHash, chainId
+                transitionHash, address(this), newInstance, prover, chainId
             ),
             signature
         );
 
-        if (!_isInstanceValid( uint32(bytes4(proof[:4])), oldInstance)) revert SGX_INVALID_INSTANCE();
+        if (!_isInstanceValid(id, oldInstance)) revert SGX_INVALID_INSTANCE();
 
         if (oldInstance != newInstance) {
-            _replaceInstance( uint32(bytes4(proof[:4])), oldInstance, newInstance);
+            _replaceInstance(id, oldInstance, newInstance);
         }
     }
 
