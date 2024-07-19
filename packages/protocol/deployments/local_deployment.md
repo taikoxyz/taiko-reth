@@ -23,6 +23,8 @@ participants:
     el_image: ghcr.io/paradigmxyz/reth # We can use custom image, (remote, e.g.: ethpandaops/reth:main-9c0bc84 or locally: taiko_reth)
     cl_type: teku
     cl_image: consensys/teku:latest
+network_params:
+  network_id: '160010'
 ```
 
 #### 1.1 Local reth-based network
