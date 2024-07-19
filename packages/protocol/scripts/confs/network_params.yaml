@@ -1,0 +1,11 @@
+participants:
+  - el_type: reth
+    el_image: taiko_reth
+    cl_type: lighthouse
+    cl_image: sigp/lighthouse:latest
+  - el_type: reth
+    el_image: taiko_reth
+    cl_type: teku
+    cl_image: consensys/teku:latest
+network_params:
+  network_id: '160010'

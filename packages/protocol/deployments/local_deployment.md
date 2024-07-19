@@ -11,7 +11,7 @@ brew install kurtosis-tech/tap/kurtosis-cli
 
 ### 1. Define the network config parameters
 
-Create a `network_param.yaml` file.
+Create a `network_params.yaml` file.
 
 ```shell
 participants:
