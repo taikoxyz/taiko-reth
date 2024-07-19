@@ -88,23 +88,25 @@ contract TaikoL1Test is TaikoL1TestBase {
         }
     }
 
-    function test_L1_propose_block_outside_the_4_epoch_window() external {
-        giveEthAndTko(Alice, 100 ether, 100 ether);
+    // This test does not fail anymore, because proposing is possible but validating of the preconf window violation will be done 
+    // So for now, not needed ! Commenting out. When PR approved, i'll delete also.
+    // function test_L1_propose_block_outside_the_4_epoch_window() external {
+    //     giveEthAndTko(Alice, 100 ether, 100 ether);
 
-        TaikoData.BlockMetadata memory meta;
+    //     TaikoData.BlockMetadata memory meta;
 
-        vm.roll(block.number + 1);
-        vm.warp(block.timestamp + 12);
+    //     vm.roll(block.number + 1);
+    //     vm.warp(block.timestamp + 12);
 
-        bytes32 parentMetaHash;
-        bytes32 parentBlockHash = GENESIS_BLOCK_HASH;
-        // Create metadata and propose the block 129 blocks later only
-        meta = createBlockMetaData(Alice, 1, 1, true, parentMetaHash, parentBlockHash);
-        vm.roll(block.number + 129);
-        vm.warp(block.timestamp + 129 * 12);
+    //     bytes32 parentMetaHash;
+    //     bytes32 parentBlockHash = GENESIS_BLOCK_HASH;
+    //     // Create metadata and propose the block 129 blocks later only
+    //     meta = createBlockMetaData(Alice, 1, 1, true, parentMetaHash, parentBlockHash);
+    //     vm.roll(block.number + 129);
+    //     vm.warp(block.timestamp + 129 * 12);
 
-        proposeBlock(Alice, meta, TaikoErrors.L1_INVALID_L1_STATE_BLOCK.selector);
-    }
+    //     proposeBlock(Alice, meta, TaikoErrors.L1_INVALID_L1_STATE_BLOCK.selector);
+    // }
 
     function test_print_genesis_hash() external pure {
         console2.logBytes32(keccak256("GENESIS_BLOCK_HASH"));

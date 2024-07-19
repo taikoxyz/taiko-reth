@@ -129,44 +129,46 @@ contract TaikoL1 is EssentialContract, TaikoEvents, TaikoErrors {
         // Check that the tx length is non-zero and within the supported range
         require(_block.txListByteSize <= config.blockMaxTxListBytes, "invalid txlist size");
 
-        // Also since we dont write into storage this check is hard to do here + the
-        // parentBlock.l1StateBlockNumber too for the preconfs (checking the 4 epoch window)
-        // I just guess, but also during proving we can see if this condition is
-        // fulfilled OR not, and then resulting in an empty block (+slashing of the
-        // proposer/preconfer) ?
-        TaikoData.Block storage parentBlock = state.blocks[(state.numBlocks - 1)];
+        /* NOT NEEDED ! Commenting out. When PR approved, i'll delete also. */
+        // // Also since we dont write into storage this check is hard to do here + the
+        // // parentBlock.l1StateBlockNumber too for the preconfs (checking the 4 epoch window)
+        // // I just guess, but also during proving we can see if this condition is
+        // // fulfilled OR not, and then resulting in an empty block (+slashing of the
+        // // proposer/preconfer) ?
+        // TaikoData.Block storage parentBlock = state.blocks[(state.numBlocks - 1)];
 
-        require(_block.parentMetaHash == parentBlock.metaHash, "invalid parentMetaHash");
-        require(_block.parentBlockHash == parentBlock.blockHash, "invalid parentHash");
+        // require(_block.parentMetaHash == parentBlock.metaHash, "invalid parentMetaHash");
+        // require(_block.parentBlockHash == parentBlock.blockHash, "invalid parentHash");
 
-        // Verify the passed in L1 state block number.
-        // We only allow the L1 block to be 4 epochs old.
-        // The other constraint is that the L1 block number needs to be larger than or equal the one
-        // in the previous L2 block.
+        // // Verify the passed in L1 state block number.
+        // // We only allow the L1 block to be 4 epochs old.
+        // // The other constraint is that the L1 block number needs to be larger than or equal the one
+        // // in the previous L2 block.
 
-        if (
-            _block.l1StateBlockNumber + 128 < block.number
-                || _block.l1StateBlockNumber >= block.number
-                || _block.l1StateBlockNumber < parentBlock.l1StateBlockNumber
-        ) {
-            revert L1_INVALID_L1_STATE_BLOCK();
-        }
+        // if (
+        //     _block.l1StateBlockNumber + 128 < block.number
+        //         || _block.l1StateBlockNumber >= block.number
+        //         || _block.l1StateBlockNumber < parentBlock.l1StateBlockNumber
+        // ) {
+        //     revert L1_INVALID_L1_STATE_BLOCK();
+        // }
 
-        // Verify the passed in timestamp.
-        // We only allow the timestamp to be 4 epochs old.
-        // The other constraint is that the timestamp needs to be larger than or equal the one
-        // in the previous L2 block.
-        if (
-            _block.timestamp + 128 * 12 < block.timestamp || _block.timestamp > block.timestamp
-                || _block.timestamp < parentBlock.timestamp
-        ) {
-            revert L1_INVALID_TIMESTAMP();
-        }
+        // // Verify the passed in timestamp.
+        // // We only allow the timestamp to be 4 epochs old.
+        // // The other constraint is that the timestamp needs to be larger than or equal the one
+        // // in the previous L2 block.
+        // if (
+        //     _block.timestamp + 128 * 12 < block.timestamp || _block.timestamp > block.timestamp
+        //         || _block.timestamp < parentBlock.timestamp
+        // ) {
+        //     revert L1_INVALID_TIMESTAMP();
+        // }
 
         emit BlockProposed({ blockId: _block.l2BlockNumber, meta: _block });
     }
 
     // These will be unknown in the smart contract
+    // NOT NEEDED ! Commenting out. When PR approved, i'll delete also.
     // Maybe possible to extract with ChainProver, but not directly from here.
     // function getBlock(uint64 blockId) {}
     // function getLastVerifiedBlockId() {}
