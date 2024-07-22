@@ -30,7 +30,7 @@ contract PBSActor {
         payable
     {
         // TODO(Brecht): just pass in opaque data to make it general, though kind of doesn't matter
-       operator.proposeBlock{ value: msg.value - tip }(data, txLists, proverPaymentData);
+        operator.proposeBlock{ value: msg.value - tip }(data, txLists, proverPaymentData);
 
         // Do conditional payment
         address(block.coinbase).sendEtherAndVerify(tip);

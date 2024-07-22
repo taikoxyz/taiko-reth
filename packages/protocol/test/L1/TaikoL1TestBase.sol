@@ -15,7 +15,7 @@ contract MockVerifier {
 abstract contract TaikoL1TestBase is TaikoTest {
     AddressManager public addressManager;
     // AssignmentHook public assignmentHook;
-    BasedOperator public basedOperator;
+    ChainProver public chainProver;
     TaikoToken public tko;
     // SignalService public ss;
     TaikoL1 public L1;
@@ -38,7 +38,7 @@ abstract contract TaikoL1TestBase is TaikoTest {
     address public L2SS = randAddress();
     address public L2 = randAddress();
 
-    function deployTaikoL1(address addressManager) internal virtual returns (TaikoL1 taikoL1);
+    function deployTaikoL1() internal virtual returns (TaikoL1 taikoL1);
 
     function setUp() public virtual {
         vm.startPrank(Alice);
@@ -53,15 +53,14 @@ abstract contract TaikoL1TestBase is TaikoTest {
             })
         );
 
-        L1 = deployTaikoL1(address(addressManager));
+        L1 = deployTaikoL1();
         conf = L1.getConfig();
 
-        console2.log("Address szar:", (address(addressManager)));
-        basedOperator = BasedOperator(
+        chainProver = ChainProver(
             deployProxy({
-                name: "operator",
-                impl: address(new BasedOperator()),
-                data: abi.encodeCall(BasedOperator.init, (Alice, address(addressManager)))
+                name: "chain_prover",
+                impl: address(new ChainProver()),
+                data: abi.encodeCall(ChainProver.init, (Alice, address(addressManager)))
             })
         );
 
@@ -74,7 +73,7 @@ abstract contract TaikoL1TestBase is TaikoTest {
         );
 
         registerAddress("taiko", address(L1));
-        registerAddress("operator", address(basedOperator));
+        registerAddress("chain_prover", address(chainProver));
         registerAddress("verifier_registry", address(vr));
 
         //         ss = SignalService(
@@ -245,7 +244,6 @@ abstract contract TaikoL1TestBase is TaikoTest {
 
     function proposeBlock(
         address proposer,
-        address prover,
         TaikoData.BlockMetadata memory meta,
         bytes4 revertReason
     )
@@ -304,9 +302,8 @@ abstract contract TaikoL1TestBase is TaikoTest {
         // hookcalls[0] = TaikoData.HookCall(address(assignmentHook), abi.encode(assignment));
 
         bytes[] memory dummyTxList = new bytes[](1);
-        dummyTxList[0] =
-            hex"0000000000000000000000000000000000000000000000000000000000000001";
-        
+        dummyTxList[0] = hex"0000000000000000000000000000000000000000000000000000000000000001";
+
         // If blob is used, empty tx list
         bytes[] memory emptyTxList;
 
@@ -318,14 +315,14 @@ abstract contract TaikoL1TestBase is TaikoTest {
 
         if (revertReason == "") {
             vm.prank(proposer, proposer);
-            _returnedBlocks = basedOperator.proposeBlock{ value: 1 ether / 10 }(
-                metasEncoded, meta.blobUsed == true ? emptyTxList : dummyTxList, prover
+            _returnedBlocks = L1.proposeBlock{ value: 1 ether / 10 }(
+                metasEncoded, meta.blobUsed == true ? emptyTxList : dummyTxList
             );
         } else {
             vm.prank(proposer, proposer);
             vm.expectRevert(revertReason);
-            _returnedBlocks = basedOperator.proposeBlock{ value: 1 ether / 10 }(
-                metasEncoded, meta.blobUsed == true ? emptyTxList : dummyTxList, prover
+            _returnedBlocks = L1.proposeBlock{ value: 1 ether / 10 }(
+                metasEncoded, meta.blobUsed == true ? emptyTxList : dummyTxList
             );
             return meta;
         }
@@ -335,12 +332,12 @@ abstract contract TaikoL1TestBase is TaikoTest {
 
     function proveBlock(address prover, bytes memory blockProof) internal {
         vm.prank(prover, prover);
-        basedOperator.proveBlock(blockProof);
+        chainProver.prove(blockProof);
     }
 
-    function verifyBlock(uint64 count) internal {
-        basedOperator.verifyBlocks(count);
-    }
+    // function verifyBlock(uint64 count) internal {
+    //     basedOperator.verifyBlocks(count);
+    // }
 
     // function setupGuardianProverMultisig() internal {
     //     address[] memory initMultiSig = new address[](5);
@@ -391,17 +388,16 @@ abstract contract TaikoL1TestBase is TaikoTest {
     // }
 
     function createSgxSignatureProof(
-        TaikoData.Transition memory tran,
         address newInstance,
         address prover,
-        bytes32 metaHash
+        bytes32 transitionHash
     )
         internal
         view
         returns (bytes memory signature)
     {
         bytes32 digest = LibPublicInput.hashPublicInputs(
-            tran, address(sv1), newInstance, prover, metaHash, L1.getConfig().chainId
+            transitionHash, address(sv1), newInstance, prover, L1.getConfig().chainId
         );
 
         uint256 signerPrivateKey;
@@ -434,9 +430,9 @@ abstract contract TaikoL1TestBase is TaikoTest {
         string memory str = string.concat(
             Strings.toString(logCount++),
             ":[",
-            Strings.toString(L1.getLastVerifiedBlockId()),
+            "LEGACY_PRINTING_SHALL_BE_REMOVED",
             unicode"→",
-            Strings.toString(L1.getNumOfBlocks()),
+            "LEGACY_PRINTING_SHALL_BE_REMOVED",
             "] // ",
             comment
         );
@@ -452,16 +448,16 @@ abstract contract TaikoL1TestBase is TaikoTest {
         address coinbase,
         uint64 l2BlockNumber,
         uint32 belowBlockTipHeight, // How many blocks below from current tip (block.id)
-        bool blobUsed
+        bool blobUsed,
+        bytes32 parentMetaHash,
+        bytes32 parentBlockHash
     )
         internal
         returns (TaikoData.BlockMetadata memory meta)
     {
         meta.blockHash = randBytes32();
-
-        TaikoData.Block memory parentBlock = L1.getBlock(l2BlockNumber - 1);
-        meta.parentMetaHash = parentBlock.metaHash;
-        meta.parentBlockHash = parentBlock.blockHash;
+        meta.parentMetaHash = parentMetaHash;
+        meta.parentBlockHash = parentBlockHash;
         meta.l1Hash = blockhash(block.number - belowBlockTipHeight);
         meta.difficulty = block.prevrandao;
         meta.blobHash = randBytes32();
@@ -483,7 +479,8 @@ abstract contract TaikoL1TestBase is TaikoTest {
     }
 
     function createProofs(
-        TaikoData.BlockMetadata memory meta,
+        uint64 newL1BlockNumber,
+        bytes32 newL1Root,
         address prover,
         bool threeMockSGXProofs // Used to indicate to "trick" the BasedProver with 3 different (but
             // same code) deployments of SGX verifier - later we can fine tune to have 3 correct,
@@ -491,16 +488,10 @@ abstract contract TaikoL1TestBase is TaikoTest {
     )
         internal
         view
-        returns (BasedOperator.ProofBatch memory proofBatch)
+        returns (ChainProver.ProofBatch memory proofBatch)
     {
-        // Set metadata
-        proofBatch.blockMetadata = meta;
-
-        // Set transition
-        TaikoData.Transition memory transition;
-        transition.parentBlockHash = L1.getBlock(meta.l2BlockNumber - 1).blockHash;
-        transition.blockHash = meta.blockHash;
-        proofBatch.transition = transition;
+        proofBatch.newL1BlockNumber = newL1BlockNumber;
+        proofBatch.newL1Root = newL1Root;
 
         // Set prover
         proofBatch.prover = prover;
@@ -516,10 +507,20 @@ abstract contract TaikoL1TestBase is TaikoTest {
             newInstance = SGX_X_0;
         }
 
-        BasedOperator.ProofData[] memory proofs = new BasedOperator.ProofData[](3);
+        ChainProver.ProofData[] memory proofs = new ChainProver.ProofData[](3);
 
-        bytes memory signature =
-            createSgxSignatureProof(transition, newInstance, prover, keccak256(abi.encode(meta)));
+        bytes memory signature = createSgxSignatureProof(
+            newInstance,
+            prover,
+            keccak256(
+                abi.encode(
+                    chainProver.currentStateHash(),
+                    keccak256(
+                        abi.encode(blockhash(proofBatch.newL1BlockNumber), proofBatch.newL1Root)
+                    )
+                )
+            )
+        );
 
         // The order is on purpose reversed, becase of the L1_INVALID_OR_DUPLICATE_VERIFIER() check
         proofs[0].verifier = sv2;
