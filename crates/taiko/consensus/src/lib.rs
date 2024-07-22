@@ -25,16 +25,16 @@ use std::{sync::Arc, time::SystemTime};
 mod validation;
 pub use validation::validate_block_post_execution;
 
-/// Ethereum beacon consensus
+/// Taiko beacon consensus
 ///
 /// This consensus engine does basic checks as outlined in the execution specs.
 #[derive(Debug)]
-pub struct EthBeaconConsensus {
+pub struct TaikoBeaconConsensus {
     /// Configuration
     chain_spec: Arc<ChainSpec>,
 }
 
-impl EthBeaconConsensus {
+impl TaikoBeaconConsensus {
     /// Create a new instance of [`EthBeaconConsensus`]
     pub const fn new(chain_spec: Arc<ChainSpec>) -> Self {
         Self { chain_spec }
@@ -85,7 +85,7 @@ impl EthBeaconConsensus {
     }
 }
 
-impl Consensus for EthBeaconConsensus {
+impl Consensus for TaikoBeaconConsensus {
     fn validate_header(&self, header: &SealedHeader) -> Result<(), ConsensusError> {
         validate_header_gas(header)?;
         validate_header_base_fee(header, &self.chain_spec)?;
@@ -239,7 +239,7 @@ mod tests {
         let child = header_with_gas_limit(parent.gas_limit + 5);
 
         assert_eq!(
-            EthBeaconConsensus::new(Arc::new(ChainSpec::default()))
+            TaikoBeaconConsensus::new(Arc::new(ChainSpec::default()))
                 .validate_against_parent_gas_limit(&child, &parent),
             Ok(())
         );
@@ -251,7 +251,7 @@ mod tests {
         let child = header_with_gas_limit(MINIMUM_GAS_LIMIT - 1);
 
         assert_eq!(
-            EthBeaconConsensus::new(Arc::new(ChainSpec::default()))
+            TaikoBeaconConsensus::new(Arc::new(ChainSpec::default()))
                 .validate_against_parent_gas_limit(&child, &parent),
             Err(ConsensusError::GasLimitInvalidMinimum { child_gas_limit: child.gas_limit })
         );
@@ -263,7 +263,7 @@ mod tests {
         let child = header_with_gas_limit(parent.gas_limit + parent.gas_limit / 1024 + 1);
 
         assert_eq!(
-            EthBeaconConsensus::new(Arc::new(ChainSpec::default()))
+            TaikoBeaconConsensus::new(Arc::new(ChainSpec::default()))
                 .validate_against_parent_gas_limit(&child, &parent),
             Err(ConsensusError::GasLimitInvalidIncrease {
                 parent_gas_limit: parent.gas_limit,
@@ -278,7 +278,7 @@ mod tests {
         let child = header_with_gas_limit(parent.gas_limit - 5);
 
         assert_eq!(
-            EthBeaconConsensus::new(Arc::new(ChainSpec::default()))
+            TaikoBeaconConsensus::new(Arc::new(ChainSpec::default()))
                 .validate_against_parent_gas_limit(&child, &parent),
             Ok(())
         );
@@ -290,7 +290,7 @@ mod tests {
         let child = header_with_gas_limit(parent.gas_limit - parent.gas_limit / 1024 - 1);
 
         assert_eq!(
-            EthBeaconConsensus::new(Arc::new(ChainSpec::default()))
+            TaikoBeaconConsensus::new(Arc::new(ChainSpec::default()))
                 .validate_against_parent_gas_limit(&child, &parent),
             Err(ConsensusError::GasLimitInvalidDecrease {
                 parent_gas_limit: parent.gas_limit,
@@ -312,6 +312,6 @@ mod tests {
         }
         .seal_slow();
 
-        assert_eq!(EthBeaconConsensus::new(chain_spec).validate_header(&header), Ok(()));
+        assert_eq!(TaikoBeaconConsensus::new(chain_spec).validate_header(&header), Ok(()));
     }
 }

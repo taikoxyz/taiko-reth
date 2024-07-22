@@ -21,8 +21,9 @@ reth-transaction-pool.workspace = true
 reth-network.workspace = true
 reth-consensus.workspace = true
 reth-auto-seal-consensus.workspace = true
-reth-beacon-consensus.workspace = true
 
+# taiko
+taiko-reth-beacon-consensus.workspace = true
 taiko-reth-evm.workspace = true
 taiko-reth-engine-primitives.workspace = true
 taiko-reth-payload-builder.workspace = true

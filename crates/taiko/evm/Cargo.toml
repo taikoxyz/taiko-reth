@@ -20,7 +20,7 @@ reth-prune-types.workspace = true
 reth-execution-types.workspace = true
 
 # Taiko
-taiko-reth-consensus.workspace = true
+taiko-reth-beacon-consensus.workspace = true
 
 # Ethereum
 revm-primitives = { workspace = true, features = ["taiko"] }

@@ -1,5 +1,5 @@
 [package]
-name = "taiko-reth-consensus"
+name = "taiko-reth-beacon-consensus"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

@@ -9748,7 +9748,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "taiko-reth-consensus"
+name = "taiko-reth-beacon-consensus"
 version = "1.0.0"
 dependencies = [
  "reth-chainspec",
@@ -9793,7 +9793,7 @@ dependencies = [
  "revm-primitives",
  "secp256k1",
  "serde_json",
- "taiko-reth-consensus",
+ "taiko-reth-beacon-consensus",
 ]
 
 [[package]]
@@ -9803,7 +9803,6 @@ dependencies = [
  "eyre",
  "reth-auto-seal-consensus",
  "reth-basic-payload-builder",
- "reth-beacon-consensus",
  "reth-consensus",
  "reth-network",
  "reth-node-builder",
@@ -9811,6 +9810,7 @@ dependencies = [
  "reth-provider",
  "reth-tracing",
  "reth-transaction-pool",
+ "taiko-reth-beacon-consensus",
  "taiko-reth-engine-primitives",
  "taiko-reth-evm",
  "taiko-reth-payload-builder",

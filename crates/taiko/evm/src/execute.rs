@@ -30,7 +30,7 @@ use revm_primitives::{
     db::{Database, DatabaseCommit},
     Address, BlockEnv, CfgEnvWithHandlerCfg, EnvWithHandlerCfg, HashSet, ResultAndState,
 };
-use taiko_reth_consensus::validate_block_post_execution;
+use taiko_reth_beacon_consensus::validate_block_post_execution;
 
 #[cfg(not(feature = "std"))]
 use alloc::{sync::Arc, vec, vec::Vec};

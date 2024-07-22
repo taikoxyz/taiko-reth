@@ -3,7 +3,6 @@
 use crate::{TaikoEngineTypes, TaikoEvmConfig};
 use reth_auto_seal_consensus::AutoSealConsensus;
 use reth_basic_payload_builder::{BasicPayloadJobGenerator, BasicPayloadJobGeneratorConfig};
-use reth_beacon_consensus::EthBeaconConsensus;
 use reth_network::NetworkHandle;
 use reth_node_builder::{
     components::{
@@ -21,6 +20,7 @@ use reth_transaction_pool::{
     TransactionValidationTaskExecutor,
 };
 use std::sync::Arc;
+use taiko_reth_beacon_consensus::TaikoBeaconConsensus;
 use taiko_reth_engine_primitives::{
     TaikoBuiltPayload, TaikoPayloadAttributes, TaikoPayloadBuilderAttributes,
 };
@@ -264,7 +264,7 @@ where
         if ctx.is_dev() {
             Ok(Arc::new(AutoSealConsensus::new(ctx.chain_spec())))
         } else {
-            Ok(Arc::new(EthBeaconConsensus::new(ctx.chain_spec())))
+            Ok(Arc::new(TaikoBeaconConsensus::new(ctx.chain_spec())))
         }
     }
 }
