@@ -3,7 +3,7 @@ use alloy_rlp::{BufMut, Encodable};
 use itertools::Itertools;
 use reth_db_api::database::Database;
 use reth_execution_errors::StorageRootError;
-use reth_primitives::{proofs::IntoTrieAccount, B256};
+use reth_primitives::B256;
 use reth_provider::{providers::ConsistentDbView, DatabaseProviderFactory, ProviderError};
 use reth_tasks::pool::BlockingTaskPool;
 use reth_trie::{
@@ -12,7 +12,7 @@ use reth_trie::{
     trie_cursor::TrieCursorFactory,
     updates::TrieUpdates,
     walker::TrieWalker,
-    HashBuilder, HashedPostState, Nibbles, StorageRoot,
+    HashBuilder, HashedPostState, Nibbles, StorageRoot, TrieAccount,
 };
 use std::{collections::HashMap, sync::Arc};
 use thiserror::Error;
@@ -86,7 +86,7 @@ where
         retain_updates: bool,
     ) -> Result<(B256, TrieUpdates), AsyncStateRootError> {
         let mut tracker = ParallelTrieTracker::default();
-        let prefix_sets = self.hashed_state.construct_prefix_sets();
+        let prefix_sets = self.hashed_state.construct_prefix_sets().freeze();
         let storage_root_targets = StorageRootTargets::new(
             self.hashed_state.accounts.keys().copied(),
             prefix_sets.storage_prefix_sets,
@@ -132,7 +132,7 @@ where
             trie_cursor_factory.account_trie_cursor().map_err(ProviderError::Database)?,
             prefix_sets.account_prefix_set,
         )
-        .with_updates(retain_updates);
+        .with_deletions_retained(retain_updates);
         let mut account_node_iter = TrieNodeIter::new(
             walker,
             hashed_cursor_factory.hashed_account_cursor().map_err(ProviderError::Database)?,
@@ -166,11 +166,11 @@ where
                     };
 
                     if retain_updates {
-                        trie_updates.extend(updates.into_iter());
+                        trie_updates.insert_storage_updates(hashed_address, updates);
                     }
 
                     account_rlp.clear();
-                    let account = IntoTrieAccount::to_trie_account((account, storage_root));
+                    let account = TrieAccount::from((account, storage_root));
                     account.encode(&mut account_rlp as &mut dyn BufMut);
                     hash_builder.add_leaf(Nibbles::unpack(hashed_address), &account_rlp);
                 }
@@ -179,7 +179,7 @@ where
 
         let root = hash_builder.root();
 
-        trie_updates.finalize_state_updates(
+        trie_updates.finalize(
             account_node_iter.walker,
             hash_builder,
             prefix_sets.destroyed_accounts,

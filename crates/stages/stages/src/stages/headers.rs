@@ -10,11 +10,10 @@ use reth_db_api::{
 };
 use reth_etl::Collector;
 use reth_network_p2p::headers::{downloader::HeaderDownloader, error::HeadersDownloaderError};
-use reth_primitives::{BlockHash, BlockNumber, SealedHeader, StaticFileSegment};
+use reth_primitives::{BlockHash, BlockNumber, SealedHeader, StaticFileSegment, B256};
 use reth_provider::{
     providers::{StaticFileProvider, StaticFileWriter},
     BlockHashReader, DatabaseProviderRW, HeaderProvider, HeaderSyncGap, HeaderSyncGapProvider,
-    HeaderSyncMode,
 };
 use reth_stages_api::{
     BlockErrorKind, CheckpointBlockRange, EntitiesCheckpoint, ExecInput, ExecOutput,
@@ -25,6 +24,7 @@ use std::{
     sync::Arc,
     task::{ready, Context, Poll},
 };
+use tokio::sync::watch;
 use tracing::*;
 
 /// The headers stage.
@@ -44,8 +44,8 @@ pub struct HeaderStage<Provider, Downloader: HeaderDownloader> {
     provider: Provider,
     /// Strategy for downloading the headers
     downloader: Downloader,
-    /// The sync mode for the stage.
-    mode: HeaderSyncMode,
+    /// The tip for the stage.
+    tip: watch::Receiver<B256>,
     /// Consensus client implementation
     consensus: Arc<dyn Consensus>,
     /// Current sync gap.
@@ -68,14 +68,14 @@ where
     pub fn new(
         database: Provider,
         downloader: Downloader,
-        mode: HeaderSyncMode,
+        tip: watch::Receiver<B256>,
         consensus: Arc<dyn Consensus>,
         etl_config: EtlConfig,
     ) -> Self {
         Self {
             provider: database,
             downloader,
-            mode,
+            tip,
             consensus,
             sync_gap: None,
             hash_collector: Collector::new(etl_config.file_size / 2, etl_config.dir.clone()),
@@ -90,7 +90,7 @@ where
     /// database table.
     fn write_headers<DB: Database>(
         &mut self,
-        tx: &<DB as Database>::TXMut,
+        provider: &DatabaseProviderRW<DB>,
         static_file_provider: StaticFileProvider,
     ) -> Result<BlockNumber, StageError> {
         let total_headers = self.header_collector.len();
@@ -143,7 +143,8 @@ where
 
         info!(target: "sync::stages::headers", total = total_headers, "Writing headers hash index");
 
-        let mut cursor_header_numbers = tx.cursor_write::<RawTable<tables::HeaderNumbers>>()?;
+        let mut cursor_header_numbers =
+            provider.tx_ref().cursor_write::<RawTable<tables::HeaderNumbers>>()?;
         let mut first_sync = false;
 
         // If we only have the genesis block hash, then we are at first sync, and we can remove it,
@@ -206,7 +207,7 @@ where
         }
 
         // Lookup the head and tip of the sync range
-        let gap = self.provider.sync_gap(self.mode.clone(), current_checkpoint.block_number)?;
+        let gap = self.provider.sync_gap(self.tip.clone(), current_checkpoint.block_number)?;
         let tip = gap.target.tip();
         self.sync_gap = Some(gap.clone());
 
@@ -281,7 +282,7 @@ where
         // Write the headers and related tables to DB from ETL space
         let to_be_processed = self.hash_collector.len() as u64;
         let last_header_number =
-            self.write_headers::<DB>(provider.tx_ref(), provider.static_file_provider().clone())?;
+            self.write_headers(provider, provider.static_file_provider().clone())?;
 
         // Clear ETL collectors
         self.hash_collector.clear();
@@ -317,7 +318,7 @@ where
         // First unwind the db tables, until the unwind_to block number. use the walker to unwind
         // HeaderNumbers based on the index in CanonicalHeaders
         provider.unwind_table_by_walker::<tables::CanonicalHeaders, tables::HeaderNumbers>(
-            input.unwind_to,
+            input.unwind_to..,
         )?;
         provider.unwind_table_by_num::<tables::CanonicalHeaders>(input.unwind_to)?;
         provider.unwind_table_by_num::<tables::HeaderTerminalDifficulties>(input.unwind_to)?;
@@ -376,13 +377,12 @@ mod tests {
         stage_test_suite, ExecuteStageTestRunner, StageTestRunner, UnwindStageTestRunner,
     };
     use assert_matches::assert_matches;
+    use reth_execution_types::ExecutionOutcome;
     use reth_primitives::{BlockBody, SealedBlock, SealedBlockWithSenders, B256};
-    use reth_provider::{
-        BlockWriter, ExecutionOutcome, ProviderFactory, StaticFileProviderFactory,
-    };
+    use reth_provider::{BlockWriter, ProviderFactory, StaticFileProviderFactory};
     use reth_stages_api::StageUnitCheckpoint;
     use reth_testing_utils::generators::{self, random_header, random_header_range};
-    use reth_trie::{updates::TrieUpdates, HashedPostState};
+    use reth_trie::{updates::TrieUpdates, HashedPostStateSorted};
     use test_runner::HeadersTestRunner;
 
     mod test_runner {
@@ -436,7 +436,7 @@ mod tests {
                 HeaderStage::new(
                     self.db.factory.clone(),
                     (*self.downloader_factory)(),
-                    HeaderSyncMode::Tip(self.channel.1.clone()),
+                    self.channel.1.clone(),
                     self.consensus.clone(),
                     EtlConfig::default(),
                 )
@@ -630,9 +630,8 @@ mod tests {
             .append_blocks_with_state(
                 sealed_blocks,
                 ExecutionOutcome::default(),
-                HashedPostState::default(),
+                HashedPostStateSorted::default(),
                 TrieUpdates::default(),
-                None,
             )
             .unwrap();
         provider.commit().unwrap();

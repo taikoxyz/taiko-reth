@@ -1,9 +1,9 @@
-use super::{AccountReader, BlockHashReader, BlockIdReader, StateRootProvider};
+use super::{AccountReader, BlockHashReader, BlockIdReader, StateProofProvider, StateRootProvider};
 use auto_impl::auto_impl;
 use reth_execution_types::ExecutionOutcome;
 use reth_primitives::{
-    proofs::AccountProof, Address, BlockHash, BlockId, BlockNumHash, BlockNumber, BlockNumberOrTag,
-    Bytecode, StorageKey, StorageValue, B256, KECCAK_EMPTY, U256,
+    Address, BlockHash, BlockId, BlockNumHash, BlockNumber, BlockNumberOrTag, Bytecode, StorageKey,
+    StorageValue, B256, KECCAK_EMPTY, U256,
 };
 use reth_storage_errors::provider::{ProviderError, ProviderResult};
 
@@ -12,7 +12,9 @@ pub type StateProviderBox = Box<dyn StateProvider>;
 
 /// An abstraction for a type that provides state data.
 #[auto_impl(&, Arc, Box)]
-pub trait StateProvider: BlockHashReader + AccountReader + StateRootProvider + Send + Sync {
+pub trait StateProvider:
+    BlockHashReader + AccountReader + StateRootProvider + StateProofProvider + Send + Sync
+{
     /// Get storage of given account.
     fn storage(
         &self,
@@ -22,9 +24,6 @@ pub trait StateProvider: BlockHashReader + AccountReader + StateRootProvider + S
 
     /// Get account code by its hash
     fn bytecode_by_hash(&self, code_hash: B256) -> ProviderResult<Option<Bytecode>>;
-
-    /// Get account and storage proofs.
-    fn proof(&self, address: Address, keys: &[B256]) -> ProviderResult<AccountProof>;
 
     /// Get account code by its address.
     ///

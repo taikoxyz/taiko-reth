@@ -1,10 +1,15 @@
 //! Traits for execution.
 
-use reth_execution_types::ExecutionOutcome;
-use reth_primitives::{BlockNumber, BlockWithSenders, Receipt, Request, U256};
+// Re-export execution types
+pub use reth_execution_types::{BlockExecutionInput, BlockExecutionOutput, ExecutionOutcome};
+
+use reth_primitives::{BlockNumber, BlockWithSenders, Receipt};
 use reth_prune_types::PruneModes;
-use revm::db::BundleState;
 use revm_primitives::db::Database;
+use std::fmt::Display;
+
+#[cfg(not(feature = "std"))]
+use alloc::vec::Vec;
 
 pub use reth_execution_errors::{BlockExecutionError, BlockValidationError};
 pub use reth_storage_errors::provider::ProviderError;
@@ -81,49 +86,15 @@ pub trait BatchExecutor<DB> {
     /// This can be used to optimize state pruning during execution.
     fn set_tip(&mut self, tip: BlockNumber);
 
+    /// Set the prune modes.
+    ///
+    /// They are used to determine which parts of the state should be kept during execution.
+    fn set_prune_modes(&mut self, prune_modes: PruneModes);
+
     /// The size hint of the batch's tracked state size.
     ///
     /// This is used to optimize DB commits depending on the size of the state.
     fn size_hint(&self) -> Option<usize>;
-}
-
-/// The output of an ethereum block.
-///
-/// Contains the state changes, transaction receipts, and total gas used in the block.
-///
-/// TODO(mattsse): combine with `ExecutionOutcome`
-#[derive(Debug)]
-pub struct BlockExecutionOutput<T> {
-    /// The changed state of the block after execution.
-    pub state: BundleState,
-    /// All the receipts of the transactions in the block.
-    pub receipts: Vec<T>,
-    /// All the EIP-7685 requests of the transactions in the block.
-    pub requests: Vec<Request>,
-    /// The total gas used by the block.
-    pub gas_used: u64,
-}
-
-/// A helper type for ethereum block inputs that consists of a block and the total difficulty.
-#[derive(Debug)]
-pub struct BlockExecutionInput<'a, Block> {
-    /// The block to execute.
-    pub block: &'a Block,
-    /// The total difficulty of the block.
-    pub total_difficulty: U256,
-}
-
-impl<'a, Block> BlockExecutionInput<'a, Block> {
-    /// Creates a new input.
-    pub const fn new(block: &'a Block, total_difficulty: U256) -> Self {
-        Self { block, total_difficulty }
-    }
-}
-
-impl<'a, Block> From<(&'a Block, U256)> for BlockExecutionInput<'a, Block> {
-    fn from((block, total_difficulty): (&'a Block, U256)) -> Self {
-        Self::new(block, total_difficulty)
-    }
 }
 
 /// A type that can create a new executor for block execution.
@@ -139,7 +110,7 @@ pub trait BlockExecutorProvider: Send + Sync + Clone + Unpin + 'static {
     ///
     /// It is not expected to validate the state trie root, this must be done by the caller using
     /// the returned state.
-    type Executor<DB: Database<Error = ProviderError>>: for<'a> Executor<
+    type Executor<DB: Database<Error: Into<ProviderError> + Display>>: for<'a> Executor<
         DB,
         Input<'a> = BlockExecutionInput<'a, BlockWithSenders>,
         Output = BlockExecutionOutput<Receipt>,
@@ -147,7 +118,7 @@ pub trait BlockExecutorProvider: Send + Sync + Clone + Unpin + 'static {
     >;
 
     /// An executor that can execute a batch of blocks given a database.
-    type BatchExecutor<DB: Database<Error = ProviderError>>: for<'a> BatchExecutor<
+    type BatchExecutor<DB: Database<Error: Into<ProviderError> + Display>>: for<'a> BatchExecutor<
         DB,
         Input<'a> = BlockExecutionInput<'a, BlockWithSenders>,
         Output = ExecutionOutcome,
@@ -159,18 +130,15 @@ pub trait BlockExecutorProvider: Send + Sync + Clone + Unpin + 'static {
     /// This is used to execute a single block and get the changed state.
     fn executor<DB>(&self, db: DB) -> Self::Executor<DB>
     where
-        DB: Database<Error = ProviderError>;
+        DB: Database<Error: Into<ProviderError> + Display>;
 
     /// Creates a new batch executor with the given database and pruning modes.
     ///
     /// Batch executor is used to execute multiple blocks in sequence and keep track of the state
     /// during historical sync which involves executing multiple blocks in sequence.
-    ///
-    /// The pruning modes are used to determine which parts of the state should be kept during
-    /// execution.
-    fn batch_executor<DB>(&self, db: DB, prune_modes: PruneModes) -> Self::BatchExecutor<DB>
+    fn batch_executor<DB>(&self, db: DB) -> Self::BatchExecutor<DB>
     where
-        DB: Database<Error = ProviderError>;
+        DB: Database<Error: Into<ProviderError> + Display>;
 }
 
 #[cfg(test)]
@@ -178,25 +146,26 @@ mod tests {
     use super::*;
     use reth_primitives::Block;
     use revm::db::{CacheDB, EmptyDBTyped};
+    use revm_primitives::U256;
     use std::marker::PhantomData;
 
     #[derive(Clone, Default)]
     struct TestExecutorProvider;
 
     impl BlockExecutorProvider for TestExecutorProvider {
-        type Executor<DB: Database<Error = ProviderError>> = TestExecutor<DB>;
-        type BatchExecutor<DB: Database<Error = ProviderError>> = TestExecutor<DB>;
+        type Executor<DB: Database<Error: Into<ProviderError> + Display>> = TestExecutor<DB>;
+        type BatchExecutor<DB: Database<Error: Into<ProviderError> + Display>> = TestExecutor<DB>;
 
         fn executor<DB>(&self, _db: DB) -> Self::Executor<DB>
         where
-            DB: Database<Error = ProviderError>,
+            DB: Database<Error: Into<ProviderError> + Display>,
         {
             TestExecutor(PhantomData)
         }
 
-        fn batch_executor<DB>(&self, _db: DB, _prune_modes: PruneModes) -> Self::BatchExecutor<DB>
+        fn batch_executor<DB>(&self, _db: DB) -> Self::BatchExecutor<DB>
         where
-            DB: Database<Error = ProviderError>,
+            DB: Database<Error: Into<ProviderError> + Display>,
         {
             TestExecutor(PhantomData)
         }
@@ -228,6 +197,10 @@ mod tests {
         }
 
         fn set_tip(&mut self, _tip: BlockNumber) {
+            todo!()
+        }
+
+        fn set_prune_modes(&mut self, _prune_modes: PruneModes) {
             todo!()
         }
 

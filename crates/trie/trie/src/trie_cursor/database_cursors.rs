@@ -1,5 +1,5 @@
 use super::{TrieCursor, TrieCursorFactory};
-use crate::{updates::TrieKey, BranchNodeCompact, Nibbles, StoredNibbles, StoredNibblesSubKey};
+use crate::{BranchNodeCompact, Nibbles, StoredNibbles, StoredNibblesSubKey};
 use reth_db::{tables, DatabaseError};
 use reth_db_api::{
     cursor::{DbCursorRO, DbDupCursorRO},
@@ -9,24 +9,28 @@ use reth_primitives::B256;
 
 /// Implementation of the trie cursor factory for a database transaction.
 impl<'a, TX: DbTx> TrieCursorFactory for &'a TX {
-    fn account_trie_cursor(&self) -> Result<Box<dyn TrieCursor + '_>, DatabaseError> {
-        Ok(Box::new(DatabaseAccountTrieCursor::new(self.cursor_read::<tables::AccountsTrie>()?)))
+    type AccountTrieCursor = DatabaseAccountTrieCursor<<TX as DbTx>::Cursor<tables::AccountsTrie>>;
+    type StorageTrieCursor =
+        DatabaseStorageTrieCursor<<TX as DbTx>::DupCursor<tables::StoragesTrie>>;
+
+    fn account_trie_cursor(&self) -> Result<Self::AccountTrieCursor, DatabaseError> {
+        Ok(DatabaseAccountTrieCursor::new(self.cursor_read::<tables::AccountsTrie>()?))
     }
 
-    fn storage_tries_cursor(
+    fn storage_trie_cursor(
         &self,
         hashed_address: B256,
-    ) -> Result<Box<dyn TrieCursor + '_>, DatabaseError> {
-        Ok(Box::new(DatabaseStorageTrieCursor::new(
+    ) -> Result<Self::StorageTrieCursor, DatabaseError> {
+        Ok(DatabaseStorageTrieCursor::new(
             self.cursor_dup_read::<tables::StoragesTrie>()?,
             hashed_address,
-        )))
+        ))
     }
 }
 
 /// A cursor over the account trie.
 #[derive(Debug)]
-pub struct DatabaseAccountTrieCursor<C>(C);
+pub struct DatabaseAccountTrieCursor<C>(pub(crate) C);
 
 impl<C> DatabaseAccountTrieCursor<C> {
     /// Create a new account trie cursor.
@@ -44,7 +48,7 @@ where
         &mut self,
         key: Nibbles,
     ) -> Result<Option<(Nibbles, BranchNodeCompact)>, DatabaseError> {
-        Ok(self.0.seek_exact(StoredNibbles(key))?.map(|value| (value.0 .0, value.1 .0)))
+        Ok(self.0.seek_exact(StoredNibbles(key))?.map(|value| (value.0 .0, value.1)))
     }
 
     /// Seeks a key in the account trie that matches or is greater than the provided key.
@@ -52,12 +56,17 @@ where
         &mut self,
         key: Nibbles,
     ) -> Result<Option<(Nibbles, BranchNodeCompact)>, DatabaseError> {
-        Ok(self.0.seek(StoredNibbles(key))?.map(|value| (value.0 .0, value.1 .0)))
+        Ok(self.0.seek(StoredNibbles(key))?.map(|value| (value.0 .0, value.1)))
+    }
+
+    /// Move the cursor to the next entry and return it.
+    fn next(&mut self) -> Result<Option<(Nibbles, BranchNodeCompact)>, DatabaseError> {
+        Ok(self.0.next()?.map(|value| (value.0 .0, value.1)))
     }
 
     /// Retrieves the current key in the cursor.
-    fn current(&mut self) -> Result<Option<TrieKey>, DatabaseError> {
-        Ok(self.0.current()?.map(|(k, _)| TrieKey::AccountNode(k)))
+    fn current(&mut self) -> Result<Option<Nibbles>, DatabaseError> {
+        Ok(self.0.current()?.map(|(k, _)| k.0))
     }
 }
 
@@ -79,7 +88,7 @@ impl<C> DatabaseStorageTrieCursor<C> {
 
 impl<C> TrieCursor for DatabaseStorageTrieCursor<C>
 where
-    C: DbDupCursorRO<tables::StoragesTrie> + DbCursorRO<tables::StoragesTrie> + Send + Sync,
+    C: DbCursorRO<tables::StoragesTrie> + DbDupCursorRO<tables::StoragesTrie> + Send + Sync,
 {
     /// Seeks an exact match for the given key in the storage trie.
     fn seek_exact(
@@ -104,16 +113,21 @@ where
             .map(|value| (value.nibbles.0, value.node)))
     }
 
+    /// Move the cursor to the next entry and return it.
+    fn next(&mut self) -> Result<Option<(Nibbles, BranchNodeCompact)>, DatabaseError> {
+        Ok(self.cursor.next_dup()?.map(|(_, v)| (v.nibbles.0, v.node)))
+    }
+
     /// Retrieves the current value in the storage trie cursor.
-    fn current(&mut self) -> Result<Option<TrieKey>, DatabaseError> {
-        Ok(self.cursor.current()?.map(|(k, v)| TrieKey::StorageNode(k, v.nibbles)))
+    fn current(&mut self) -> Result<Option<Nibbles>, DatabaseError> {
+        Ok(self.cursor.current()?.map(|(_, v)| v.nibbles.0))
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{StorageTrieEntry, StoredBranchNode};
+    use crate::StorageTrieEntry;
     use reth_db_api::{cursor::DbCursorRW, transaction::DbTxMut};
     use reth_primitives::hex_literal::hex;
     use reth_provider::test_utils::create_test_provider_factory;
@@ -135,13 +149,13 @@ mod tests {
             cursor
                 .upsert(
                     key.into(),
-                    StoredBranchNode(BranchNodeCompact::new(
+                    BranchNodeCompact::new(
                         0b0000_0010_0000_0001,
                         0b0000_0010_0000_0001,
                         0,
                         Vec::default(),
                         None,
-                    )),
+                    ),
                 )
                 .unwrap();
         }

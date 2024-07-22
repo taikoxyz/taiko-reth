@@ -2,23 +2,26 @@
 
 use crate::{
     args::{
-        utils::{chain_help, genesis_value_parser, SUPPORTED_CHAINS},
+        utils::{chain_help, chain_value_parser, SUPPORTED_CHAINS},
         LogArgs,
     },
-    commands::{
-        config_cmd, db, debug_cmd, dump_genesis, import, init_cmd, init_state,
-        node::{self, NoArgs},
-        p2p, recover, stage, test_vectors,
-    },
+    commands::debug_cmd,
+    macros::block_executor,
     version::{LONG_VERSION, SHORT_VERSION},
 };
 use clap::{value_parser, Parser, Subcommand};
+use reth_chainspec::ChainSpec;
+use reth_cli_commands::{
+    config_cmd, db, dump_genesis, import, init_cmd, init_state,
+    node::{self, NoArgs},
+    p2p, prune, recover, stage,
+};
 use reth_cli_runner::CliRunner;
 use reth_db::DatabaseEnv;
 use reth_node_builder::{NodeBuilder, WithLaunchContext};
-use reth_primitives::ChainSpec;
 use reth_tracing::FileWorkerGuard;
 use std::{ffi::OsString, fmt, future::Future, sync::Arc};
+use tracing::info;
 
 /// Re-export of the `reth_node_core` types specifically in the `cli` module.
 ///
@@ -45,7 +48,7 @@ pub struct Cli<Ext: clap::Args + fmt::Debug = NoArgs> {
         value_name = "CHAIN_OR_PATH",
         long_help = chain_help(),
         default_value = SUPPORTED_CHAINS[0],
-        value_parser = genesis_value_parser,
+        value_parser = chain_value_parser,
         global = true,
     )]
     chain: Arc<ChainSpec>,
@@ -139,6 +142,7 @@ impl<Ext: clap::Args + fmt::Debug> Cli<Ext> {
             self.logs.log_file_directory.join(self.chain.chain.to_string());
 
         let _guard = self.init_tracing()?;
+        info!(target: "reth::cli", "Initialized tracing, debug log directory: {}", self.logs.log_file_directory);
 
         let runner = CliRunner::default();
         match self.command {
@@ -147,7 +151,9 @@ impl<Ext: clap::Args + fmt::Debug> Cli<Ext> {
             }
             Commands::Init(command) => runner.run_blocking_until_ctrl_c(command.execute()),
             Commands::InitState(command) => runner.run_blocking_until_ctrl_c(command.execute()),
-            Commands::Import(command) => runner.run_blocking_until_ctrl_c(command.execute()),
+            Commands::Import(command) => runner.run_blocking_until_ctrl_c(
+                command.execute(|chain_spec| block_executor!(chain_spec)),
+            ),
             #[cfg(feature = "optimism")]
             Commands::ImportOp(command) => runner.run_blocking_until_ctrl_c(command.execute()),
             #[cfg(feature = "optimism")]
@@ -156,12 +162,16 @@ impl<Ext: clap::Args + fmt::Debug> Cli<Ext> {
             }
             Commands::DumpGenesis(command) => runner.run_blocking_until_ctrl_c(command.execute()),
             Commands::Db(command) => runner.run_blocking_until_ctrl_c(command.execute()),
-            Commands::Stage(command) => runner.run_command_until_exit(|ctx| command.execute(ctx)),
+            Commands::Stage(command) => runner.run_command_until_exit(|ctx| {
+                command.execute(ctx, |chain_spec| block_executor!(chain_spec))
+            }),
             Commands::P2P(command) => runner.run_until_ctrl_c(command.execute()),
+            #[cfg(feature = "dev")]
             Commands::TestVectors(command) => runner.run_until_ctrl_c(command.execute()),
             Commands::Config(command) => runner.run_until_ctrl_c(command.execute()),
             Commands::Debug(command) => runner.run_command_until_exit(|ctx| command.execute(ctx)),
             Commands::Recover(command) => runner.run_command_until_exit(|ctx| command.execute(ctx)),
+            Commands::Prune(command) => runner.run_until_ctrl_c(command.execute()),
         }
     }
 
@@ -193,11 +203,11 @@ pub enum Commands<Ext: clap::Args + fmt::Debug = NoArgs> {
     /// This syncs RLP encoded OP blocks below Bedrock from a file, without executing.
     #[cfg(feature = "optimism")]
     #[command(name = "import-op")]
-    ImportOp(crate::commands::import_op::ImportOpCommand),
+    ImportOp(reth_optimism_cli::ImportOpCommand),
     /// This imports RLP encoded receipts from a file.
     #[cfg(feature = "optimism")]
     #[command(name = "import-receipts-op")]
-    ImportReceiptsOp(crate::commands::import_receipts_op::ImportReceiptsOpCommand),
+    ImportReceiptsOp(reth_optimism_cli::ImportReceiptsOpCommand),
     /// Dumps genesis block JSON configuration to stdout.
     DumpGenesis(dump_genesis::DumpGenesisCommand),
     /// Database debugging utilities
@@ -210,8 +220,9 @@ pub enum Commands<Ext: clap::Args + fmt::Debug = NoArgs> {
     #[command(name = "p2p")]
     P2P(p2p::Command),
     /// Generate Test Vectors
+    #[cfg(feature = "dev")]
     #[command(name = "test-vectors")]
-    TestVectors(test_vectors::Command),
+    TestVectors(reth_cli_commands::test_vectors::Command),
     /// Write config to stdout
     #[command(name = "config")]
     Config(config_cmd::Command),
@@ -221,6 +232,9 @@ pub enum Commands<Ext: clap::Args + fmt::Debug = NoArgs> {
     /// Scripts for node recovery
     #[command(name = "recover")]
     Recover(recover::Command),
+    /// Prune according to the configuration without any limits
+    #[command(name = "prune")]
+    Prune(prune::PruneCommand),
 }
 
 #[cfg(test)]

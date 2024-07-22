@@ -12,8 +12,9 @@ use crate::{
 };
 use futures::{Future, FutureExt, Stream, StreamExt};
 use reth_consensus::{test_utils::TestConsensus, Consensus};
+use reth_eth_wire_types::HeadersDirection;
 use reth_network_peers::{PeerId, WithPeerId};
-use reth_primitives::{Header, HeadersDirection, SealedHeader};
+use reth_primitives::{Header, SealedHeader};
 use std::{
     fmt,
     pin::Pin,
@@ -38,7 +39,7 @@ pub struct TestHeaderDownloader {
 
 impl TestHeaderDownloader {
     /// Instantiates the downloader with the mock responses
-    pub fn new(
+    pub const fn new(
         client: TestHeadersClient,
         consensus: Arc<TestConsensus>,
         limit: u64,

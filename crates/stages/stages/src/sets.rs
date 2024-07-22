@@ -12,7 +12,7 @@
 //! ```no_run
 //! # use reth_stages::Pipeline;
 //! # use reth_stages::sets::{OfflineStages};
-//! # use reth_primitives::MAINNET;
+//! # use reth_chainspec::MAINNET;
 //! # use reth_prune_types::PruneModes;
 //! # use reth_evm_ethereum::EthEvmConfig;
 //! # use reth_provider::StaticFileProviderFactory;
@@ -36,8 +36,8 @@
 use crate::{
     stages::{
         AccountHashingStage, BodyStage, ExecutionStage, FinishStage, HeaderStage,
-        IndexAccountHistoryStage, IndexStorageHistoryStage, MerkleStage, SenderRecoveryStage,
-        StorageHashingStage, TransactionLookupStage,
+        IndexAccountHistoryStage, IndexStorageHistoryStage, MerkleStage, PruneSenderRecoveryStage,
+        PruneStage, SenderRecoveryStage, StorageHashingStage, TransactionLookupStage,
     },
     StageSet, StageSetBuilder,
 };
@@ -46,9 +46,11 @@ use reth_consensus::Consensus;
 use reth_db_api::database::Database;
 use reth_evm::execute::BlockExecutorProvider;
 use reth_network_p2p::{bodies::downloader::BodyDownloader, headers::downloader::HeaderDownloader};
-use reth_provider::{HeaderSyncGapProvider, HeaderSyncMode};
+use reth_primitives::B256;
+use reth_provider::HeaderSyncGapProvider;
 use reth_prune_types::PruneModes;
-use std::sync::Arc;
+use std::{ops::Not, sync::Arc};
+use tokio::sync::watch;
 
 /// A set containing all stages to run a fully syncing instance of reth.
 ///
@@ -63,6 +65,7 @@ use std::sync::Arc;
 /// - [`BodyStage`]
 /// - [`SenderRecoveryStage`]
 /// - [`ExecutionStage`]
+/// - [`PruneSenderRecoveryStage`] (execute)
 /// - [`MerkleStage`] (unwind)
 /// - [`AccountHashingStage`]
 /// - [`StorageHashingStage`]
@@ -70,6 +73,7 @@ use std::sync::Arc;
 /// - [`TransactionLookupStage`]
 /// - [`IndexStorageHistoryStage`]
 /// - [`IndexAccountHistoryStage`]
+/// - [`PruneStage`] (execute)
 /// - [`FinishStage`]
 #[derive(Debug)]
 pub struct DefaultStages<Provider, H, B, EF> {
@@ -88,7 +92,7 @@ impl<Provider, H, B, E> DefaultStages<Provider, H, B, E> {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         provider: Provider,
-        header_mode: HeaderSyncMode,
+        tip: watch::Receiver<B256>,
         consensus: Arc<dyn Consensus>,
         header_downloader: H,
         body_downloader: B,
@@ -102,7 +106,7 @@ impl<Provider, H, B, E> DefaultStages<Provider, H, B, E> {
         Self {
             online: OnlineStages::new(
                 provider,
-                header_mode,
+                tip,
                 consensus,
                 header_downloader,
                 body_downloader,
@@ -120,7 +124,7 @@ where
     E: BlockExecutorProvider,
 {
     /// Appends the default offline stages and default finish stage to the given builder.
-    pub fn add_offline_stages<DB: Database>(
+    pub fn add_offline_stages<DB: Database + 'static>(
         default_offline: StageSetBuilder<DB>,
         executor_factory: E,
         stages_config: StageConfig,
@@ -159,8 +163,8 @@ where
 pub struct OnlineStages<Provider, H, B> {
     /// Sync gap provider for the headers stage.
     provider: Provider,
-    /// The sync mode for the headers stage.
-    header_mode: HeaderSyncMode,
+    /// The tip for the headers stage.
+    tip: watch::Receiver<B256>,
     /// The consensus engine used to validate incoming data.
     consensus: Arc<dyn Consensus>,
     /// The block header downloader
@@ -175,13 +179,13 @@ impl<Provider, H, B> OnlineStages<Provider, H, B> {
     /// Create a new set of online stages with default values.
     pub fn new(
         provider: Provider,
-        header_mode: HeaderSyncMode,
+        tip: watch::Receiver<B256>,
         consensus: Arc<dyn Consensus>,
         header_downloader: H,
         body_downloader: B,
         stages_config: StageConfig,
     ) -> Self {
-        Self { provider, header_mode, consensus, header_downloader, body_downloader, stages_config }
+        Self { provider, tip, consensus, header_downloader, body_downloader, stages_config }
     }
 }
 
@@ -203,7 +207,7 @@ where
     pub fn builder_with_bodies<DB: Database>(
         bodies: BodyStage<B>,
         provider: Provider,
-        mode: HeaderSyncMode,
+        tip: watch::Receiver<B256>,
         header_downloader: H,
         consensus: Arc<dyn Consensus>,
         stages_config: StageConfig,
@@ -212,7 +216,7 @@ where
             .add_stage(HeaderStage::new(
                 provider,
                 header_downloader,
-                mode,
+                tip,
                 consensus.clone(),
                 stages_config.etl,
             ))
@@ -232,7 +236,7 @@ where
             .add_stage(HeaderStage::new(
                 self.provider,
                 self.header_downloader,
-                self.header_mode,
+                self.tip,
                 self.consensus.clone(),
                 self.stages_config.etl.clone(),
             ))
@@ -245,13 +249,15 @@ where
 /// A combination of (in order)
 ///
 /// - [`ExecutionStages`]
+/// - [`PruneSenderRecoveryStage`]
 /// - [`HashingStages`]
 /// - [`HistoryIndexingStages`]
+/// - [`PruneStage`]
 #[derive(Debug, Default)]
 #[non_exhaustive]
 pub struct OfflineStages<EF> {
     /// Executor factory needs for execution stage
-    pub executor_factory: EF,
+    executor_factory: EF,
     /// Configuration for each stage in the pipeline
     stages_config: StageConfig,
     /// Prune configuration for every segment that can be pruned
@@ -272,7 +278,7 @@ impl<EF> OfflineStages<EF> {
 impl<E, DB> StageSet<DB> for OfflineStages<E>
 where
     E: BlockExecutorProvider,
-    DB: Database,
+    DB: Database + 'static,
 {
     fn builder(self) -> StageSetBuilder<DB> {
         ExecutionStages::new(
@@ -281,11 +287,21 @@ where
             self.prune_modes.clone(),
         )
         .builder()
+        // If sender recovery prune mode is set, add the prune sender recovery stage.
+        .add_stage_opt(self.prune_modes.sender_recovery.map(|prune_mode| {
+            PruneSenderRecoveryStage::new(prune_mode, self.stages_config.prune.commit_threshold)
+        }))
         .add_set(HashingStages { stages_config: self.stages_config.clone() })
         .add_set(HistoryIndexingStages {
             stages_config: self.stages_config.clone(),
-            prune_modes: self.prune_modes,
+            prune_modes: self.prune_modes.clone(),
         })
+        // If any prune modes are set, add the prune stage.
+        .add_stage_opt(self.prune_modes.is_empty().not().then(|| {
+            // Prune stage should be added after all hashing stages, because otherwise it will
+            // delete
+            PruneStage::new(self.prune_modes.clone(), self.stages_config.prune.commit_threshold)
+        }))
     }
 }
 

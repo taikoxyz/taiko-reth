@@ -53,7 +53,7 @@ pub use error::{
 };
 
 mod invalid_headers;
-use invalid_headers::InvalidHeaderCache;
+pub use invalid_headers::InvalidHeaderCache;
 
 mod event;
 pub use event::{BeaconConsensusEngineEvent, ConsensusEngineLiveSyncProgress};
@@ -62,13 +62,12 @@ mod handle;
 pub use handle::BeaconConsensusEngineHandle;
 
 mod forkchoice;
-pub use forkchoice::ForkchoiceStatus;
-use forkchoice::{ForkchoiceStateHash, ForkchoiceStateTracker};
+pub use forkchoice::{ForkchoiceStateHash, ForkchoiceStateTracker, ForkchoiceStatus};
 
 mod metrics;
 use metrics::EngineMetrics;
 
-pub(crate) mod sync;
+pub mod sync;
 use sync::{EngineSyncController, EngineSyncEvent};
 
 /// Hooks for running during the main loop of
@@ -88,6 +87,18 @@ const MAX_INVALID_HEADERS: u32 = 512u32;
 /// This is the default threshold, the distance to the head that the tree will be used for sync.
 /// If the distance exceeds this threshold, the pipeline will be used for sync.
 pub const MIN_BLOCKS_FOR_PIPELINE_RUN: u64 = EPOCH_SLOTS;
+
+/// Represents a pending forkchoice update.
+///
+/// This type encapsulates the necessary components for a pending forkchoice update
+/// in the context of a beacon consensus engine.
+///
+/// It consists of:
+/// - The current fork choice state.
+/// - Optional payload attributes specific to the engine type.
+/// - Sender for the result of an oneshot channel, conveying the outcome of the fork choice update.
+type PendingForkchoiceUpdate<PayloadAttributes> =
+    (ForkchoiceState, Option<PayloadAttributes>, oneshot::Sender<RethResult<OnForkChoiceUpdated>>);
 
 /// The beacon consensus engine is the driver that switches between historical and live sync.
 ///
@@ -190,12 +201,7 @@ where
     /// It is recorded if we cannot process the forkchoice update because
     /// a hook with database read-write access is active.
     /// This is a temporary solution to always process missed FCUs.
-    #[allow(clippy::type_complexity)]
-    pending_forkchoice_update: Option<(
-        ForkchoiceState,
-        Option<EngineT::PayloadAttributes>,
-        oneshot::Sender<RethResult<OnForkChoiceUpdated>>,
-    )>,
+    pending_forkchoice_update: Option<PendingForkchoiceUpdate<EngineT::PayloadAttributes>>,
     /// Tracks the header of invalid payloads that were rejected by the engine because they're
     /// invalid.
     invalid_headers: InvalidHeaderCache,
@@ -229,7 +235,7 @@ where
         + ChainSpecProvider
         + 'static,
     Client: HeadersClient + BodiesClient + Clone + Unpin + 'static,
-    EngineT: EngineTypes + Unpin + 'static,
+    EngineT: EngineTypes + Unpin,
 {
     /// Create a new instance of the [`BeaconConsensusEngine`].
     #[allow(clippy::too_many_arguments)]
@@ -240,7 +246,6 @@ where
         task_spawner: Box<dyn TaskSpawner>,
         sync_state_updater: Box<dyn NetworkSyncUpdater>,
         max_block: Option<BlockNumber>,
-        run_pipeline_continuously: bool,
         payload_builder: PayloadBuilderHandle<EngineT>,
         target: Option<B256>,
         pipeline_run_threshold: u64,
@@ -254,7 +259,6 @@ where
             task_spawner,
             sync_state_updater,
             max_block,
-            run_pipeline_continuously,
             payload_builder,
             target,
             pipeline_run_threshold,
@@ -285,7 +289,6 @@ where
         task_spawner: Box<dyn TaskSpawner>,
         sync_state_updater: Box<dyn NetworkSyncUpdater>,
         max_block: Option<BlockNumber>,
-        run_pipeline_continuously: bool,
         payload_builder: PayloadBuilderHandle<EngineT>,
         target: Option<B256>,
         pipeline_run_threshold: u64,
@@ -299,7 +302,6 @@ where
             pipeline,
             client,
             task_spawner.clone(),
-            run_pipeline_continuously,
             max_block,
             blockchain.chain_spec(),
             event_sender.clone(),
@@ -1448,11 +1450,6 @@ where
             return Ok(())
         }
 
-        // update the canon chain if continuous is enabled
-        if self.sync.run_pipeline_continuously() {
-            self.set_canonical_head(ctrl.block_number().unwrap_or_default())?;
-        }
-
         let sync_target_state = match self.forkchoice_state_tracker.sync_target_state() {
             Some(current_state) => current_state,
             None => {
@@ -1804,7 +1801,7 @@ where
         + ChainSpecProvider
         + Unpin
         + 'static,
-    EngineT: EngineTypes + Unpin + 'static,
+    EngineT: EngineTypes + Unpin,
 {
     type Output = Result<(), BeaconConsensusEngineError>;
 
@@ -1984,7 +1981,7 @@ mod tests {
         BeaconForkChoiceUpdateError,
     };
     use assert_matches::assert_matches;
-    use reth_primitives::{ChainSpecBuilder, MAINNET};
+    use reth_chainspec::{ChainSpecBuilder, MAINNET};
     use reth_provider::{BlockWriter, ProviderFactory};
     use reth_rpc_types::engine::{ForkchoiceState, ForkchoiceUpdated, PayloadStatus};
     use reth_rpc_types_compat::engine::payload::block_to_payload_v1;
@@ -2169,9 +2166,8 @@ mod tests {
                 provider
                     .insert_block(
                         b.clone().try_seal_with_senders().expect("invalid tx signature in block"),
-                        None,
                     )
-                    .map(|_| ())
+                    .map(drop)
             })
             .expect("failed to insert");
         provider.commit().unwrap();
@@ -2499,8 +2495,9 @@ mod tests {
 
     mod new_payload {
         use super::*;
+        use alloy_genesis::Genesis;
         use reth_db::test_utils::create_test_static_files_dir;
-        use reth_primitives::{genesis::Genesis, Hardfork, U256};
+        use reth_primitives::{EthereumHardfork, U256};
         use reth_provider::{
             providers::StaticFileProvider, test_utils::blocks::BlockchainTestData,
         };
@@ -2729,9 +2726,9 @@ mod tests {
         async fn payload_pre_merge() {
             let data = BlockchainTestData::default();
             let mut block1 = data.blocks[0].0.block.clone();
-            block1
-                .header
-                .set_difficulty(MAINNET.fork(Hardfork::Paris).ttd().unwrap() - U256::from(1));
+            block1.header.set_difficulty(
+                MAINNET.fork(EthereumHardfork::Paris).ttd().unwrap() - U256::from(1),
+            );
             block1 = block1.unseal().seal_slow();
             let (block2, exec_result2) = data.blocks[1].clone();
             let mut block2 = block2.unseal().block;

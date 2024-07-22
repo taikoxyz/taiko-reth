@@ -13,7 +13,7 @@ mod chain_info;
 pub use chain_info::CanonChainTracker;
 
 mod header_sync_gap;
-pub use header_sync_gap::{HeaderSyncGap, HeaderSyncGapProvider, HeaderSyncMode};
+pub use header_sync_gap::{HeaderSyncGap, HeaderSyncGapProvider};
 
 mod state;
 pub use state::StateWriter;
@@ -21,7 +21,8 @@ pub use state::StateWriter;
 mod chain;
 pub use chain::{
     CanonStateNotification, CanonStateNotificationSender, CanonStateNotificationStream,
-    CanonStateNotifications, CanonStateSubscriptions,
+    CanonStateNotifications, CanonStateSubscriptions, ForkChoiceNotifications, ForkChoiceStream,
+    ForkChoiceSubscriptions,
 };
 
 mod spec;
@@ -43,7 +44,7 @@ mod stats;
 pub use stats::StatsReader;
 
 mod full;
-pub use full::FullProvider;
+pub use full::{FullProvider, FullRpcProvider};
 
 mod tree_viewer;
 pub use tree_viewer::TreeViewer;

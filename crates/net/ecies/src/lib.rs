@@ -14,11 +14,11 @@ pub mod stream;
 pub mod util;
 
 mod error;
-pub use error::ECIESError;
+pub use error::{ECIESError, ECIESErrorImpl};
 
-mod codec;
+pub mod codec;
 
-use reth_primitives::{
+use alloy_primitives::{
     bytes::{Bytes, BytesMut},
     B512 as PeerId,
 };

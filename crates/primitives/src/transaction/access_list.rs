@@ -10,20 +10,26 @@ mod tests {
     use crate::{Address, B256};
     use alloy_rlp::{RlpDecodable, RlpDecodableWrapper, RlpEncodable, RlpEncodableWrapper};
     use proptest::proptest;
-    use reth_codecs::{main_codec, Compact};
+    use proptest_arbitrary_interop::arb;
+    use reth_codecs::{reth_codec, Compact};
+    use serde::{Deserialize, Serialize};
 
     /// This type is kept for compatibility tests after the codec support was added to alloy-eips
     /// AccessList type natively
-    #[main_codec(rlp)]
+    #[reth_codec(rlp)]
     #[derive(
-        Clone, Debug, PartialEq, Eq, Hash, Default, RlpDecodableWrapper, RlpEncodableWrapper,
+        Clone,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash,
+        Default,
+        RlpDecodableWrapper,
+        RlpEncodableWrapper,
+        Serialize,
+        Deserialize,
     )]
-    struct RethAccessList(
-        #[proptest(
-            strategy = "proptest::collection::vec(proptest::arbitrary::any::<RethAccessListItem>(), 0..=20)"
-        )]
-        Vec<RethAccessListItem>,
-    );
+    struct RethAccessList(Vec<RethAccessListItem>);
 
     impl PartialEq<AccessList> for RethAccessList {
         fn eq(&self, other: &AccessList) -> bool {
@@ -32,8 +38,19 @@ mod tests {
     }
 
     // This
-    #[main_codec(rlp)]
-    #[derive(Clone, Debug, PartialEq, Eq, Hash, Default, RlpDecodable, RlpEncodable)]
+    #[reth_codec(rlp)]
+    #[derive(
+        Clone,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash,
+        Default,
+        RlpDecodable,
+        RlpEncodable,
+        Serialize,
+        Deserialize,
+    )]
     #[serde(rename_all = "camelCase")]
     struct RethAccessListItem {
         /// Account address that would be loaded at the start of execution
@@ -41,9 +58,6 @@ mod tests {
         /// The storage keys to be loaded at the start of execution.
         ///
         /// Each key is a 32-byte value representing a specific storage slot.
-        #[proptest(
-            strategy = "proptest::collection::vec(proptest::arbitrary::any::<B256>(), 0..=20)"
-        )]
         storage_keys: Vec<B256>,
     }
 
@@ -55,11 +69,11 @@ mod tests {
 
     proptest!(
         #[test]
-        fn test_roundtrip_accesslist_compat(access_list: RethAccessList) {
+        fn test_roundtrip_accesslist_compat(access_list in arb::<RethAccessList>()) {
             // Convert access_list to buffer and then create alloy_access_list from buffer and
             // compare
             let mut compacted_reth_access_list = Vec::<u8>::new();
-            let len = access_list.clone().to_compact(&mut compacted_reth_access_list);
+            let len = access_list.to_compact(&mut compacted_reth_access_list);
 
             // decode the compacted buffer to AccessList
             let alloy_access_list = AccessList::from_compact(&compacted_reth_access_list, len).0;

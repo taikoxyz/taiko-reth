@@ -12,6 +12,7 @@ use reth_blockchain_tree_api::{
     BlockValidationKind, BlockchainTreeEngine, BlockchainTreeViewer, CanonicalOutcome,
     InsertPayloadOk,
 };
+use reth_chainspec::{ChainInfo, ChainSpec};
 use reth_db_api::{
     database::Database,
     models::{AccountBeforeTx, StoredBlockBodyIndices},
@@ -19,9 +20,9 @@ use reth_db_api::{
 use reth_evm::ConfigureEvmEnv;
 use reth_primitives::{
     Account, Address, Block, BlockHash, BlockHashOrNumber, BlockId, BlockNumHash, BlockNumber,
-    BlockNumberOrTag, BlockWithSenders, ChainInfo, ChainSpec, Header, Receipt, SealedBlock,
-    SealedBlockWithSenders, SealedHeader, TransactionMeta, TransactionSigned,
-    TransactionSignedNoHash, TxHash, TxNumber, Withdrawal, Withdrawals, B256, U256,
+    BlockNumberOrTag, BlockWithSenders, Header, Receipt, SealedBlock, SealedBlockWithSenders,
+    SealedHeader, TransactionMeta, TransactionSigned, TransactionSignedNoHash, TxHash, TxNumber,
+    Withdrawal, Withdrawals, B256, U256,
 };
 use reth_prune_types::{PruneCheckpoint, PruneSegment};
 use reth_stages_types::{StageCheckpoint, StageId};
@@ -54,7 +55,7 @@ mod bundle_state_provider;
 pub use bundle_state_provider::BundleStateProvider;
 
 mod chain_info;
-use chain_info::ChainInfoTracker;
+pub use chain_info::ChainInfoTracker;
 
 mod consistent_view;
 use alloy_rpc_types_engine::ForkchoiceState;
@@ -73,6 +74,8 @@ pub struct BlockchainProvider<DB> {
     tree: Arc<dyn TreeViewer>,
     /// Tracks the chain info wrt forkchoice updates
     chain_info: ChainInfoTracker,
+    // TODO: replace chain_info with CanonicalInMemoryState.
+    //canonical_in_memory_state: CanonicalInMemoryState,
 }
 
 impl<DB> Clone for BlockchainProvider<DB> {
@@ -81,6 +84,8 @@ impl<DB> Clone for BlockchainProvider<DB> {
             database: self.database.clone(),
             tree: self.tree.clone(),
             chain_info: self.chain_info.clone(),
+            // TODO: add canonical_in_memory_state
+            // canonical_in_memory_state: self.canonical_in_memory_state.clone(),
         }
     }
 }
@@ -91,9 +96,17 @@ impl<DB> BlockchainProvider<DB> {
     pub fn with_latest(
         database: ProviderFactory<DB>,
         tree: Arc<dyn TreeViewer>,
+        // TODO: add in_memory_state
+        // in_memory_state: Arc<dyn InMemoryState>,
         latest: SealedHeader,
     ) -> Self {
-        Self { database, tree, chain_info: ChainInfoTracker::new(latest) }
+        Self {
+            database,
+            tree,
+            // TODO: add in_memory_state
+            // in_memory_state,
+            chain_info: ChainInfoTracker::new(latest),
+        }
     }
 
     /// Sets the treeviewer for the provider.
@@ -277,7 +290,7 @@ where
                 block
             }
             BlockSource::Pending => self.tree.block_by_hash(hash).map(|block| block.unseal()),
-            BlockSource::Database => self.database.block_by_hash(hash)?,
+            BlockSource::Canonical => self.database.block_by_hash(hash)?,
         };
 
         Ok(block)
@@ -325,6 +338,14 @@ where
         transaction_kind: TransactionVariant,
     ) -> ProviderResult<Option<BlockWithSenders>> {
         self.database.block_with_senders(id, transaction_kind)
+    }
+
+    fn sealed_block_with_senders(
+        &self,
+        id: BlockHashOrNumber,
+        transaction_kind: TransactionVariant,
+    ) -> ProviderResult<Option<SealedBlockWithSenders>> {
+        self.database.sealed_block_with_senders(id, transaction_kind)
     }
 
     fn block_range(&self, range: RangeInclusive<BlockNumber>) -> ProviderResult<Vec<Block>> {
@@ -505,6 +526,10 @@ where
     fn get_stage_checkpoint_progress(&self, id: StageId) -> ProviderResult<Option<Vec<u8>>> {
         self.database.provider()?.get_stage_checkpoint_progress(id)
     }
+
+    fn get_all_checkpoints(&self) -> ProviderResult<Vec<(String, StageCheckpoint)>> {
+        self.database.provider()?.get_all_checkpoints()
+    }
 }
 
 impl<DB> EvmEnvProvider for BlockchainProvider<DB>
@@ -535,22 +560,6 @@ where
         EvmConfig: ConfigureEvmEnv,
     {
         self.database.provider()?.fill_env_with_header(cfg, block_env, header, evm_config)
-    }
-
-    fn fill_block_env_at(
-        &self,
-        block_env: &mut BlockEnv,
-        at: BlockHashOrNumber,
-    ) -> ProviderResult<()> {
-        self.database.provider()?.fill_block_env_at(block_env, at)
-    }
-
-    fn fill_block_env_with_header(
-        &self,
-        block_env: &mut BlockEnv,
-        header: &Header,
-    ) -> ProviderResult<()> {
-        self.database.provider()?.fill_block_env_with_header(block_env, header)
     }
 
     fn fill_cfg_env_at<EvmConfig>(
@@ -587,6 +596,10 @@ where
         segment: PruneSegment,
     ) -> ProviderResult<Option<PruneCheckpoint>> {
         self.database.provider()?.get_prune_checkpoint(segment)
+    }
+
+    fn get_prune_checkpoints(&self) -> ProviderResult<Vec<(PruneSegment, PruneCheckpoint)>> {
+        self.database.provider()?.get_prune_checkpoints()
     }
 }
 
@@ -811,7 +824,7 @@ where
                 // trait impl
                 if Some(true) == hash.require_canonical {
                     // check the database, canonical blocks are only stored in the database
-                    self.find_block_by_hash(hash.block_hash, BlockSource::Database)
+                    self.find_block_by_hash(hash.block_hash, BlockSource::Canonical)
                 } else {
                     self.block_by_hash(hash.block_hash)
                 }
