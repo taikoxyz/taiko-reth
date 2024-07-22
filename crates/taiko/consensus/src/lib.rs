@@ -13,8 +13,8 @@ use reth_consensus::{Consensus, ConsensusError, PostExecutionInput};
 use reth_consensus_common::validation::{
     validate_4844_header_standalone, validate_against_parent_4844,
     validate_against_parent_eip1559_base_fee, validate_against_parent_hash_number,
-    validate_against_parent_timestamp, validate_block_pre_execution, validate_header_base_fee,
-    validate_header_extradata, validate_header_gas,
+    validate_block_pre_execution, validate_header_base_fee, validate_header_extradata,
+    validate_header_gas,
 };
 use reth_primitives::{
     constants::MINIMUM_GAS_LIMIT, BlockWithSenders, Header, SealedBlock, SealedHeader,
@@ -47,37 +47,10 @@ impl TaikoBeaconConsensus {
     fn validate_against_parent_gas_limit(
         &self,
         header: &SealedHeader,
-        parent: &SealedHeader,
+        _parent: &SealedHeader,
     ) -> Result<(), ConsensusError> {
-        // Determine the parent gas limit, considering elasticity multiplier on the London fork.
-        let parent_gas_limit =
-            if self.chain_spec.fork(Hardfork::London).transitions_at_block(header.number) {
-                parent.gas_limit *
-                    self.chain_spec
-                        .base_fee_params_at_timestamp(header.timestamp)
-                        .elasticity_multiplier as u64
-            } else {
-                parent.gas_limit
-            };
-
-        // Check for an increase in gas limit beyond the allowed threshold.
-        if header.gas_limit > parent_gas_limit {
-            if header.gas_limit - parent_gas_limit >= parent_gas_limit / 1024 {
-                return Err(ConsensusError::GasLimitInvalidIncrease {
-                    parent_gas_limit,
-                    child_gas_limit: header.gas_limit,
-                })
-            }
-        }
-        // Check for a decrease in gas limit beyond the allowed threshold.
-        else if parent_gas_limit - header.gas_limit >= parent_gas_limit / 1024 {
-            return Err(ConsensusError::GasLimitInvalidDecrease {
-                parent_gas_limit,
-                child_gas_limit: header.gas_limit,
-            })
-        }
         // Check if the self gas limit is below the minimum required limit.
-        else if header.gas_limit < MINIMUM_GAS_LIMIT {
+        if header.gas_limit < MINIMUM_GAS_LIMIT {
             return Err(ConsensusError::GasLimitInvalidMinimum { child_gas_limit: header.gas_limit })
         }
 
@@ -221,6 +194,30 @@ impl Consensus for TaikoBeaconConsensus {
         validate_block_post_execution(block, &self.chain_spec, input.receipts, input.requests)
     }
 }
+
+/// Validates the timestamp against the parent to make sure it is in the past.
+#[inline]
+fn validate_against_parent_timestamp(
+    header: &SealedHeader,
+    parent: &SealedHeader,
+) -> Result<(), ConsensusError> {
+    if header.timestamp < parent.timestamp {
+        return Err(ConsensusError::TimestampIsInPast {
+            parent_timestamp: parent.timestamp,
+            timestamp: header.timestamp,
+        })
+    }
+    Ok(())
+}
+
+// #[inline]
+// fn validate_ommers(header: &SealedHeader) -> Result<(), ConsensusError> {
+//     if header.ommers_hash == EMPTY_OMMER_ROOT_HASH  {
+//         return Err(ConsensusError::OmmersHashEmpty)
+//     }
+//     Ok(())
+
+// }
 
 #[cfg(test)]
 mod tests {

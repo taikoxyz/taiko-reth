@@ -296,6 +296,11 @@ pub static TAIKO_INTERNAL_L2_A: Lazy<Arc<ChainSpec>> = Lazy::new(|| {
         chain: TaikoNamedChain::TaikoInternalL2A.into(),
         genesis: get_taiko_genesis(TaikoNamedChain::TaikoInternalL2A),
         hardforks: BTreeMap::from([
+            (
+                Hardfork::Paris,
+                ForkCondition::TTD { fork_block: None, total_difficulty: U256::ZERO },
+            ),
+            (Hardfork::London, ForkCondition::Block(0)),
             (Hardfork::Shanghai, ForkCondition::Block(0)),
             (Hardfork::Cancun, ForkCondition::Never),
         ]),
@@ -315,6 +320,11 @@ pub static TAIKO_TESTNET: Lazy<Arc<ChainSpec>> = Lazy::new(|| {
         chain: TaikoNamedChain::Katla.into(),
         genesis: get_taiko_genesis(TaikoNamedChain::Katla),
         hardforks: BTreeMap::from([
+            (
+                Hardfork::Paris,
+                ForkCondition::TTD { fork_block: None, total_difficulty: U256::ZERO },
+            ),
+            (Hardfork::London, ForkCondition::Block(0)),
             (Hardfork::Shanghai, ForkCondition::Block(0)),
             (Hardfork::Cancun, ForkCondition::Never),
         ]),
@@ -336,6 +346,11 @@ pub static TAIKO_HEKLA: Lazy<Arc<ChainSpec>> = Lazy::new(|| {
         genesis_hash: None,
         paris_block_and_final_difficulty: None,
         hardforks: BTreeMap::from([
+            (
+                Hardfork::Paris,
+                ForkCondition::TTD { fork_block: None, total_difficulty: U256::ZERO },
+            ),
+            (Hardfork::London, ForkCondition::Block(0)),
             (Hardfork::Shanghai, ForkCondition::Block(0)),
             (Hardfork::Cancun, ForkCondition::default()),
         ]),
@@ -354,6 +369,11 @@ pub static TAIKO_MAINNET: Lazy<Arc<ChainSpec>> = Lazy::new(|| {
         genesis_hash: None,
         paris_block_and_final_difficulty: None,
         hardforks: BTreeMap::from([
+            (
+                Hardfork::Paris,
+                ForkCondition::TTD { fork_block: None, total_difficulty: U256::ZERO },
+            ),
+            (Hardfork::London, ForkCondition::Block(0)),
             (Hardfork::Shanghai, ForkCondition::Block(0)),
             (Hardfork::Cancun, ForkCondition::default()),
         ]),

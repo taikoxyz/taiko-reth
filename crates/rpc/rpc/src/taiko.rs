@@ -55,6 +55,7 @@ where
         content
     }
 
+    #[allow(clippy::type_complexity)]
     fn get_txs(
         &self,
         locals: &[String],
