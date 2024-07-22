@@ -304,7 +304,7 @@ where
         let taiko_tx_env_with_recovered = |tx: &TransactionSignedEcRecovered| -> TxEnv {
             let mut tx_env = tx_env_with_recovered(tx);
             tx_env.taiko.is_anchor = is_anchor;
-            tx_env.taiko.treasury = chain_spec.l2_contract.unwrap();
+            tx_env.taiko.treasury = chain_spec.treasury();
             tx_env
         };
         let env = EnvWithHandlerCfg::new_with_cfg_env(
@@ -507,7 +507,7 @@ fn check_anchor_tx(
     // Extract the `to` address
     let TxKind::Call(to) = anchor.to else { bail!("anchor tx not a smart contract call") };
     // Check that the L2 contract is being called
-    ensure!(to == chain_spec.l2_contract.unwrap(), "anchor transaction to mismatch");
+    ensure!(to == chain_spec.treasury(), "anchor transaction to mismatch");
     // Check that it's from the golden touch address
     ensure!(from == *GOLDEN_TOUCH_ACCOUNT, "anchor transaction from mismatch");
     // Tx can't have any ETH attached

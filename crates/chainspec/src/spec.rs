@@ -67,8 +67,6 @@ pub static MAINNET: Lazy<Arc<ChainSpec>> = Lazy::new(|| {
         )),
         base_fee_params: BaseFeeParamsKind::Constant(BaseFeeParams::ethereum()),
         prune_delete_limit: 3500,
-        #[cfg(feature = "taiko")]
-        l2_contract: None,
     }
     .into()
 });
@@ -93,8 +91,6 @@ pub static GOERLI: Lazy<Arc<ChainSpec>> = Lazy::new(|| {
         )),
         base_fee_params: BaseFeeParamsKind::Constant(BaseFeeParams::ethereum()),
         prune_delete_limit: 1700,
-        #[cfg(feature = "taiko")]
-        l2_contract: None,
     }
     .into()
 });
@@ -119,8 +115,6 @@ pub static SEPOLIA: Lazy<Arc<ChainSpec>> = Lazy::new(|| {
         )),
         base_fee_params: BaseFeeParamsKind::Constant(BaseFeeParams::ethereum()),
         prune_delete_limit: 1700,
-        #[cfg(feature = "taiko")]
-        l2_contract: None,
     }
     .into()
 });
@@ -143,8 +137,6 @@ pub static HOLESKY: Lazy<Arc<ChainSpec>> = Lazy::new(|| {
         )),
         base_fee_params: BaseFeeParamsKind::Constant(BaseFeeParams::ethereum()),
         prune_delete_limit: 1700,
-        #[cfg(feature = "taiko")]
-        l2_contract: None,
     }
     .into()
 });
@@ -311,7 +303,6 @@ pub static TAIKO_INTERNAL_L2_A: Lazy<Arc<ChainSpec>> = Lazy::new(|| {
             max_change_denominator: 8,
             elasticity_multiplier: 2,
         }),
-        l2_contract: None,
         ..Default::default()
     }
     .into()
@@ -331,7 +322,6 @@ pub static TAIKO_TESTNET: Lazy<Arc<ChainSpec>> = Lazy::new(|| {
             max_change_denominator: 8,
             elasticity_multiplier: 2,
         }),
-        l2_contract: None,
         ..Default::default()
     }
     .into()
@@ -350,7 +340,6 @@ pub static TAIKO_HEKLA: Lazy<Arc<ChainSpec>> = Lazy::new(|| {
             (Hardfork::Cancun, ForkCondition::default()),
         ]),
         deposit_contract: None,
-        l2_contract: None,
         ..Default::default()
     }
     .into()
@@ -369,7 +358,6 @@ pub static TAIKO_MAINNET: Lazy<Arc<ChainSpec>> = Lazy::new(|| {
             (Hardfork::Cancun, ForkCondition::default()),
         ]),
         deposit_contract: None,
-        l2_contract: None,
         ..Default::default()
     }
     .into()
@@ -441,10 +429,6 @@ pub struct ChainSpec {
     /// the amount of blocks between pruner runs to account for the difference in amount of new
     /// data coming in.
     pub prune_delete_limit: usize,
-
-    /// The l2 contract address for Taiko chains
-    #[cfg(feature = "taiko")]
-    pub l2_contract: Option<Address>,
 }
 
 impl Default for ChainSpec {
@@ -458,8 +442,6 @@ impl Default for ChainSpec {
             deposit_contract: Default::default(),
             base_fee_params: BaseFeeParamsKind::Constant(BaseFeeParams::ethereum()),
             prune_delete_limit: MAINNET.prune_delete_limit,
-            #[cfg(feature = "taiko")]
-            l2_contract: None,
         }
     }
 }

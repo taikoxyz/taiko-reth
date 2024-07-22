@@ -1,9 +1,25 @@
+use core::str::FromStr;
 use std::collections::BTreeMap;
 
+use crate::ChainSpec;
 use alloy_chains::Chain;
 use alloy_genesis::{ChainConfig, Genesis, GenesisAccount};
 use once_cell::sync::Lazy;
 use revm_primitives::{Address, Bytes, FixedBytes, U256};
+
+impl ChainSpec {
+    /// Returns the treasury address for the chain.
+    #[inline]
+    pub fn treasury(&self) -> Address {
+        const SUFFIX: &str = "10001";
+        let prefix = self.chain().id().to_string();
+        Address::from_str(&format!(
+            "{prefix}{}{SUFFIX}",
+            "0".repeat(Address::len_bytes() * 2 - prefix.len() - SUFFIX.len())
+        ))
+        .unwrap()
+    }
+}
 
 // Taiko Chain Configuration, sets the chain_id to the internal devnet L2A by default.
 static TAIKO_CHAIN_CONFIG: Lazy<ChainConfig> = Lazy::new(|| ChainConfig {
