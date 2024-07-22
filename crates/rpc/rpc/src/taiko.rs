@@ -139,10 +139,10 @@ where
     /// TxPoolContent retrieves the transaction pool content with the given upper limits.
     async fn txpool_content(
         &self,
-        beneficiary: Address,
-        base_fee: u64,
-        block_max_gas_limit: u64,
-        max_bytes_per_tx_list: u64,
+        _beneficiary: Address,
+        _base_fee: u64,
+        _block_max_gas_limit: u64,
+        _max_bytes_per_tx_list: u64,
         locals: Vec<String>,
         max_transactions_lists: u64,
     ) -> RpcResult<Vec<Vec<Transaction>>> {
