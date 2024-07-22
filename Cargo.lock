@@ -9751,10 +9751,14 @@ dependencies = [
 name = "taiko-reth-beacon-consensus"
 version = "1.0.0"
 dependencies = [
+ "alloy-sol-types",
+ "anyhow",
+ "lazy_static",
  "reth-chainspec",
  "reth-consensus",
  "reth-consensus-common",
  "reth-primitives",
+ "revm-primitives",
  "tracing",
 ]
 
@@ -9781,8 +9785,6 @@ version = "1.0.0"
 dependencies = [
  "alloy-eips",
  "alloy-sol-types",
- "anyhow",
- "lazy_static",
  "reth-chainspec",
  "reth-evm",
  "reth-execution-types",
@@ -9821,9 +9823,7 @@ name = "taiko-reth-payload-builder"
 version = "1.0.0"
 dependencies = [
  "alloy-rlp",
- "anyhow",
  "reth-basic-payload-builder",
- "reth-chainspec",
  "reth-errors",
  "reth-evm",
  "reth-payload-builder",
@@ -9831,6 +9831,7 @@ dependencies = [
  "reth-provider",
  "reth-revm",
  "reth-transaction-pool",
+ "taiko-reth-beacon-consensus",
  "taiko-reth-engine-primitives",
  "taiko-reth-evm",
  "taiko-reth-primitives",

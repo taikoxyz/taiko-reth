@@ -1,8 +1,8 @@
 //! Taiko related functionality for the block executor.
 
-use anyhow::{anyhow, bail, ensure, Context, Result};
+use anyhow::{anyhow, bail, ensure, Result};
 use lazy_static::lazy_static;
-use reth_primitives::{Block, TransactionSigned, TxKind};
+use reth_primitives::{Block, Header, TransactionSigned, TxKind};
 use revm_primitives::{alloy_primitives::uint, Address, U256};
 use std::str::FromStr;
 
@@ -49,7 +49,16 @@ pub fn check_anchor_signature(anchor: &TransactionSigned) -> Result<()> {
 
 use alloy_sol_types::{sol, SolCall};
 
-use crate::execute::TaikoData;
+/// Data required to validate a Taiko Block
+#[derive(Clone, Debug, Default)]
+pub struct TaikoData {
+    /// header
+    pub l1_header: Header,
+    /// parent L1 header
+    pub parent_header: Header,
+    /// L2 contract
+    pub l2_contract: Address,
+}
 
 sol! {
     /// Anchor call
@@ -75,10 +84,11 @@ pub fn decode_anchor(bytes: &[u8]) -> Result<anchorCall> {
 /// Verifies the anchor tx correctness
 pub fn check_anchor_tx(
     tx: &TransactionSigned,
-    from: &Address,
-    block: &Block,
-    taiko_data: &TaikoData,
-) -> Result<()> {
+    from: Address,
+    base_fee_per_gas: u64,
+    treasury: Address,
+) -> anyhow::Result<()> {
+    use anyhow::{anyhow, bail, ensure, Context};
     let anchor = tx.as_eip1559().context(anyhow!("anchor tx is not an EIP1559 tx"))?;
 
     // Check the signature
@@ -86,20 +96,28 @@ pub fn check_anchor_tx(
 
     // Extract the `to` address
     let TxKind::Call(to) = anchor.to else { bail!("anchor tx not a smart contract call") };
-    // Check that it's from the golden touch address
-    ensure!(*from == *GOLDEN_TOUCH_ACCOUNT, "anchor transaction from mismatch");
     // Check that the L2 contract is being called
-    ensure!(to == taiko_data.l2_contract, "anchor transaction to mismatch");
+    ensure!(to == treasury, "anchor transaction to mismatch");
+    // Check that it's from the golden touch address
+    ensure!(from == *GOLDEN_TOUCH_ACCOUNT, "anchor transaction from mismatch");
     // Tx can't have any ETH attached
     ensure!(anchor.value == U256::from(0), "anchor transaction value mismatch");
     // Tx needs to have the expected gas limit
     ensure!(anchor.gas_limit == ANCHOR_GAS_LIMIT, "anchor transaction gas price mismatch");
     // Check needs to have the base fee set to the block base fee
-    ensure!(
-        anchor.max_fee_per_gas == block.header.base_fee_per_gas.unwrap().into(),
-        "anchor transaction gas mismatch"
-    );
+    ensure!(anchor.max_fee_per_gas == base_fee_per_gas as u128, "anchor transaction gas mismatch");
+    Ok(())
+}
 
+/// Verifies the anchor tx correctness
+pub fn check_anchor_tx_with_calldata(
+    tx: &TransactionSigned,
+    from: Address,
+    block: &Block,
+    taiko_data: &TaikoData,
+) -> Result<()> {
+    check_anchor_tx(tx, from, block.base_fee_per_gas.unwrap_or_default(), taiko_data.l2_contract)?;
+    let anchor = tx.as_eip1559().unwrap();
     // Okay now let's decode the anchor tx to verify the inputs
     let anchor_call = decode_anchor(&anchor.input)?;
     // The L1 blockhash needs to match the expected value

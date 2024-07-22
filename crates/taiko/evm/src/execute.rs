@@ -30,7 +30,9 @@ use revm_primitives::{
     db::{Database, DatabaseCommit},
     Address, BlockEnv, CfgEnvWithHandlerCfg, EnvWithHandlerCfg, HashSet, ResultAndState,
 };
-use taiko_reth_beacon_consensus::validate_block_post_execution;
+use taiko_reth_beacon_consensus::{
+    check_anchor_tx_with_calldata, validate_block_post_execution, TaikoData,
+};
 
 #[cfg(not(feature = "std"))]
 use alloc::{sync::Arc, vec, vec::Vec};
@@ -178,7 +180,7 @@ where
 
             // verify the anchor tx
             if is_anchor {
-                crate::anchor::check_anchor_tx(transaction, sender, &block.block, &taiko_data)
+                check_anchor_tx_with_calldata(transaction, *sender, &block.block, &taiko_data)
                     .map_err(|e| BlockExecutionError::CanonicalRevert { inner: e.to_string() })?;
             }
 
@@ -293,17 +295,6 @@ pub struct TaikoBlockExecutor<EvmConfig, DB> {
     state: State<DB>,
     /// Taiko data
     taiko_data: Option<TaikoData>,
-}
-
-/// Data required to validate a Taiko Block
-#[derive(Clone, Debug, Default)]
-pub struct TaikoData {
-    /// header
-    pub l1_header: Header,
-    /// parent L1 header
-    pub parent_header: Header,
-    /// L2 contract
-    pub l2_contract: Address,
 }
 
 impl<EvmConfig, DB> TaikoBlockExecutor<EvmConfig, DB> {

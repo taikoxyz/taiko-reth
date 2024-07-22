@@ -18,3 +18,13 @@ reth-primitives = { workspace = true, features = ["taiko"] }
 reth-consensus.workspace = true
 
 tracing.workspace = true
+
+# Alloy
+alloy-sol-types.workspace = true
+
+# Ethereum
+revm-primitives = { workspace = true, features = ["taiko"] }
+
+# Misc
+lazy_static.workspace = true
+anyhow.workspace = true

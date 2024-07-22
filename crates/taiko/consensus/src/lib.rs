@@ -25,6 +25,9 @@ use std::{sync::Arc, time::SystemTime};
 mod validation;
 pub use validation::validate_block_post_execution;
 
+mod anchor;
+pub use anchor::*;
+
 /// Taiko beacon consensus
 ///
 /// This consensus engine does basic checks as outlined in the execution specs.
