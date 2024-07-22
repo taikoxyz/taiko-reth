@@ -16,6 +16,7 @@ reth-chainspec.workspace = true
 reth-evm.workspace = true
 reth-primitives.workspace = true
 reth-revm.workspace = true
+reth-consensus.workspace = true
 reth-ethereum-consensus.workspace = true
 reth-prune-types.workspace = true
 reth-execution-types.workspace = true
@@ -27,9 +28,12 @@ revm-primitives.workspace = true
 alloy-eips.workspace = true
 alloy-sol-types.workspace = true
 
+# Misc
+lazy_static.workspace = true
+anyhow.workspace = true
+
 [dev-dependencies]
 reth-testing-utils.workspace = true
 reth-revm = { workspace = true, features = ["test-utils"] }
 secp256k1.workspace = true
 serde_json.workspace = true
-

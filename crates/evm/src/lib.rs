@@ -13,6 +13,8 @@ use reth_primitives::{revm::env::fill_block_env, Address, Header, TransactionSig
 use revm::{inspector_handle_register, Database, Evm, EvmBuilder, GetInspector};
 use revm_primitives::{BlockEnv, CfgEnvWithHandlerCfg, EnvWithHandlerCfg, SpecId, TxEnv};
 
+pub use revm::db::BundleState;
+
 pub mod either;
 pub mod execute;
 pub mod noop;
@@ -35,6 +37,7 @@ pub trait ConfigureEvm: ConfigureEvmEnv {
     fn evm<'a, DB: Database + 'a>(
         &'a self,
         db: DB,
+        is_taiko: bool,
     ) -> Evm<'a, Self::DefaultExternalContext<'a>, DB>;
 
     /// Returns a new EVM with the given database configured with the given environment settings,
@@ -46,7 +49,7 @@ pub trait ConfigureEvm: ConfigureEvmEnv {
         db: DB,
         env: EnvWithHandlerCfg,
     ) -> Evm<'a, Self::DefaultExternalContext<'a>, DB> {
-        let mut evm = self.evm(db);
+        let mut evm = self.evm(db, env.handler_cfg.is_taiko);
         evm.modify_spec_id(env.spec_id());
         evm.context.evm.env = env.env;
         evm

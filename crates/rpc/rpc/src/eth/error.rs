@@ -455,6 +455,9 @@ impl From<revm::primitives::InvalidTransaction> for RpcInvalidTransactionError {
             InvalidTransaction::HaltedDepositPostRegolith => {
                 Self::Optimism(OptimismInvalidTransactionError::HaltedDepositPostRegolith)
             }
+            InvalidTransaction::InvalidAnchorTransaction => {
+                RpcInvalidTransactionError::BlobTransactionIsCreate
+            }
             // TODO(EOF)
             InvalidTransaction::EofCrateShouldHaveToAddress => todo!("EOF"),
         }

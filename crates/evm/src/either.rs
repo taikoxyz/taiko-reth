@@ -48,19 +48,19 @@ where
     A: for<'a> Executor<
         DB,
         Input<'a> = BlockExecutionInput<'a, BlockWithSenders>,
-        Output = BlockExecutionOutput<Receipt>,
+        Output = BlockExecutionOutput<Receipt, DB>,
         Error = BlockExecutionError,
     >,
     B: for<'a> Executor<
         DB,
         Input<'a> = BlockExecutionInput<'a, BlockWithSenders>,
-        Output = BlockExecutionOutput<Receipt>,
+        Output = BlockExecutionOutput<Receipt, DB>,
         Error = BlockExecutionError,
     >,
     DB: Database<Error = ProviderError>,
 {
     type Input<'a> = BlockExecutionInput<'a, BlockWithSenders>;
-    type Output = BlockExecutionOutput<Receipt>;
+    type Output = BlockExecutionOutput<Receipt, DB>;
     type Error = BlockExecutionError;
 
     fn execute(self, input: Self::Input<'_>) -> Result<Self::Output, Self::Error> {

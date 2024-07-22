@@ -200,6 +200,8 @@ fn fill_tx_env_with_system_contract_call(
         // blob fields can be None for this tx
         blob_hashes: Vec::new(),
         max_fee_per_blob_gas: None,
+        eof_initcodes: Vec::new(),
+        eof_initcodes_hashed: std::collections::HashMap::new(),
         #[cfg(feature = "optimism")]
         optimism: OptimismFields {
             source_hash: None,
@@ -209,6 +211,8 @@ fn fill_tx_env_with_system_contract_call(
             // enveloped tx size.
             enveloped_tx: Some(Bytes::default()),
         },
+        #[cfg(feature = "taiko")]
+        taiko: revm_primitives::TaikoFields { treasury: Address::default(), is_anchor: false },
     };
 
     // ensure the block gas limit is >= the tx
