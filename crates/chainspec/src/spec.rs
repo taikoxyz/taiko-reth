@@ -1,3 +1,5 @@
+#[cfg(feature = "taiko")]
+use super::taiko::{get_taiko_genesis, TaikoNamedChain};
 use crate::constants::MAINNET_DEPOSIT_CONTRACT;
 #[cfg(not(feature = "std"))]
 use alloc::{
@@ -287,6 +289,100 @@ pub static BASE_MAINNET: Lazy<Arc<ChainSpec>> = Lazy::new(|| {
     .into()
 });
 
+/// The Taiko internal L2 A spec
+#[cfg(feature = "taiko")]
+pub static TAIKO_INTERNAL_L2_A: Lazy<Arc<ChainSpec>> = Lazy::new(|| {
+    ChainSpec {
+        chain: TaikoNamedChain::TaikoInternalL2A.into(),
+        genesis: get_taiko_genesis(TaikoNamedChain::TaikoInternalL2A),
+        hardforks: BTreeMap::from([
+            (
+                Hardfork::Paris,
+                ForkCondition::TTD { fork_block: None, total_difficulty: U256::ZERO },
+            ),
+            (Hardfork::London, ForkCondition::Block(0)),
+            (Hardfork::Shanghai, ForkCondition::Block(0)),
+            (Hardfork::Cancun, ForkCondition::Never),
+        ]),
+        base_fee_params: BaseFeeParamsKind::Constant(BaseFeeParams {
+            max_change_denominator: 8,
+            elasticity_multiplier: 2,
+        }),
+        ..Default::default()
+    }
+    .into()
+});
+
+/// The Taiko testnet spec
+#[cfg(feature = "taiko")]
+pub static TAIKO_TESTNET: Lazy<Arc<ChainSpec>> = Lazy::new(|| {
+    ChainSpec {
+        chain: TaikoNamedChain::Katla.into(),
+        genesis: get_taiko_genesis(TaikoNamedChain::Katla),
+        hardforks: BTreeMap::from([
+            (
+                Hardfork::Paris,
+                ForkCondition::TTD { fork_block: None, total_difficulty: U256::ZERO },
+            ),
+            (Hardfork::London, ForkCondition::Block(0)),
+            (Hardfork::Shanghai, ForkCondition::Block(0)),
+            (Hardfork::Cancun, ForkCondition::Never),
+        ]),
+        base_fee_params: BaseFeeParamsKind::Constant(BaseFeeParams {
+            max_change_denominator: 8,
+            elasticity_multiplier: 2,
+        }),
+        ..Default::default()
+    }
+    .into()
+});
+
+/// The Taiko A7 spec
+#[cfg(feature = "taiko")]
+pub static TAIKO_HEKLA: Lazy<Arc<ChainSpec>> = Lazy::new(|| {
+    ChainSpec {
+        chain: 167009.into(),
+        genesis: get_taiko_genesis(TaikoNamedChain::Hekla),
+        genesis_hash: None,
+        paris_block_and_final_difficulty: None,
+        hardforks: BTreeMap::from([
+            (
+                Hardfork::Paris,
+                ForkCondition::TTD { fork_block: None, total_difficulty: U256::ZERO },
+            ),
+            (Hardfork::London, ForkCondition::Block(0)),
+            (Hardfork::Shanghai, ForkCondition::Block(0)),
+            (Hardfork::Cancun, ForkCondition::default()),
+        ]),
+        deposit_contract: None,
+        ..Default::default()
+    }
+    .into()
+});
+
+/// The Taiko Mainnet spec
+#[cfg(feature = "taiko")]
+pub static TAIKO_MAINNET: Lazy<Arc<ChainSpec>> = Lazy::new(|| {
+    ChainSpec {
+        chain: 167000.into(),
+        genesis: get_taiko_genesis(TaikoNamedChain::Mainnet),
+        genesis_hash: None,
+        paris_block_and_final_difficulty: None,
+        hardforks: BTreeMap::from([
+            (
+                Hardfork::Paris,
+                ForkCondition::TTD { fork_block: None, total_difficulty: U256::ZERO },
+            ),
+            (Hardfork::London, ForkCondition::Block(0)),
+            (Hardfork::Shanghai, ForkCondition::Block(0)),
+            (Hardfork::Cancun, ForkCondition::default()),
+        ]),
+        deposit_contract: None,
+        ..Default::default()
+    }
+    .into()
+});
+
 /// A wrapper around [`BaseFeeParams`] that allows for specifying constant or dynamic EIP-1559
 /// parameters based on the active [Hardfork].
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -503,7 +599,7 @@ impl ChainSpec {
                 // given timestamp.
                 for (fork, params) in bf_params.iter().rev() {
                     if self.is_fork_active_at_timestamp(*fork, timestamp) {
-                        return *params
+                        return *params;
                     }
                 }
 
@@ -715,7 +811,7 @@ impl ChainSpec {
                 } else {
                     // we can return here because this block fork is not active, so we set the
                     // `next` value
-                    return ForkId { hash: forkhash, next: block }
+                    return ForkId { hash: forkhash, next: block };
                 }
             }
         }
@@ -736,7 +832,7 @@ impl ChainSpec {
                 // can safely return here because we have already handled all block forks and
                 // have handled all active timestamp forks, and set the next value to the
                 // timestamp that is known but not active yet
-                return ForkId { hash: forkhash, next: timestamp }
+                return ForkId { hash: forkhash, next: timestamp };
             }
         }
 
@@ -751,7 +847,7 @@ impl ChainSpec {
                 // to satisfy every timestamp ForkCondition, we find the last ForkCondition::Block
                 // if one exists, and include its block_num in the returned Head
                 if let Some(last_block_num) = self.last_block_fork_before_merge_or_timestamp() {
-                    return Head { timestamp, number: last_block_num, ..Default::default() }
+                    return Head { timestamp, number: last_block_num, ..Default::default() };
                 }
                 Head { timestamp, ..Default::default() }
             }
@@ -779,17 +875,17 @@ impl ChainSpec {
                     ForkCondition::TTD { fork_block, .. } => {
                         // handle Sepolia merge netsplit case
                         if fork_block.is_some() {
-                            return *fork_block
+                            return *fork_block;
                         }
                         // ensure curr_cond is indeed ForkCondition::Block and return block_num
                         if let ForkCondition::Block(block_num) = curr_cond {
-                            return Some(block_num)
+                            return Some(block_num);
                         }
                     }
                     ForkCondition::Timestamp(_) => {
                         // ensure curr_cond is indeed ForkCondition::Block and return block_num
                         if let ForkCondition::Block(block_num) = curr_cond {
-                            return Some(block_num)
+                            return Some(block_num);
                         }
                     }
                     ForkCondition::Block(_) | ForkCondition::Never => continue,

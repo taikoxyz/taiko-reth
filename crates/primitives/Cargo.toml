@@ -48,6 +48,10 @@ tempfile = { workspace = true, optional = true }
 thiserror-no-std = { workspace = true, default-features = false }
 zstd = { version = "0.13", features = ["experimental"], optional = true }
 
+# `test-utils` feature
+hash-db = { version = "~0.15", optional = true }
+plain_hasher = { version = "0.2", optional = true }
+
 # arbitrary utils
 arbitrary = { workspace = true, features = ["derive"], optional = true }
 proptest = { workspace = true, optional = true }
@@ -105,6 +109,8 @@ optimism = [
     "reth-ethereum-forks/optimism",
     "revm-primitives/optimism",
 ]
+
+taiko = ["reth-chainspec/taiko", "revm-primitives/taiko"]
 alloy-compat = ["reth-primitives-traits/alloy-compat", "dep:alloy-rpc-types"]
 std = ["thiserror-no-std/std"]
 test-utils = ["reth-primitives-traits/test-utils"]
@@ -117,4 +123,3 @@ harness = false
 name = "validate_blob_tx"
 required-features = ["arbitrary", "c-kzg"]
 harness = false
-

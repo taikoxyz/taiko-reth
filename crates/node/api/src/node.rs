@@ -12,7 +12,8 @@ use reth_provider::FullProvider;
 use reth_tasks::TaskExecutor;
 use reth_transaction_pool::TransactionPool;
 use std::marker::PhantomData;
-
+#[cfg(feature = "taiko")]
+use taiko_reth_provider::TaikoProvider;
 /// The type that configures the essential types of an ethereum like node.
 ///
 /// This includes the primitive types of a node, the engine API types for communication with the
@@ -60,6 +61,10 @@ pub trait FullNodeTypes: NodeTypes + 'static {
     /// Underlying database type used by the node to store and retrieve data.
     type DB: Database + DatabaseMetrics + DatabaseMetadata + Clone + Unpin + 'static;
     /// The provider type used to interact with the node.
+    #[cfg(feature = "taiko")]
+    type Provider: FullProvider<Self::DB> + TaikoProvider;
+    /// The provider type used to interact with the node
+    #[cfg(not(feature = "taiko"))]
     type Provider: FullProvider<Self::DB>;
 }
 
@@ -103,10 +108,22 @@ where
     type Engine = Types::Engine;
 }
 
+#[cfg(not(feature = "taiko"))]
 impl<Types, DB, Provider> FullNodeTypes for FullNodeTypesAdapter<Types, DB, Provider>
 where
     Types: NodeTypes,
     Provider: FullProvider<DB>,
+    DB: Database + DatabaseMetrics + DatabaseMetadata + Clone + Unpin + 'static,
+{
+    type DB = DB;
+    type Provider = Provider;
+}
+
+#[cfg(feature = "taiko")]
+impl<Types, DB, Provider> FullNodeTypes for FullNodeTypesAdapter<Types, DB, Provider>
+where
+    Types: NodeTypes,
+    Provider: FullProvider<DB> + TaikoProvider,
     DB: Database + DatabaseMetrics + DatabaseMetadata + Clone + Unpin + 'static,
 {
     type DB = DB;

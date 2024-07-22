@@ -24,6 +24,8 @@ use reth_rpc_types_compat::engine::payload::{
 use reth_storage_api::{BlockReader, HeaderProvider, StateProviderFactory};
 use reth_tasks::TaskSpawner;
 use std::{sync::Arc, time::Instant};
+#[cfg(feature = "taiko")]
+use taiko_reth_engine_primitives::TaikoExecutionPayload;
 use tokio::sync::oneshot;
 use tracing::{trace, warn};
 
@@ -118,6 +120,8 @@ where
             EngineApiMessageVersion::V1,
             payload_or_attrs,
         )?;
+        #[cfg(feature = "taiko")]
+        let payload = TaikoExecutionPayload::from(payload);
         Ok(self.inner.beacon_consensus.new_payload(payload, None).await?)
     }
 
@@ -136,6 +140,8 @@ where
             EngineApiMessageVersion::V2,
             payload_or_attrs,
         )?;
+        #[cfg(feature = "taiko")]
+        let payload = TaikoExecutionPayload::from(payload);
         Ok(self.inner.beacon_consensus.new_payload(payload, None).await?)
     }
 
@@ -160,6 +166,8 @@ where
 
         let cancun_fields = CancunPayloadFields { versioned_hashes, parent_beacon_block_root };
 
+        #[cfg(feature = "taiko")]
+        let payload = TaikoExecutionPayload::from(payload);
         Ok(self.inner.beacon_consensus.new_payload(payload, Some(cancun_fields)).await?)
     }
 
@@ -184,6 +192,8 @@ where
 
         let cancun_fields = CancunPayloadFields { versioned_hashes, parent_beacon_block_root };
 
+        #[cfg(feature = "taiko")]
+        let payload = TaikoExecutionPayload::from(payload);
         Ok(self.inner.beacon_consensus.new_payload(payload, Some(cancun_fields)).await?)
     }
 
@@ -426,7 +436,7 @@ where
     ) -> EngineApiResult<ExecutionPayloadBodiesV1> {
         let len = hashes.len() as u64;
         if len > MAX_PAYLOAD_BODIES_LIMIT {
-            return Err(EngineApiError::PayloadRequestTooLarge { len })
+            return Err(EngineApiError::PayloadRequestTooLarge { len });
         }
 
         let mut result = Vec::with_capacity(hashes.len());
@@ -466,7 +476,7 @@ where
             return Err(EngineApiError::TerminalTD {
                 execution: merge_terminal_td,
                 consensus: terminal_total_difficulty,
-            })
+            });
         }
 
         self.inner.beacon_consensus.transition_configuration_exchanged().await;
@@ -476,7 +486,7 @@ where
             return Ok(TransitionConfiguration {
                 terminal_total_difficulty: merge_terminal_td,
                 ..Default::default()
-            })
+            });
         }
 
         // Attempt to look up terminal block hash
@@ -541,9 +551,9 @@ where
                 // TODO: decide if we want this branch - the FCU INVALID response might be more
                 // useful than the payload attributes INVALID response
                 if fcu_res.is_invalid() {
-                    return Ok(fcu_res)
+                    return Ok(fcu_res);
                 }
-                return Err(err.into())
+                return Err(err.into());
             }
         }
 

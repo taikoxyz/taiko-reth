@@ -64,7 +64,9 @@ members = [
     "crates/optimism/primitives/",
     "crates/payload/basic/",
     "crates/payload/builder/",
-    "crates/payload/primitives/",
+    "crates/payload/primitives",
+    "crates/ethereum/payload",
+    "crates/optimism/payload",
     "crates/payload/validator/",
     "crates/primitives/",
     "crates/primitives-traits/",
@@ -125,6 +127,15 @@ members = [
     "examples/txpool-tracing/",
     "testing/ef-tests/",
     "testing/testing-utils",
+    # Taiko additional crates
+    "crates/taiko/consensus/",
+    "crates/taiko/engine-primitives/",
+    "crates/taiko/evm",
+    "crates/taiko/node",
+    "crates/taiko/payload/builder",
+    "crates/taiko/payload/validator",
+    "crates/taiko/primitives/",
+    "crates/taiko/storage/",
 ]
 default-members = ["bin/reth"]
 
@@ -342,6 +353,15 @@ reth-trie = { path = "crates/trie/trie" }
 reth-trie-common = { path = "crates/trie/common" }
 reth-trie-parallel = { path = "crates/trie/parallel" }
 
+taiko-reth-beacon-consensus = { path = "crates/taiko/consensus" }
+taiko-reth-primitives = { path = "crates/taiko/primitives" }
+taiko-reth-provider = { path = "crates/taiko/storage" }
+taiko-reth-evm = { path = "crates/taiko/evm" }
+taiko-reth-payload-builder = { path = "crates/taiko/payload/builder" }
+taiko-reth-payload-validator = { path = "crates/taiko/payload/validator" }
+taiko-reth-engine-primitives = { path = "crates/taiko/engine-primitives" }
+taiko-reth-node = { path = "crates/taiko/node" }
+
 # revm
 revm = { version = "10.0.0", features = [
     "std",
@@ -429,6 +449,8 @@ sha2 = { version = "0.10", default-features = false }
 paste = "1.0"
 url = "2.3"
 backon = "0.4"
+anyhow = "1.0.86"
+lazy_static = "1.5.0"
 
 # metrics
 metrics = "0.23.0"
@@ -500,3 +522,15 @@ serial_test = "3"
 similar-asserts = "1.5.0"
 test-fuzz = "5"
 iai-callgrind = "0.11"
+
+
+[patch.crates-io]
+revm = { git = "https://github.com/taikoxyz/revm.git", branch = "v37-taiko" }
+revm-interpreter = { git = "https://github.com/taikoxyz/revm.git", branch = "v37-taiko" }
+revm-precompile = { git = "https://github.com/taikoxyz/revm.git", branch = "v37-taiko" }
+revm-primitives = { git = "https://github.com/taikoxyz/revm.git", branch = "v37-taiko" }
+c-kzg = { git = "https://github.com/brechtpd/c-kzg-4844", branch = "for-alpha7" }
+secp256k1 = { git = "https://github.com/CeciliaZ030/rust-secp256k1", branch = "sp1-patch" }
+
+[patch.'https://github.com/bluealloy/revm.git']
+revm = { git = "https://github.com/taikoxyz/revm.git", branch = "v37-taiko" }

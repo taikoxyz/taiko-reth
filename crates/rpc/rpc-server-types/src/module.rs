@@ -195,7 +195,7 @@ impl FromStr for RpcModuleSelection {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         if s.is_empty() {
-            return Ok(Self::Selection(Default::default()))
+            return Ok(Self::Selection(Default::default()));
         }
         let mut modules = s.split(',').map(str::trim).peekable();
         let first = modules.peek().copied().ok_or(ParseError::VariantNotFound)?;
@@ -255,6 +255,9 @@ pub enum RethRpcModule {
     Reth,
     /// `ots_` module
     Ots,
+    /// `taiko_` module
+    #[cfg(feature = "taiko")]
+    Taiko,
     /// For single non-standard `eth_` namespace call `eth_callBundle`
     ///
     /// This is separate from [`RethRpcModule::Eth`] because it is a non standardized call that
@@ -309,6 +312,8 @@ impl FromStr for RethRpcModule {
             "reth" => Self::Reth,
             "ots" => Self::Ots,
             "eth-call-bundle" | "eth_callBundle" => Self::EthCallBundle,
+            #[cfg(feature = "taiko")]
+            "taiko" => Self::Taiko,
             _ => return Err(ParseError::VariantNotFound),
         })
     }

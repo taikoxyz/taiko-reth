@@ -21,3 +21,9 @@ reth-network.workspace = true
 reth-payload-builder.workspace = true
 reth-payload-primitives.workspace = true
 reth-tasks.workspace = true
+
+# taiko
+taiko-reth-provider = { workspace = true, optional = true }
+
+[features]
+taiko = ["dep:taiko-reth-provider"]

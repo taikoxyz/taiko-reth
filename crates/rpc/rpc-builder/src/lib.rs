@@ -177,6 +177,8 @@ use reth_provider::{
     AccountReader, BlockReader, BlockReaderIdExt, CanonStateSubscriptions, ChainSpecProvider,
     ChangeSetReader, EvmEnvProvider, StateProviderFactory,
 };
+#[cfg(feature = "taiko")]
+use reth_rpc::TaikoApi;
 use reth_rpc::{
     eth::{cache::EthStateCache, traits::RawTransactionForwarder, EthBundle},
     AdminApi, DebugApi, EngineEthApi, EthApi, EthSubscriptionIdProvider, NetApi, OtterscanApi,
@@ -194,6 +196,8 @@ use std::{
     sync::Arc,
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
+#[cfg(feature = "taiko")]
+use taiko_reth_provider::L1OriginReader;
 use tower_http::cors::CorsLayer;
 use tracing::{instrument, trace};
 
@@ -237,15 +241,7 @@ pub async fn launch<Provider, Pool, Network, Tasks, Events, EvmConfig>(
     evm_config: EvmConfig,
 ) -> Result<RpcServerHandle, RpcError>
 where
-    Provider: BlockReaderIdExt
-        + AccountReader
-        + StateProviderFactory
-        + EvmEnvProvider
-        + ChainSpecProvider
-        + ChangeSetReader
-        + Clone
-        + Unpin
-        + 'static,
+    Provider: ProviderExt,
     Pool: TransactionPool + Clone + 'static,
     Network: NetworkInfo + Peers + Clone + 'static,
     Tasks: TaskSpawner + Clone + 'static,
@@ -428,15 +424,7 @@ impl<Provider, Pool, Network, Tasks, Events, EvmConfig>
 impl<Provider, Pool, Network, Tasks, Events, EvmConfig>
     RpcModuleBuilder<Provider, Pool, Network, Tasks, Events, EvmConfig>
 where
-    Provider: BlockReaderIdExt
-        + AccountReader
-        + StateProviderFactory
-        + EvmEnvProvider
-        + ChainSpecProvider
-        + ChangeSetReader
-        + Clone
-        + Unpin
-        + 'static,
+    Provider: ProviderExt,
     Pool: TransactionPool + Clone + 'static,
     Network: NetworkInfo + Peers + Clone + 'static,
     Tasks: TaskSpawner + Clone + 'static,
@@ -750,18 +738,72 @@ where
     }
 }
 
+/// A helper type that holds the transport specific modules.
+#[cfg(not(feature = "taiko"))]
+pub trait ProviderExt:
+    BlockReaderIdExt
+    + AccountReader
+    + StateProviderFactory
+    + EvmEnvProvider
+    + ChainSpecProvider
+    + ChangeSetReader
+    + Clone
+    + Unpin
+    + 'static
+{
+}
+
+#[cfg(not(feature = "taiko"))]
+impl<
+        T: BlockReaderIdExt
+            + AccountReader
+            + StateProviderFactory
+            + EvmEnvProvider
+            + ChainSpecProvider
+            + ChangeSetReader
+            + Clone
+            + Unpin
+            + 'static,
+    > ProviderExt for T
+{
+}
+
+/// A helper type that holds the transport specific modules.
+#[cfg(feature = "taiko")]
+pub trait ProviderExt:
+    BlockReaderIdExt
+    + AccountReader
+    + StateProviderFactory
+    + EvmEnvProvider
+    + L1OriginReader
+    + ChainSpecProvider
+    + ChangeSetReader
+    + Clone
+    + Unpin
+    + 'static
+{
+}
+
+#[cfg(feature = "taiko")]
+impl<
+        T: BlockReaderIdExt
+            + AccountReader
+            + StateProviderFactory
+            + EvmEnvProvider
+            + L1OriginReader
+            + ChainSpecProvider
+            + ChangeSetReader
+            + Clone
+            + Unpin
+            + 'static,
+    > ProviderExt for T
+{
+}
+
 impl<Provider, Pool, Network, Tasks, Events, EvmConfig>
     RethModuleRegistry<Provider, Pool, Network, Tasks, Events, EvmConfig>
 where
-    Provider: BlockReaderIdExt
-        + AccountReader
-        + StateProviderFactory
-        + EvmEnvProvider
-        + ChainSpecProvider
-        + ChangeSetReader
-        + Clone
-        + Unpin
-        + 'static,
+    Provider: ProviderExt,
     Pool: TransactionPool + Clone + 'static,
     Network: NetworkInfo + Peers + Clone + 'static,
     Tasks: TaskSpawner + Clone + 'static,
@@ -974,6 +1016,12 @@ where
                         }
                         RethRpcModule::EthCallBundle => {
                             EthBundle::new(eth_api.clone(), self.blocking_pool_guard.clone())
+                                .into_rpc()
+                                .into()
+                        }
+                        #[cfg(feature = "taiko")]
+                        RethRpcModule::Taiko => {
+                            TaikoApi::new(self.provider.clone(), self.pool.clone())
                                 .into_rpc()
                                 .into()
                         }
@@ -1314,7 +1362,7 @@ impl RpcServerConfig {
                             http_cors_domains: Some(http_cors.clone()),
                             ws_cors_domains: Some(ws_cors.clone()),
                         }
-                        .into())
+                        .into());
                     }
                     Some(ws_cors)
                 }
@@ -1355,7 +1403,7 @@ impl RpcServerConfig {
                 ws_local_addr: Some(addr),
                 server: WsHttpServers::SamePort(server),
                 jwt_secret: self.jwt_secret,
-            })
+            });
         }
 
         let mut http_local_addr = None;
@@ -1603,7 +1651,7 @@ impl TransportRpcModules {
     /// Returns [Ok(false)] if no http transport is configured.
     pub fn merge_http(&mut self, other: impl Into<Methods>) -> Result<bool, RegisterMethodError> {
         if let Some(ref mut http) = self.http {
-            return http.merge(other.into()).map(|_| true)
+            return http.merge(other.into()).map(|_| true);
         }
         Ok(false)
     }
@@ -1615,7 +1663,7 @@ impl TransportRpcModules {
     /// Returns [Ok(false)] if no ws transport is configured.
     pub fn merge_ws(&mut self, other: impl Into<Methods>) -> Result<bool, RegisterMethodError> {
         if let Some(ref mut ws) = self.ws {
-            return ws.merge(other.into()).map(|_| true)
+            return ws.merge(other.into()).map(|_| true);
         }
         Ok(false)
     }
@@ -1627,7 +1675,7 @@ impl TransportRpcModules {
     /// Returns [Ok(false)] if no ipc transport is configured.
     pub fn merge_ipc(&mut self, other: impl Into<Methods>) -> Result<bool, RegisterMethodError> {
         if let Some(ref mut ipc) = self.ipc {
-            return ipc.merge(other.into()).map(|_| true)
+            return ipc.merge(other.into()).map(|_| true);
         }
         Ok(false)
     }

@@ -40,6 +40,9 @@ reth-beacon-consensus.workspace = true
 reth-prune-types.workspace = true
 reth-stages-types.workspace = true
 
+# taiko
+taiko-reth-engine-primitives = { workspace = true, optional = true }
+
 # ethereum
 alloy-genesis.workspace = true
 alloy-rpc-types-engine.workspace = true
@@ -107,6 +110,14 @@ optimism = [
     "reth-provider/optimism",
     "reth-rpc-types-compat/optimism",
     "reth-beacon-consensus/optimism",
+]
+
+taiko = [
+    "reth-rpc/taiko",
+    "reth-primitives/taiko",
+    "reth-chainspec/taiko",
+    "reth-beacon-consensus/taiko",
+    "dep:taiko-reth-engine-primitives",
 ]
 
 jemalloc = ["dep:tikv-jemalloc-ctl"]

@@ -387,6 +387,10 @@ pub enum ConsensusError {
         /// The block's timestamp.
         timestamp: u64,
     },
+
+    /// Error when the first transaction in the block is not an anchor transaction.
+    #[error("missing anchor transaction")]
+    AnchorTxMissing,
 }
 
 impl ConsensusError {
