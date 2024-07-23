@@ -1,0 +1,52 @@
+name: Propose a block
+
+on:
+  push:
+    branches:
+      - gwyneth
+  pull_request:
+    branches:
+      - gwyneth
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    env:
+      PRIVATE_KEY: ${{ secrets.PRIVATE_KEY }}
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+
+    - name: Set up Docker
+      uses: docker/setup-buildx-action@v2
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y curl apt-transport-https
+        # Run setup_deps.sh which installs Docker, checks Docker daemon, installs Kurtosis, and extracts RPC port
+        ./scripts/setup_deps.sh
+
+    - name: Run Forge Script
+      run: |
+        # Read the RPC port from the temporary file
+        RPC_PORT=$(cat /tmp/kurtosis_rpc_port)
+        
+        # Load the .env file and extract the PRIVATE_KEY if not set via GitHub Secrets
+        if [ -z "$PRIVATE_KEY" ]; then
+          if [ -f .env ]; then
+            export $(grep -v '^#' .env | xargs)
+            PRIVATE_KEY=${PRIVATE_KEY}
+          else
+            echo ".env file not found and PRIVATE_KEY not set via GitHub Secrets."
+            exit 1
+          fi
+        fi
+
+        # Run the forge foundry script
+        FORGE_COMMAND="forge script --rpc-url http://127.0.0.1:$RPC_PORT scripts/L2_txn_simulation/ProposeBlock.s.sol -vvvv --broadcast --private-key $PRIVATE_KEY --legacy"
+        echo "Running forge foundry script..."
+        eval $FORGE_COMMAND
+        echo "Forge script execution completed."
