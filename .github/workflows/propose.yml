@@ -4,9 +4,11 @@ on:
   push:
     branches:
       - gwyneth
+      - gwyneth/**
   pull_request:
     branches:
       - gwyneth
+      - gwyneth/**
 
 jobs:
   build-and-test:
@@ -25,7 +27,42 @@ jobs:
     - name: Install dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y curl apt-transport-https
+        sudo apt-get install -y curl apt-transport-https software-properties-common
+        
+        # Install Docker
+        if ! command -v docker &> /dev/null
+        then
+          curl -fsSL https://get.docker.com -o get-docker.sh
+          sh get-docker.sh
+        fi
+        
+        # Start Docker service
+        sudo systemctl start docker
+        sudo systemctl enable docker
+        
+        # Check Docker installation
+        docker --version
+
+        # Install Kurtosis
+        if ! command -v kurtosis &> /dev/null
+        then
+          curl -fsSL https://kurtosis-public.s3.amazonaws.com/cli/cli-installer.sh | bash
+        fi
+        
+        # Check Kurtosis installation
+        kurtosis version
+
+        # Install Forge
+        if ! command -v forge &> /dev/null
+        then
+          curl -L https://foundry.paradigm.xyz | bash
+          source ~/.bashrc
+          foundryup
+        fi
+        
+        # Check Forge installation
+        forge --version
+
         # Run setup_deps.sh which installs Docker, checks Docker daemon, installs Kurtosis, and extracts RPC port
         ./scripts/setup_deps.sh
 
@@ -34,18 +71,7 @@ jobs:
         # Read the RPC port from the temporary file
         RPC_PORT=$(cat /tmp/kurtosis_rpc_port)
         
-        # Load the .env file and extract the PRIVATE_KEY if not set via GitHub Secrets
-        if [ -z "$PRIVATE_KEY" ]; then
-          if [ -f .env ]; then
-            export $(grep -v '^#' .env | xargs)
-            PRIVATE_KEY=${PRIVATE_KEY}
-          else
-            echo ".env file not found and PRIVATE_KEY not set via GitHub Secrets."
-            exit 1
-          fi
-        fi
-
-        # Run the forge foundry script
+        # Run the forge foundry script using the PRIVATE_KEY from GitHub Secrets
         FORGE_COMMAND="forge script --rpc-url http://127.0.0.1:$RPC_PORT scripts/L2_txn_simulation/ProposeBlock.s.sol -vvvv --broadcast --private-key $PRIVATE_KEY --legacy"
         echo "Running forge foundry script..."
         eval $FORGE_COMMAND
