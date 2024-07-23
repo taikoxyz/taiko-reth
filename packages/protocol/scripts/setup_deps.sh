@@ -105,6 +105,7 @@ if [ -z "$RPC_PORT" ]; then
     exit 1
 else
     echo "Extracted RPC port: $RPC_PORT"
+    echo "$RPC_PORT" > /tmp/kurtosis_rpc_port
 fi
 
 # Load the .env file and extract the PRIVATE_KEY
