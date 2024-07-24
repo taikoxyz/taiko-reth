@@ -5,18 +5,8 @@ pragma solidity >=0.8.12 <0.9.0;
 import "./XChain.sol";
 
 contract Bus is XChain {
-    // Messages are stored only on the source chain for ASYNC messages.
-    // In SYNC mode, the message is stored on both the source and the target chain.
-    bytes32[] public messages;
-
     // Stored only on the target chain
     mapping (bytes32 => bool) public consumed;
-
-    enum ProofType {
-        INVALID,
-        ASYNC,
-        SYNC
-    }
 
     function isMessageSent(bytes32 messageHash, uint busID) external view returns (bool) {
         return messages[busID] == messageHash;
@@ -50,9 +40,5 @@ contract Bus is XChain {
         } else {
             revert("INVALID BUS PROOF");
         }
-    }
-
-    function calcMessageHash(bytes memory message) internal view returns (bytes32) {
-        return keccak256(abi.encode(EVM.chainId(), msg.sender, message));
     }
 }

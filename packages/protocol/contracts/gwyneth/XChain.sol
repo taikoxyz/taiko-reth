@@ -21,6 +21,16 @@ contract XChain {
         uint busID;
     }
 
+    enum ProofType {
+        INVALID,
+        ASYNC,
+        SYNC
+    }
+
+    // Messages are stored only on the source chain for ASYNC messages.
+    // In SYNC mode, the message is stored on both the source and the target chain.
+    bytes32[] public messages;
+
     // Only stored on L1
     // Currently getBlockHash() is not supported via the new Taiko Gwyneth
     //ITaiko public taiko;
@@ -31,6 +41,7 @@ contract XChain {
     event ExecuteNextOn(uint chainID, address from, address target, bytes callData);
 
     error FUNC_NOT_IMPLEMENTED();
+    error NO_NEED_BUS_PROOF_ALL_ASYNC();
 
     function init(/*ITaiko _taiko*/)
         internal
@@ -99,6 +110,10 @@ contract XChain {
          // todo(@Brecht): Currently not supported or well, at least TaikoL1 does not have it with the current design.
         //return taiko.getBlockHash(chainID, blockID);
     }
+    
+    function calcMessageHash(bytes memory message) internal view returns (bytes32) {
+        return keccak256(abi.encode(EVM.chainId(), msg.sender, message));
+    }
 
     // Supports setting the call options using any L2 in the booster network.
     // This is done by first checking the validity of the blockhash of the specified L2.
@@ -121,6 +136,20 @@ contract XChain {
     // todo (@Brecht):
     // There was a circular reference (XBus inherits from XChain, while also XChain has a XBus property, so i made these to compile)
     // They will be inherited in XBus, but basically XBus can be incorporated into XChain, no ?
-    function write(bytes memory message) public virtual notImplemented returns (uint) {}
-    function consume(uint fromChainId, bytes memory message, bytes calldata proof) public virtual notImplemented {}
+
+    // Currently, supposingly there is "synchronous composability", so let's assume a synchronous world
+    function write(bytes memory message) public virtual returns (uint) {
+        messages.push(calcMessageHash(message));
+        return messages.length - 1;
+    }
+
+    // Even tho the function just passes thru to write(), it is needed to bus-compatibility, where the consume function will differ
+    function consume(uint256 /*fromChainId*/, bytes memory message, bytes calldata proof) public virtual {
+        ProofType proofType = ProofType(uint16(bytes2(proof[:2])));
+
+        if (proofType != ProofType.ASYNC) {
+             revert NO_NEED_BUS_PROOF_ALL_ASYNC();
+        }
+        write(message);
+    }
 }
