@@ -1,11 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import "../gwyneth/XChainToken.sol";
+import "../gwyneth/XChainERC20Token.sol";
 
-contract xErc20Example is ERC20, XChainToken  {
-    constructor() ERC20("xERC20", "xERC") {
-        _mint(msg.sender, 100_000_000_000 * 10**18 );
-    }
+contract xERC20Example is XChainERC20Token  {
+    constructor(string memory name_, string memory symbol_, address premintAddress_, uint256 premintAmount_ ) XChainERC20Token(name_, symbol_, premintAddress_, premintAmount_ ) {}
 }

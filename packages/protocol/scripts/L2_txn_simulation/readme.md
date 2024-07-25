@@ -1,4 +1,4 @@
-# Create / simulate L2 transactions
+# Create / simulate L2 transactions (propose transaction and an xtransfer of a dummy xChainToken)
 
 In order to test the L2 node execution hook functionality, we need create valid L2 transactions and submit those to TaikoL1 - where a hook will be built in, to listen the proposeBlock and execute those transactions. This folder is to create L2 transactions (using the same pre-funded accounts Kurtosis is setting up by default) and submit it to our "L1" while using the local taiko_reth image as the EL.
 
@@ -15,6 +15,7 @@ kurtosis run github.com/ethpandaops/ethereum-package --args-file YOUR_PATH_TO_NE
 ```shell
 forge script --rpc-url http://127.0.0.1:PORT scripts/DeployL1Locally.s.sol -vvvv --broadcast --private-key PK --legacy
 ```
+# ProposeBlock
 
 ## 1. Create and print L2 transactions ("off-chain")
 
@@ -44,3 +45,10 @@ curl http://127.0.0.1:YOUR_PORT \
 ```
 
 
+# Send a dummy xChainToken
+
+In order to send cross-chain transactions with `xCallOptions()`, when the network is up and running, deploy an `xChainERC20Token` contract and fire away an `xtransfer()` transaction.
+
+```shell
+forge script --rpc-url http://127.0.0.1:YOUR_PORT scripts/L2_txn_simulation/CreateXChainTxn.s.sol -vvvv --broadcast --private-key PK_IN_ENV_FILE --legacy
+```

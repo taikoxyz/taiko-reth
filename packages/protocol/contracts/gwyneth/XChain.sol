@@ -74,6 +74,7 @@ contract XChain {
     // - to be external
     // - to have `bytes proof` as the last function argument
     modifier xFunction(uint fromChainId, uint toChainId, bytes calldata proof) {
+        // Current code is written with async case ! (This is outdated there, no need to run if running in sync. comp mode)
         if (fromChainId != toChainId) {
             // Remove the proof data from the message data
             // Bytes arays are padded to 32 bytes and start with a 32 byte length value
@@ -136,6 +137,10 @@ contract XChain {
     // todo (@Brecht):
     // There was a circular reference (XBus inherits from XChain, while also XChain has a XBus property, so i made these to compile)
     // They will be inherited in XBus, but basically XBus can be incorporated into XChain, no ?
+
+    // Question (Brecht):
+    //- Shall we put back these functionalities to bus ?
+    //- Shall we remove (as i did here) the ownership of the bus - then use the previous implementation ? (notImplemented modifier) and overwrite in the child "bus" ?
 
     // Currently, supposingly there is "synchronous composability", so let's assume a synchronous world
     function write(bytes memory message) public virtual returns (uint) {
