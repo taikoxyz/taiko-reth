@@ -35,7 +35,7 @@ contract Bus is XChain {
             require(consumed[messageHash] == false);
             consumed[messageHash] = true;
         } else if (proofType == ProofType.SYNC) {
-            // Sync system with shared validity
+            // Sync system with shared validity (e.g.: like a SignalService shared validity thing)
             write(message);
         } else {
             revert("INVALID BUS PROOF");
