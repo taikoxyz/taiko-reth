@@ -10,6 +10,7 @@ contract XChainERC20Token is XChain, ERC20 {
     // Only stored on L1
     // @Brecht -> Shall we overwrite in our xERC20Example the totalSupply() of ERC20 ? And use this var instead of the ERC20's _totalSupply
     // Not sure in this because i guess it shall serve the same purpose as totalSupply(), also it is a completely different interaction (on xChain) than on the canonical chain, but the totalSupply shall be the same IMO.
+    //meeting meinutes: We can get rid of this.
     uint private _totalBalance;
     // Stored on all chains
     // This lead me to realize we need thi sinheritance:
@@ -23,15 +24,6 @@ contract XChainERC20Token is XChain, ERC20 {
 
     constructor(string memory name_, string memory symbol_, address premintAddress_, uint256 premintAmount_ ) ERC20(name_, symbol_) {
         _mint(premintAddress_, premintAmount_);
-    }
-
-    function totalBalance() //Is it the same as totalSupply() if so, i think that shall be fine!
-        xExecuteOn(EVM.l1ChainId) //why it has an xExecuteOn modifier ? And why it is applied only here ?
-        external
-        view 
-        returns (uint)
-    {
-        return _totalBalance;
     }
 
     // xtransfer for async case (proof needed)
@@ -71,6 +63,17 @@ contract XChainERC20Token is XChain, ERC20 {
     }
 
     /* Overrides of ERC20 */
+    //Change totalSupply and apply xExecuteOn modifier
+    function totalSupply() //Is it the same as totalSupply() if so, i think that shall be fine!
+        xExecuteOn(EVM.l1ChainId) //why it has an xExecuteOn modifier ? And why it is applied only here ?
+        public
+        view
+        override
+        returns (uint256)
+    {
+        return _totalSupply;
+    }
+
     function balanceOf(address account) public view virtual override returns (uint256) {
         return _balances[account];
     }

@@ -143,18 +143,8 @@ contract XChain {
     //- Shall we remove (as i did here) the ownership of the bus - then use the previous implementation ? (notImplemented modifier) and overwrite in the child "bus" ?
 
     // Currently, supposingly there is "synchronous composability", so let's assume a synchronous world
-    function write(bytes memory message) public virtual returns (uint) {
-        messages.push(calcMessageHash(message));
-        return messages.length - 1;
-    }
+    function write(bytes memory message) public virtual notImplemented returns (uint) {}
 
     // Even tho the function just passes thru to write(), it is needed to bus-compatibility, where the consume function will differ
-    function consume(uint256 /*fromChainId*/, bytes memory message, bytes calldata proof) public virtual {
-        ProofType proofType = ProofType(uint16(bytes2(proof[:2])));
-
-        if (proofType != ProofType.ASYNC) {
-             revert NO_NEED_BUS_PROOF_ALL_ASYNC();
-        }
-        write(message);
-    }
+    function consume(uint256 /*fromChainId*/, bytes memory message, bytes calldata proof) public notImplemented virtual {}
 }
