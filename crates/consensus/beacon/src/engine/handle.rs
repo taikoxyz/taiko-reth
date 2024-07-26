@@ -49,8 +49,11 @@ where
         cancun_fields: Option<CancunPayloadFields>,
     ) -> Result<PayloadStatus, BeaconOnNewPayloadError> {
         let (tx, rx) = oneshot::channel();
+        println!("new_payload start");
         let _ = self.to_engine.send(BeaconEngineMessage::NewPayload { payload, cancun_fields, tx });
-        rx.await.map_err(|_| BeaconOnNewPayloadError::EngineUnavailable)?
+        let res = rx.await.map_err(|_| BeaconOnNewPayloadError::EngineUnavailable)?;
+        println!("new_payload end");
+        res
     }
 
     /// Sends a forkchoice update message to the beacon consensus engine and waits for a response.

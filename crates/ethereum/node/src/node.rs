@@ -53,6 +53,7 @@ impl EthereumNode {
             PayloadBuilderAttributes = EthPayloadBuilderAttributes,
         >,
     {
+        println!("EthereumNode.components");
         ComponentsBuilder::default()
             .node_types::<Node>()
             .pool(EthereumPoolBuilder::default())

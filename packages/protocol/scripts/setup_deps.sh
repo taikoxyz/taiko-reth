@@ -57,13 +57,13 @@ if [[ "$OSTYPE" == "darwin"* ]]; then
 elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
     if [ -f /etc/os-release ]; then
         . /etc/os-release
-        if [[ "$ID" == "ubuntu" ]]; then
+        #if [[ "$ID" == "ubuntu" ]]; then
             echo "Detected Ubuntu."
             install_kurtosis_ubuntu
-        else
-            echo "This script currently supports only Ubuntu and macOS."
-            exit 1
-        fi
+        #else
+        #    echo "This script currently supports only Ubuntu and macOS."
+        #    exit 1
+        #fi
     else
         echo "This script currently supports only Ubuntu and macOS."
         exit 1

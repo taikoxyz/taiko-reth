@@ -539,3 +539,8 @@ serial_test = "3"
 similar-asserts = "1.5.0"
 test-fuzz = "5"
 iai-callgrind = "0.11"
+
+
+#[patch.crates-io]
+#revm = { path = "../revm/crates/revm" }
+#revm-primitives = { path = "../revm/crates/primitives" }

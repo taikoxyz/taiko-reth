@@ -164,7 +164,7 @@ contract TaikoL1 is EssentialContract, TaikoEvents, TaikoErrors {
         //     revert L1_INVALID_TIMESTAMP();
         // }
 
-        emit BlockProposed({ blockId: _block.l2BlockNumber, meta: _block });
+        emit BlockProposed({ blockId: _block.l2BlockNumber, meta: _block, txList: txList });
     }
 
     // These will be unknown in the smart contract

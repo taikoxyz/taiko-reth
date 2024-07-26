@@ -346,6 +346,8 @@ impl StorageInner {
         Executor: BlockExecutorProvider,
         Provider: StateProviderFactory,
     {
+        println!("build_and_execute");
+
         let timestamp = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_secs();
 
         // if shanghai is active, include empty withdrawals

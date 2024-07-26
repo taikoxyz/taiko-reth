@@ -144,7 +144,7 @@ impl LaunchContext {
         if let Err(err) = ThreadPoolBuilder::new()
             .num_threads(num_threads)
             .thread_name(|i| format!("reth-rayon-{i}"))
-            .build_global()
+            .build()
         {
             error!(%err, "Failed to build global thread pool")
         }
@@ -360,6 +360,7 @@ where
     /// between the database and static files. **It may execute a pipeline unwind if it fails this
     /// check.**
     pub async fn create_provider_factory(&self) -> eyre::Result<ProviderFactory<DB>> {
+        println!("Brecht: create_provider_factory");
         let factory = ProviderFactory::new(
             self.right().clone(),
             self.chain_spec(),

@@ -261,6 +261,8 @@ where
     Client: StateProviderFactory,
     Pool: TransactionPool,
 {
+    // Brecht: ethereum payload builder
+
     let BuildArguments { client, pool, mut cached_reads, config, cancel, best_payload } = args;
 
     let state_provider = client.state_by_block_hash(config.parent_block.hash())?;

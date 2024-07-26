@@ -1601,6 +1601,7 @@ where
         match action {
             BlockchainTreeAction::MakeForkchoiceHeadCanonical { state, attrs, tx } => {
                 let start = Instant::now();
+                // Brecht: reorg
                 let result = self.blockchain.make_canonical(state.head_block_hash);
                 let elapsed = self.record_make_canonical_latency(start, &result);
                 match self
@@ -2212,6 +2213,7 @@ mod tests {
             assert_matches!(engine_rx.try_recv(), Err(TryRecvError::Empty));
         }
 
+        // Brecht fork choice update
         #[tokio::test]
         async fn valid_forkchoice() {
             let mut rng = generators::rng();

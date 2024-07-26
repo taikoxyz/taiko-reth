@@ -75,6 +75,7 @@ impl Command {
 
     /// Execute `debug in-memory-merkle` command
     pub async fn execute(self, ctx: CliContext) -> eyre::Result<()> {
+        println!("debug_cmd in mem");
         let Environment { provider_factory, config, data_dir } = self.env.init(AccessRights::RW)?;
 
         let provider = provider_factory.provider()?;

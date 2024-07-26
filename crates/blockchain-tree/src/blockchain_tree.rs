@@ -1020,6 +1020,7 @@ where
         &mut self,
         block_hash: BlockHash,
     ) -> Result<CanonicalOutcome, CanonicalError> {
+        // Brecht reorg make_canonical
         let mut durations_recorder = MakeCanonicalDurationsRecorder::default();
 
         let old_block_indices = self.block_indices().clone();
@@ -1213,6 +1214,7 @@ where
         chain: Chain,
         recorder: &mut MakeCanonicalDurationsRecorder,
     ) -> Result<(), CanonicalError> {
+        // Brecht reorg state trie calculation
         let (blocks, state, chain_trie_updates) = chain.into_inner();
         let hashed_state = state.hash_state_slow();
         let prefix_sets = hashed_state.construct_prefix_sets().freeze();
