@@ -9,7 +9,6 @@ use reth_node_ethereum::EthEvmConfig;
 use reth_primitives::{
     constants,
     eip4844::kzg_to_versioned_hash,
-    keccak256,
     revm_primitives::{CfgEnvWithHandlerCfg, EVMError, ExecutionResult, ResultAndState},
     Address, Block, BlockWithSenders, Bytes, EthereumHardfork, Header, Receipt, TransactionSigned,
     TxType, B256, U256,
@@ -22,7 +21,7 @@ use reth_tracing::tracing::debug;
 
 /// Execute a rollup block and return (block with recovered senders)[BlockWithSenders], (bundle
 /// state)[BundleState] and list of (receipts)[Receipt].
-pub async fn execute_block<Pool: TransactionPool>(
+pub(crate) async fn execute_block<Pool: TransactionPool>(
     db: &mut Database,
     pool: &Pool,
     tx: &TransactionSigned,
@@ -39,6 +38,7 @@ pub async fn execute_block<Pool: TransactionPool>(
 
     // Decode transactions
     let transactions = decode_transactions(pool, tx, block_data).await?;
+    println!("transactions: {:?}", transactions);
 
     // Configure EVM
     let evm_config = EthEvmConfig::default();
@@ -65,16 +65,16 @@ fn construct_header(db: &Database, meta_data: &RollupContract::BlockMetadata) ->
 
     // Calculate base fee per gas for EIP-1559 transactions
     let base_fee_per_gas =
-        if CHAIN_SPEC.fork(EthereumHardfork::London).transitions_at_block(block_number) {
-            constants::EIP1559_INITIAL_BASE_FEE
-        } else {
-            parent_block
-                .as_ref()
-                .ok_or(eyre::eyre!("parent block not found"))?
-                .header
-                .next_block_base_fee(CHAIN_SPEC.base_fee_params_at_block(block_number))
-                .ok_or(eyre::eyre!("failed to calculate base fee"))?
-        };
+        //if CHAIN_SPEC.fork(EthereumHardfork::London).transitions_at_block(block_number) {
+            constants::EIP1559_INITIAL_BASE_FEE;
+        //} else {
+        //    parent_block
+        //        .as_ref()
+        //        .ok_or(eyre::eyre!("parent block not found"))?
+        //        .header
+        //        .next_block_base_fee(CHAIN_SPEC.base_fee_params_at_block(block_number))
+        //        .ok_or(eyre::eyre!("failed to calculate base fee"))?
+        //};
 
     // Construct header
     Ok(Header {

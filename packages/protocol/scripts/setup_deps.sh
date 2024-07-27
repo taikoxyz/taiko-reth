@@ -22,15 +22,15 @@ else
 fi
 
 # Check if the taiko_reth image exists
-if ! docker image inspect taiko_reth >/dev/null 2>&1; then
+#if ! docker image inspect taiko_reth >/dev/null 2>&1; then
     echo "Docker image taiko_reth does not exist. Building the image..."
     if ! docker build ../../ -t taiko_reth; then
         echo "Failed to build the Docker image taiko_reth."
         exit 1
     fi
-else
-    echo "Docker image taiko_reth already exists."
-fi
+#else
+#    echo "Docker image taiko_reth already exists."
+#fi
 
 # Function to install Kurtosis on macOS
 install_kurtosis_mac() {

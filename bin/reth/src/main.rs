@@ -33,13 +33,12 @@ use alloy_sol_types::{sol, SolEventInterface, SolInterface};
 use db::Database;
 use execution::execute_block;
 use once_cell::sync::Lazy;
-use reth::{args::{DiscoveryArgs, NetworkArgs, RpcServerArgs}, builder::{NodeBuilder, NodeConfig, NodeHandle}, rpc::api::EngineApiClient, tasks::TaskManager};
 use reth_chainspec::{ChainSpec, ChainSpecBuilder};
 use reth_execution_types::Chain;
 use reth_exex::{ExExContext, ExExEvent};
 use reth_node_api::FullNodeComponents;
 use reth_node_ethereum::EthereumNode;
-use reth_primitives::{address, Address, Genesis, SealedBlockWithSenders, TransactionSigned, U256};
+use reth_primitives::{address, Address, Genesis, SealedBlockWithSenders, TransactionSigned};
 use reth_tracing::tracing::{error, info};
 use rusqlite::Connection;
 use std::sync::Arc;
@@ -53,7 +52,7 @@ use RollupContract::{BlockProposed, RollupContractCalls, RollupContractEvents};
 const DATABASE_PATH: &str = "rollup.db";
 const ROLLUP_CONTRACT_ADDRESS: Address = address!("9fCF7D13d10dEdF17d0f24C62f0cf4ED462f65b7");
 const ROLLUP_SUBMITTER_ADDRESS: Address = address!("8943545177806ED17B9F23F0a21ee5948eCaa776");
-const CHAIN_ID: u64 = 160010;
+const CHAIN_ID: u64 = 160011;
 static CHAIN_SPEC: Lazy<Arc<ChainSpec>> = Lazy::new(|| {
     Arc::new(
         ChainSpecBuilder::default()
@@ -111,7 +110,7 @@ impl<Node: FullNodeComponents> Rollup<Node> {
                 }) => {
                     println!("block_number: {:?}", block_number);
                     println!("tx_list: {:?}", tx_list);
-                    let call = RollupContractCalls::abi_decode(tx.input(), true)?;
+                    let _call = RollupContractCalls::abi_decode(tx.input(), true)?;
 
                     /*if let RollupContractCalls::submitBlock(RollupContract::submitBlockCall {
                         header,
@@ -276,7 +275,7 @@ fn decode_chain_into_rollup_events(
             receipt
                 .logs
                 .iter()
-                .filter(|log| log.address == ROLLUP_CONTRACT_ADDRESS)
+                .filter(|log| { println!("log: {:?}", log); log.address == ROLLUP_CONTRACT_ADDRESS } )
                 .map(move |log| (block, tx, log))
         })
         // Decode and filter rollup events

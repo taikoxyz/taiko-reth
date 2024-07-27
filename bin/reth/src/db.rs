@@ -1,12 +1,12 @@
 use std::{
-    collections::{hash_map::Entry, HashMap},
+    //collections::{hash_map::Entry, HashMap},
     str::FromStr,
     sync::{Arc, Mutex, MutexGuard},
 };
 
 use reth_primitives::{
     revm_primitives::{AccountInfo, Bytecode},
-    Address, Bytes, SealedBlockWithSenders, StorageEntry, B256, U256,
+    Address, Bytes, SealedBlockWithSenders, B256, U256,
 };
 use reth_provider::{bundle_state::StorageRevertsIter, OriginalValuesKnown};
 use reth_revm::db::{
@@ -15,23 +15,24 @@ use reth_revm::db::{
 };
 use rusqlite::Connection;
 
+
 /// Type used to initialize revms bundle state.
-type BundleStateInit =
-    HashMap<Address, (Option<AccountInfo>, Option<AccountInfo>, HashMap<B256, (U256, U256)>)>;
+// type BundleStateInit =
+//     HashMap<Address, (Option<AccountInfo>, Option<AccountInfo>, HashMap<B256, (U256, U256)>)>;
 
-/// Types used inside RevertsInit to initialize revms reverts.
-pub type AccountRevertInit = (Option<Option<AccountInfo>>, Vec<StorageEntry>);
+// /// Types used inside RevertsInit to initialize revms reverts.
+// pub(crate) type AccountRevertInit = (Option<Option<AccountInfo>>, Vec<StorageEntry>);
 
-/// Type used to initialize revms reverts.
-pub type RevertsInit = HashMap<Address, AccountRevertInit>;
+// /// Type used to initialize revms reverts.
+// pub(crate) type RevertsInit = HashMap<Address, AccountRevertInit>;
 
-pub struct Database {
+pub(crate) struct Database {
     connection: Arc<Mutex<Connection>>,
 }
 
 impl Database {
     /// Create new database with the provided connection.
-    pub fn new(connection: Connection) -> eyre::Result<Self> {
+    pub(crate) fn new(connection: Connection) -> eyre::Result<Self> {
         let database = Self { connection: Arc::new(Mutex::new(connection)) };
         database.create_tables()?;
         Ok(database)
@@ -85,7 +86,7 @@ impl Database {
     }
 
     /// Insert block with bundle into the database.
-    pub fn insert_block_with_bundle(
+    pub(crate) fn insert_block_with_bundle(
         &self,
         block: &SealedBlockWithSenders,
         bundle: BundleState,
@@ -168,132 +169,132 @@ impl Database {
     }
 
     /// Reverts the tip block from the database, checking it against the provided block number.
-    ///
-    /// The code is adapted from <https://github.com/paradigmxyz/reth/blob/a8cd1f71a03c773c24659fc28bfed2ba5f2bd97b/crates/storage/provider/src/providers/database/provider.rs#L365-L540>
-    pub fn revert_tip_block(&self, block_number: U256) -> eyre::Result<()> {
-        let mut connection = self.connection();
-        let tx = connection.transaction()?;
+    // ///
+    // /// The code is adapted from <https://github.com/paradigmxyz/reth/blob/a8cd1f71a03c773c24659fc28bfed2ba5f2bd97b/crates/storage/provider/src/providers/database/provider.rs#L365-L540>
+    // pub(crate) fn revert_tip_block(&self, block_number: U256) -> eyre::Result<()> {
+    //     let mut connection = self.connection();
+    //     let tx = connection.transaction()?;
 
-        let tip_block_number = tx
-            .query_row::<String, _, _>(
-                "SELECT number FROM block ORDER BY number DESC LIMIT 1",
-                [],
-                |row| row.get(0),
-            )
-            .map(|data| U256::from_str(&data))??;
-        if block_number != tip_block_number {
-            eyre::bail!("Reverts can only be done from the tip. Attempted to revert block {} with tip block {}", block_number, tip_block_number);
-        }
+    //     let tip_block_number = tx
+    //         .query_row::<String, _, _>(
+    //             "SELECT number FROM block ORDER BY number DESC LIMIT 1",
+    //             [],
+    //             |row| row.get(0),
+    //         )
+    //         .map(|data| U256::from_str(&data))??;
+    //     if block_number != tip_block_number {
+    //         eyre::bail!("Reverts can only be done from the tip. Attempted to revert block {} with tip block {}", block_number, tip_block_number);
+    //     }
 
-        tx.execute("DELETE FROM block WHERE number = ?", (block_number.to_string(),))?;
+    //     tx.execute("DELETE FROM block WHERE number = ?", (block_number.to_string(),))?;
 
-        let mut state = BundleStateInit::new();
-        let mut reverts = RevertsInit::new();
+    //     let mut state = BundleStateInit::new();
+    //     let mut reverts = RevertsInit::new();
 
-        let account_reverts = tx
-            .prepare("SELECT address, data FROM account_revert WHERE block_number = ?")?
-            .query((block_number.to_string(),))?
-            .mapped(|row| {
-                Ok((
-                    Address::from_str(row.get_ref(0)?.as_str()?),
-                    serde_json::from_str::<Option<AccountInfo>>(row.get_ref(1)?.as_str()?),
-                ))
-            })
-            .map(|result| {
-                let (address, data) = result?;
-                Ok((address?, data?))
-            })
-            .collect::<eyre::Result<Vec<_>>>()?;
+    //     let account_reverts = tx
+    //         .prepare("SELECT address, data FROM account_revert WHERE block_number = ?")?
+    //         .query((block_number.to_string(),))?
+    //         .mapped(|row| {
+    //             Ok((
+    //                 Address::from_str(row.get_ref(0)?.as_str()?),
+    //                 serde_json::from_str::<Option<AccountInfo>>(row.get_ref(1)?.as_str()?),
+    //             ))
+    //         })
+    //         .map(|result| {
+    //             let (address, data) = result?;
+    //             Ok((address?, data?))
+    //         })
+    //         .collect::<eyre::Result<Vec<_>>>()?;
 
-        for (address, old_info) in account_reverts {
-            // insert old info into reverts
-            reverts.entry(address).or_default().0 = Some(old_info.clone());
+    //     for (address, old_info) in account_reverts {
+    //         // insert old info into reverts
+    //         reverts.entry(address).or_default().0 = Some(old_info.clone());
 
-            match state.entry(address) {
-                Entry::Vacant(entry) => {
-                    let new_info = get_account(&tx, address)?;
-                    entry.insert((old_info, new_info, HashMap::new()));
-                }
-                Entry::Occupied(mut entry) => {
-                    // overwrite old account state
-                    entry.get_mut().0 = old_info;
-                }
-            }
-        }
+    //         match state.entry(address) {
+    //             Entry::Vacant(entry) => {
+    //                 let new_info = get_account(&tx, address)?;
+    //                 entry.insert((old_info, new_info, HashMap::new()));
+    //             }
+    //             Entry::Occupied(mut entry) => {
+    //                 // overwrite old account state
+    //                 entry.get_mut().0 = old_info;
+    //             }
+    //         }
+    //     }
 
-        let storage_reverts = tx
-            .prepare("SELECT address, key, data FROM storage_revert WHERE block_number = ?")?
-            .query((block_number.to_string(),))?
-            .mapped(|row| {
-                Ok((
-                    Address::from_str(row.get_ref(0)?.as_str()?),
-                    B256::from_str(row.get_ref(1)?.as_str()?),
-                    U256::from_str(row.get_ref(2)?.as_str()?),
-                ))
-            })
-            .map(|result| {
-                let (address, key, data) = result?;
-                Ok((address?, key?, data?))
-            })
-            .collect::<eyre::Result<Vec<_>>>()?;
+    //     let storage_reverts = tx
+    //         .prepare("SELECT address, key, data FROM storage_revert WHERE block_number = ?")?
+    //         .query((block_number.to_string(),))?
+    //         .mapped(|row| {
+    //             Ok((
+    //                 Address::from_str(row.get_ref(0)?.as_str()?),
+    //                 B256::from_str(row.get_ref(1)?.as_str()?),
+    //                 U256::from_str(row.get_ref(2)?.as_str()?),
+    //             ))
+    //         })
+    //         .map(|result| {
+    //             let (address, key, data) = result?;
+    //             Ok((address?, key?, data?))
+    //         })
+    //         .collect::<eyre::Result<Vec<_>>>()?;
 
-        for (address, key, old_data) in storage_reverts.into_iter().rev() {
-            let old_storage = StorageEntry { key, value: old_data };
+    //     for (address, key, old_data) in storage_reverts.into_iter().rev() {
+    //         let old_storage = StorageEntry { key, value: old_data };
 
-            // insert old info into reverts
-            reverts.entry(address).or_default().1.push(old_storage);
+    //         // insert old info into reverts
+    //         reverts.entry(address).or_default().1.push(old_storage);
 
-            // get account state or insert from plain state
-            let account_state = match state.entry(address) {
-                Entry::Vacant(entry) => {
-                    let present_info = get_account(&tx, address)?;
-                    entry.insert((present_info.clone(), present_info, HashMap::new()))
-                }
-                Entry::Occupied(entry) => entry.into_mut(),
-            };
+    //         // get account state or insert from plain state
+    //         let account_state = match state.entry(address) {
+    //             Entry::Vacant(entry) => {
+    //                 let present_info = get_account(&tx, address)?;
+    //                 entry.insert((present_info.clone(), present_info, HashMap::new()))
+    //             }
+    //             Entry::Occupied(entry) => entry.into_mut(),
+    //         };
 
-            // match storage
-            match account_state.2.entry(old_storage.key) {
-                Entry::Vacant(entry) => {
-                    let new_value = get_storage(&tx, address, old_storage.key)?.unwrap_or_default();
-                    entry.insert((old_storage.value, new_value));
-                }
-                Entry::Occupied(mut entry) => {
-                    entry.get_mut().0 = old_storage.value;
-                }
-            };
-        }
+    //         // match storage
+    //         match account_state.2.entry(old_storage.key) {
+    //             Entry::Vacant(entry) => {
+    //                 let new_value = get_storage(&tx, address, old_storage.key)?.unwrap_or_default();
+    //                 entry.insert((old_storage.value, new_value));
+    //             }
+    //             Entry::Occupied(mut entry) => {
+    //                 entry.get_mut().0 = old_storage.value;
+    //             }
+    //         };
+    //     }
 
-        // iterate over local plain state remove all account and all storages
-        for (address, (old_account, new_account, storage)) in state {
-            // revert account if needed
-            if old_account != new_account {
-                if let Some(account) = old_account {
-                    upsert_account(&tx, address, |_| Ok(account))?;
-                } else {
-                    delete_account(&tx, address)?;
-                }
-            }
+    //     // iterate over local plain state remove all account and all storages
+    //     for (address, (old_account, new_account, storage)) in state {
+    //         // revert account if needed
+    //         if old_account != new_account {
+    //             if let Some(account) = old_account {
+    //                 upsert_account(&tx, address, |_| Ok(account))?;
+    //             } else {
+    //                 delete_account(&tx, address)?;
+    //             }
+    //         }
 
-            // revert storages
-            for (storage_key, (old_storage_value, _new_storage_value)) in storage {
-                // delete previous value
-                delete_storage(&tx, address, storage_key)?;
+    //         // revert storages
+    //         for (storage_key, (old_storage_value, _new_storage_value)) in storage {
+    //             // delete previous value
+    //             delete_storage(&tx, address, storage_key)?;
 
-                // insert value if needed
-                if !old_storage_value.is_zero() {
-                    upsert_storage(&tx, address, storage_key, old_storage_value)?;
-                }
-            }
-        }
+    //             // insert value if needed
+    //             if !old_storage_value.is_zero() {
+    //                 upsert_storage(&tx, address, storage_key, old_storage_value)?;
+    //             }
+    //         }
+    //     }
 
-        tx.commit()?;
+    //     tx.commit()?;
 
-        Ok(())
-    }
+    //     Ok(())
+    // }
 
     /// Get block by number.
-    pub fn get_block(&self, number: U256) -> eyre::Result<Option<SealedBlockWithSenders>> {
+    pub(crate) fn get_block(&self, number: U256) -> eyre::Result<Option<SealedBlockWithSenders>> {
         let block = self.connection().query_row::<String, _, _>(
             "SELECT data FROM block WHERE number = ?",
             (number.to_string(),),
@@ -306,46 +307,46 @@ impl Database {
         }
     }
 
-    /// Insert new account if it does not exist, update otherwise. The provided closure is called
-    /// with the current account, if it exists.
-    pub fn upsert_account(
-        &self,
-        address: Address,
-        f: impl FnOnce(Option<AccountInfo>) -> eyre::Result<AccountInfo>,
-    ) -> eyre::Result<()> {
-        upsert_account(&self.connection(), address, f)
-    }
+    // /// Insert new account if it does not exist, update otherwise. The provided closure is called
+    // /// with the current account, if it exists.
+    // pub(crate) fn upsert_account(
+    //     &self,
+    //     address: Address,
+    //     f: impl FnOnce(Option<AccountInfo>) -> eyre::Result<AccountInfo>,
+    // ) -> eyre::Result<()> {
+    //     upsert_account(&self.connection(), address, f)
+    // }
 
     /// Get account by address.
-    pub fn get_account(&self, address: Address) -> eyre::Result<Option<AccountInfo>> {
+    pub(crate) fn get_account(&self, address: Address) -> eyre::Result<Option<AccountInfo>> {
         get_account(&self.connection(), address)
     }
 }
 
-/// Insert new account if it does not exist, update otherwise. The provided closure is called
-/// with the current account, if it exists. Connection can be either
-/// [rusqlite::Transaction] or [rusqlite::Connection].
-fn upsert_account(
-    connection: &Connection,
-    address: Address,
-    f: impl FnOnce(Option<AccountInfo>) -> eyre::Result<AccountInfo>,
-) -> eyre::Result<()> {
-    let account = get_account(connection, address)?;
-    let account = f(account)?;
-    connection.execute(
-        "INSERT INTO account (address, data) VALUES (?, ?) ON CONFLICT(address) DO UPDATE SET data = excluded.data",
-        (address.to_string(), serde_json::to_string(&account)?),
-    )?;
+// /// Insert new account if it does not exist, update otherwise. The provided closure is called
+// /// with the current account, if it exists. Connection can be either
+// /// [rusqlite::Transaction] or [rusqlite::Connection].
+// fn upsert_account(
+//     connection: &Connection,
+//     address: Address,
+//     f: impl FnOnce(Option<AccountInfo>) -> eyre::Result<AccountInfo>,
+// ) -> eyre::Result<()> {
+//     let account = get_account(connection, address)?;
+//     let account = f(account)?;
+//     connection.execute(
+//         "INSERT INTO account (address, data) VALUES (?, ?) ON CONFLICT(address) DO UPDATE SET data = excluded.data",
+//         (address.to_string(), serde_json::to_string(&account)?),
+//     )?;
 
-    Ok(())
-}
+//     Ok(())
+// }
 
-/// Delete account by address. Connection can be either [rusqlite::Transaction] or
-/// [rusqlite::Connection].
-fn delete_account(connection: &Connection, address: Address) -> eyre::Result<()> {
-    connection.execute("DELETE FROM account WHERE address = ?", (address.to_string(),))?;
-    Ok(())
-}
+// /// Delete account by address. Connection can be either [rusqlite::Transaction] or
+// /// [rusqlite::Connection].
+// fn delete_account(connection: &Connection, address: Address) -> eyre::Result<()> {
+//     connection.execute("DELETE FROM account WHERE address = ?", (address.to_string(),))?;
+//     Ok(())
+// }
 
 /// Get account by address using the database connection. Connection can be either
 /// [rusqlite::Transaction] or [rusqlite::Connection].
@@ -361,30 +362,30 @@ fn get_account(connection: &Connection, address: Address) -> eyre::Result<Option
     }
 }
 
-/// Insert new storage if it does not exist, update otherwise. Connection can be either
-/// [rusqlite::Transaction] or [rusqlite::Connection].
-fn upsert_storage(
-    connection: &Connection,
-    address: Address,
-    key: B256,
-    data: U256,
-) -> eyre::Result<()> {
-    connection.execute(
-        "INSERT INTO storage (address, key, data) VALUES (?, ?, ?) ON CONFLICT(address, key) DO UPDATE SET data = excluded.data",
-        (address.to_string(), key.to_string(), data.to_string()),
-    )?;
-    Ok(())
-}
+// /// Insert new storage if it does not exist, update otherwise. Connection can be either
+// /// [rusqlite::Transaction] or [rusqlite::Connection].
+// fn upsert_storage(
+//     connection: &Connection,
+//     address: Address,
+//     key: B256,
+//     data: U256,
+// ) -> eyre::Result<()> {
+//     connection.execute(
+//         "INSERT INTO storage (address, key, data) VALUES (?, ?, ?) ON CONFLICT(address, key) DO UPDATE SET data = excluded.data",
+//         (address.to_string(), key.to_string(), data.to_string()),
+//     )?;
+//     Ok(())
+// }
 
-/// Delete storage by address and key. Connection can be either [rusqlite::Transaction] or
-/// [rusqlite::Connection].
-fn delete_storage(connection: &Connection, address: Address, key: B256) -> eyre::Result<()> {
-    connection.execute(
-        "DELETE FROM storage WHERE address = ? AND key = ?",
-        (address.to_string(), key.to_string()),
-    )?;
-    Ok(())
-}
+// /// Delete storage by address and key. Connection can be either [rusqlite::Transaction] or
+// /// [rusqlite::Connection].
+// fn delete_storage(connection: &Connection, address: Address, key: B256) -> eyre::Result<()> {
+//     connection.execute(
+//         "DELETE FROM storage WHERE address = ? AND key = ?",
+//         (address.to_string(), key.to_string()),
+//     )?;
+//     Ok(())
+// }
 
 /// Get all storages for the provided address using the database connection. Connection can be
 /// either [rusqlite::Transaction] or [rusqlite::Connection].

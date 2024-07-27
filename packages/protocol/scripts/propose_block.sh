@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Run the setup_deps.sh script to ensure dependencies are set up
-./scripts/setup_deps.sh
+#./scripts/setup_deps.sh
 
 # Read the RPC port from temporary file
 RPC_PORT=$(cat /tmp/kurtosis_rpc_port)

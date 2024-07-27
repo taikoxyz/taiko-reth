@@ -135,7 +135,7 @@ impl<Ext: clap::Args + fmt::Debug> NodeCommand<Ext> {
         Fut: Future<Output = eyre::Result<()>>,
     {
         println!("NodeCommand::execute");
-        tracing::info!(target: "reth::cli", version = ?version::SHORT_VERSION, "Starting reth");
+        tracing::info!(target: "reth::cli", version = ?version::SHORT_VERSION, "Brecht Starting reth");
 
         let Self {
             datadir,

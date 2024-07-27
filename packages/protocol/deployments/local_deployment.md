@@ -16,11 +16,11 @@ Create a `network_params.yaml` file.
 ```shell
 participants:
   - el_type: reth
-    el_image: ghcr.io/paradigmxyz/reth # We can use custom image, (remote, e.g.: ethpandaops/reth:main-9c0bc84 or locally: taiko_reth)
+    el_image: taiko_reth # We can use custom image, (remote, e.g.: ethpandaops/reth:main-9c0bc84 or locally: taiko_reth)
     cl_type: lighthouse
     cl_image: sigp/lighthouse:latest
   - el_type: reth
-    el_image: ghcr.io/paradigmxyz/reth # We can use custom image, (remote, e.g.: ethpandaops/reth:main-9c0bc84 or locally: taiko_reth)
+    el_image: taiko_reth # We can use custom image, (remote, e.g.: ethpandaops/reth:main-9c0bc84 or locally: taiko_reth)
     cl_type: teku
     cl_image: consensys/teku:latest
 network_params:
