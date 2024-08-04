@@ -14,27 +14,26 @@ use reth_primitives::{
     TxType, B256, U256,
 };
 use reth_revm::{
-    db::{states::bundle_state::BundleRetention, BundleState},
-    DBBox, DatabaseCommit, Evm, StateBuilder, StateDBBox,
+    db::{states::bundle_state::BundleRetention, BundleState}, primitives::FixedBytes, DBBox, DatabaseCommit, Evm, StateBuilder, StateDBBox
 };
 use reth_tracing::tracing::debug;
 
 /// Execute a rollup block and return (block with recovered senders)[BlockWithSenders], (bundle
 /// state)[BundleState] and list of (receipts)[Receipt].
 pub(crate) async fn execute_block<Pool: TransactionPool>(
-    db: &mut Database,
+    //db: &mut Database,
     pool: &Pool,
     tx: &TransactionSigned,
     block_metadata: &RollupContract::BlockMetadata,
     block_data: Bytes,
     //block_data_hash: B256,
-) -> eyre::Result<(BlockWithSenders, BundleState, Vec<Receipt>, Vec<ExecutionResult>)> {
+) -> eyre::Result<(BlockWithSenders/*, BundleState*/, Vec<Receipt>, Vec<ExecutionResult>)> {
     //if header.rollupChainId != U256::from(CHAIN_ID) {
     //    eyre::bail!("Invalid rollup chain ID")
     //}
 
     // Construct header
-    let header = construct_header(db, block_metadata)?;
+    let header = construct_header(block_metadata)?;
 
     // Decode transactions
     let transactions = decode_transactions(pool, tx, block_data).await?;
@@ -42,24 +41,30 @@ pub(crate) async fn execute_block<Pool: TransactionPool>(
 
     // Configure EVM
     let evm_config = EthEvmConfig::default();
-    let mut evm = configure_evm(&evm_config, db, &header);
+    //let mut evm = configure_evm(&evm_config, db, &header);
 
     // Execute transactions
-    let (executed_txs, receipts, results) = execute_transactions(&mut evm, &header, transactions)?;
+    // let (executed_txs, receipts, results) = execute_transactions(&mut evm, &header, transactions)?;
+    // println!("executed_txs: {:?}", executed_txs);
 
-    // Construct block and recover senders
-    let block = Block { header, body: executed_txs, ..Default::default() }
-        .with_recovered_senders()
-        .ok_or_eyre("failed to recover senders")?;
+    // // Construct block and recover senders
+    // let block = Block { header, body: executed_txs, ..Default::default() }
+    //     .with_recovered_senders()
+    //     .ok_or_eyre("failed to recover senders")?;
 
-    let bundle = evm.db_mut().take_bundle();
 
-    Ok((block, bundle, receipts, results))
+    let block = BlockWithSenders::default();
+    let receipts = Vec::new();
+    let results = Vec::new();
+
+    //let bundle = evm.db_mut().take_bundle();
+
+    Ok((block/* , bundle*/, receipts, results))
 }
 
 /// Construct header from the given rollup header.
-fn construct_header(db: &Database, meta_data: &RollupContract::BlockMetadata) -> eyre::Result<Header> {
-    let parent_block =  db.get_block((meta_data.l2BlockNumber - 1).try_into().unwrap())?;
+fn construct_header(meta_data: &RollupContract::BlockMetadata) -> eyre::Result<Header> {
+    //let parent_block =  db.get_block((meta_data.l2BlockNumber - 1).try_into().unwrap())?;
 
     let block_number = u64::try_from(meta_data.l2BlockNumber)?;
 
@@ -78,7 +83,8 @@ fn construct_header(db: &Database, meta_data: &RollupContract::BlockMetadata) ->
 
     // Construct header
     Ok(Header {
-        parent_hash: parent_block.map(|block| block.header.hash()).unwrap_or_default(),
+        //parent_hash: parent_block.map(|block| block.header.hash()).unwrap_or_default(),
+        parent_hash: B256::default(),
         number: block_number,
         gas_limit: u64::try_from(meta_data.gasLimit)?,
         timestamp: u64::try_from(meta_data.timestamp)?,
@@ -171,7 +177,7 @@ async fn decode_transactions<Pool: TransactionPool>(
     // Decode block data, filter only transactions with the correct chain ID and recover senders
     let transactions = Vec::<TransactionSigned>::decode(&mut raw_transactions.as_ref())?
         .into_iter()
-        .filter(|tx| tx.chain_id() == Some(CHAIN_ID))
+        .filter(|tx| {println!("chain_id: {:?}", tx.chain_id()); tx.chain_id() == Some(CHAIN_ID) })
         .map(|tx| {
             let sender = tx.recover_signer().ok_or(eyre::eyre!("failed to recover signer"))?;
             Ok((tx, sender))
