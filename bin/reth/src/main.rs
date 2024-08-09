@@ -28,8 +28,9 @@ fn main() {
         std::process::exit(1);
     }
 }*/
-
+use reth::api::FullNodeTypes;
 use alloy_sol_types::{sol, SolEventInterface, SolInterface};
+use std::marker::PhantomData;
 use db::Database;
 use execution::execute_block;
 use eyre::Error;
@@ -43,7 +44,7 @@ use reth_consensus::Consensus;
 use reth_db::{test_utils::TempDatabase, DatabaseEnv};
 use reth_execution_types::Chain;
 use reth_exex::{ExExContext, ExExEvent};
-use reth_node_api::{FullNodeTypesAdapter, NodeAddOns};
+use reth_node_api::{FullNodeTypesAdapter, NodeAddOns, FullNodeComponents};
 //use reth_node_api::{EngineTypes, FullNodeComponents, NodeAddOns};
 use reth_node_builder::{components::Components, rpc::EthApiBuilderProvider, AddOns, FullNode, Node, NodeAdapter, NodeBuilder, NodeComponentsBuilder, NodeConfig, NodeHandle, RethFullAdapter};
 use reth_node_ethereum::{node::EthereumAddOns, EthEvmConfig, EthExecutorProvider, EthereumNode};
@@ -57,7 +58,7 @@ use rpc::RpcTestContext;
 use rusqlite::Connection;
 use transaction::TransactionTestContext;
 use wallet::Wallet;
-use std::{future::Future, marker::PhantomData, pin::Pin, sync::Arc};
+use std::{future::Future, pin::Pin, sync::Arc};
 
 //use alloy_primitives::{Address, B256};
 use reth::rpc::types::engine::PayloadAttributes;
@@ -92,6 +93,7 @@ pub(crate) fn eth_payload_attributes(timestamp: u64) -> EthPayloadBuilderAttribu
     EthPayloadBuilderAttributes::new(B256::ZERO, attributes)
 }
 
+fn assert_send<T: Send>(_: &T) {}
 
 sol!(RollupContract, "TaikoL1.json");
 use RollupContract::{BlockProposed, RollupContractCalls, RollupContractEvents};
@@ -110,17 +112,25 @@ static CHAIN_SPEC: Lazy<Arc<ChainSpec>> = Lazy::new(|| {
     )
 });
 
-struct Rollup<Node: reth_node_api::FullNodeComponents> {
+struct Rollup<Node: FullNodeComponents> {
     ctx: ExExContext<Node>,
     node: TestNodeContext,
 }
 
-impl<Node: reth_node_api::FullNodeComponents> Rollup<Node> {
+// impl<Node> Rollup<'a, Node>
+// where
+//     Node: FullNodeComponents,
+//     Node::Provider: Clone + Unpin + Send + 'static,
+// {
+impl<Node: FullNodeComponents> Rollup<Node> {
     fn new(ctx: ExExContext<Node>, node: TestNodeContext) -> eyre::Result<Self> {
         Ok(Self { ctx, node })
     }
 
-    async fn start(mut self) -> eyre::Result<()> {
+    async fn start(mut self) -> eyre::Result<()> 
+    // where
+    // Self: Send + 'static{
+    {
         // Process all new chain state notifications
         while let Some(notification) = self.ctx.notifications.recv().await {
             if let Some(reverted_chain) = notification.reverted_chain() {
@@ -398,9 +408,9 @@ pub async fn setup<N>(
     is_dev: bool,
 ) -> eyre::Result<(Vec<NodeHelperType<N, N::AddOns>>, TaskManager, Wallet)>
 where
-    N: Default + Node<TmpNodeAdapter<N>>,
+    N: Default + Node<TmpNodeAdapter<N>> + Send,
     <N::AddOns as NodeAddOns<Adapter<N>>>::EthApi:
-        FullEthApiServer + AddDevSigners + EthApiBuilderProvider<Adapter<N>>,
+        FullEthApiServer + AddDevSigners + EthApiBuilderProvider<Adapter<N>> + Send,
 {
     let tasks = TaskManager::current();
     let exec = tasks.executor();
@@ -454,97 +464,32 @@ fn main() -> eyre::Result<()> {
     reth::cli::Cli::parse_args().run(|builder, _| async move {
         let handle = builder
             .node(EthereumNode::default())
-            .install_exex("Rollup", move |ctx| async {
-                //let connection = Connection::open(DATABASE_PATH)?;
-
-                let network_config = NetworkArgs {
-                    discovery: DiscoveryArgs { disable_discovery: true, ..DiscoveryArgs::default() },
-                    ..NetworkArgs::default()
-                };
-
-                let tasks = TaskManager::current();
-                let exec = tasks.executor();
-
-                // let node_config = NodeConfig::test()
-                //     .with_chain(CHAIN_SPEC.clone())
-                //     .with_network(network_config.clone())
-                //     .with_unused_ports()
-                //     .with_rpc(RpcServerArgs::default().with_unused_ports().with_http())
-                //     .set_dev(true);
-
-                // let node_handle: = NodeBuilder::new(node_config.clone())
-                //     .testing_node(exec.clone())
-                //     .node(Default::default())
-                //     .launch()
-                //     .await?;
-
-                // let mut node = NodeTestContext::new(node_handle.node).await?;
+            .install_exex("Rollup", move |ctx| {
+                Box::pin(async move {
+                    let (mut nodes, _tasks, _wallet) = setup::<EthereumNode>(
+                        1,
+                        Arc::new(
+                            ChainSpecBuilder::default()
+                                .chain(MAINNET.chain)
+                                .genesis(serde_json::from_str(include_str!("../../../crates/ethereum/node/tests/assets/genesis.json")).unwrap())
+                                .cancun_activated()
+                                .build(),
+                        ),
+                        false,
+                    )
+                    .await?;
             
-                let (mut nodes, _tasks, _wallet) = setup::<EthereumNode>(
-                    1,
-                    Arc::new(
-                        ChainSpecBuilder::default()
-                            .chain(MAINNET.chain)
-                            .genesis(serde_json::from_str(include_str!("../../../crates/ethereum/node/tests/assets/genesis.json")).unwrap())
-                            .cancun_activated()
-                            .build(),
-                    ),
-                    false,
-                )
-                .await?;
+                    let node = nodes.pop().unwrap();
             
-                let node = nodes.pop().unwrap();
+                    let rollup = Rollup::new(ctx, node)?;
+                    
+                    let future: Pin<Box<dyn Future<Output = eyre::Result<()>> + Send>> = 
+                        Box::pin(async move {
+                            rollup.start().await
+                        });
 
-                //Ok((nodes, tasks, Wallet::default().with_chain_id(chain_spec.chain().into())))
-
-                // let wallet = Wallet::default();
-                // let raw_tx = TransactionTestContext::transfer_tx_bytes(1, wallet.inner).await;
-            
-                // // make the node advance
-                // let tx_hash = node.rpc.inject_tx(raw_tx).await?;
-            
-                // // make the node advance
-                // let (payload, _): (EthBuiltPayload, _) = node.advance_block(vec![], eth_payload_attributes).await?;
-            
-                // let block_hash = payload.block().hash();
-                // let block_number = payload.block().number;
-            
-                // // assert the block has been committed to the blockchain
-                // node.assert_new_block(tx_hash, block_hash, block_number).await?;
-            
-
-                // let wallet = Wallet::default();
-                // let raw_tx = TransactionTestContext::transfer_tx_bytes(1, wallet.inner).await;
-            
-                // // make the node advance
-                // let tx_hash = node.rpc.inject_tx(raw_tx).await?;
-            
-                // // make the node advance
-                // let (payload, _) = node.advance_block(vec![], eth_payload_attributes).await?;
-            
-                // let block_hash = payload.block().hash();
-                // let block_number = payload.block().number;
-            
-                // // assert the block has been committed to the blockchain
-                // node.assert_new_block(tx_hash, block_hash, block_number).await?;
-
-                // // setup payload for submission
-                // let envelope_v3: <E as EngineTypes>::ExecutionPayloadV3 = payload.into();
-
-                // // submit payload to engine api
-                // let submission = EngineApiClient::<E>::new_payload_v3(
-                //     &self.engine_api_client,
-                //     envelope_v3.execution_payload(),
-                //     versioned_hashes,
-                //     payload_builder_attributes.parent_beacon_block_root().unwrap(),
-                // )
-                // .await?;
-                
-                //let f: Pin<Box<dyn Future<Output = Result<(), Error>> + Send>> =
-                //        Box::pin(Rollup::new(ctx, connection, node)?.start());
-                //f
-
-                Ok(Rollup::new(ctx, node)?.start())
+                    Ok(future)
+                }) as Pin<Box<dyn Future<Output = eyre::Result<Pin<Box<dyn Future<Output = eyre::Result<()>> + Send>>>> + Send>>
             })
             .launch()
             .await?;
