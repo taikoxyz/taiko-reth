@@ -9869,6 +9869,7 @@ dependencies = [
 name = "taiko-reth-proposer-consensus"
 version = "1.0.0"
 dependencies = [
+ "flate2",
  "futures-util",
  "reth-beacon-consensus",
  "reth-chainspec",

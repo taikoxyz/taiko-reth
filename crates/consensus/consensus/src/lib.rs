@@ -370,6 +370,17 @@ pub enum ConsensusError {
         child_gas_limit: u64,
     },
 
+    /// Error indicating that the child gas limit is over the maximum allowed limit.
+    ///
+    /// This error occurs when the child gas limit is more than the specified maximum gas limit.
+    #[error(
+        "child gas limit {child_gas_limit} is over the maximum allowed limit ({MINIMUM_GAS_LIMIT})"
+    )]
+    GasLimitInvalidMaximum {
+        /// The child gas limit.
+        child_gas_limit: u64,
+    },
+
     /// Error when the child gas limit exceeds the maximum allowed decrease.
     #[error("child gas_limit {child_gas_limit} max decrease is {parent_gas_limit}/1024")]
     GasLimitInvalidDecrease {

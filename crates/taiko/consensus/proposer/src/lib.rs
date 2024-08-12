@@ -15,6 +15,8 @@
 #![cfg_attr(not(test), warn(unused_crate_dependencies))]
 #![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
 
+use flate2::write::ZlibEncoder;
+use flate2::Compression;
 use reth_beacon_consensus::BeaconEngineMessage;
 use reth_chainspec::ChainSpec;
 use reth_consensus::{Consensus, ConsensusError, PostExecutionInput};
@@ -31,6 +33,7 @@ use reth_revm::database::StateProviderDatabase;
 use reth_transaction_pool::TransactionPool;
 use std::{
     collections::HashMap,
+    io::Write,
     ops::Add,
     sync::Arc,
     time::{SystemTime, UNIX_EPOCH},
@@ -249,11 +252,9 @@ impl StorageInner {
         chain_spec: &ChainSpec,
         beneficiary: Address,
         block_max_gas_limit: u64,
+        base_fee: u64,
     ) -> Header {
-        // check previous block for base fee
-        let base_fee_per_gas = self.headers.get(&self.best_block).and_then(|parent| {
-            parent.next_block_base_fee(chain_spec.base_fee_params_at_timestamp(timestamp))
-        });
+        let base_fee_per_gas = Some(base_fee);
 
         let blob_gas_used = if chain_spec.is_cancun_active_at_timestamp(timestamp) {
             let mut sum_blob_gas_used = 0;
@@ -276,7 +277,7 @@ impl StorageInner {
             receipts_root: Default::default(),
             withdrawals_root: withdrawals.map(|w| proofs::calculate_withdrawals_root(w)),
             logs_bloom: Default::default(),
-            difficulty: U256::from(2),
+            difficulty: U256::ZERO,
             number: self.best_block + 1,
             gas_limit: block_max_gas_limit,
             gas_used: 0,
@@ -330,6 +331,7 @@ impl StorageInner {
         block_max_gas_limit: u64,
         max_bytes_per_tx_list: u64,
         max_transactions_lists: u64,
+        base_fee: u64,
     ) -> Result<Vec<TriggerResult>, BlockExecutionError>
     where
         Executor: BlockExecutorProvider,
@@ -353,6 +355,7 @@ impl StorageInner {
             &chain_spec,
             beneficiary,
             block_max_gas_limit,
+            base_fee,
         );
 
         let mut block = Block {
@@ -407,12 +410,9 @@ impl StorageInner {
         header.logs_bloom = receipts_with_bloom.iter().fold(Bloom::ZERO, |bloom, r| bloom | *r);
 
         // update receipts root
-        header.receipts_root = {
-            let receipts_root =
-                execution_outcome.receipts_root_slow(header.number).expect("Receipts is present");
+        header.receipts_root =
+            execution_outcome.receipts_root_slow(header.number).expect("Receipts is present");
 
-            receipts_root
-        };
         trace!(target: "consensus::auto", root=?header.state_root, ?body, "calculated root");
 
         // finally insert into storage
@@ -420,7 +420,8 @@ impl StorageInner {
 
         // set new header with hash that should have been updated by insert_new_block
         let new_header = header.seal(self.best_hash);
-
+        let mut e = ZlibEncoder::new(Vec::new(), Compression::default());
+        e.write_all(buf);
         Ok((new_header, execution_outcome))
     }
 }

@@ -17,7 +17,7 @@ use reth_consensus_common::validation::{
     validate_header_gas,
 };
 use reth_primitives::{
-    constants::MINIMUM_GAS_LIMIT, BlockWithSenders, Header, SealedBlock, SealedHeader,
+    constants::MAXIMUM_GAS_LIMIT, BlockWithSenders, Header, SealedBlock, SealedHeader,
     EMPTY_OMMER_ROOT_HASH, U256,
 };
 use std::{sync::Arc, time::SystemTime};
@@ -52,9 +52,10 @@ impl TaikoBeaconConsensus {
         header: &SealedHeader,
         _parent: &SealedHeader,
     ) -> Result<(), ConsensusError> {
-        // Check if the self gas limit is below the minimum required limit.
-        if header.gas_limit < MINIMUM_GAS_LIMIT {
-            return Err(ConsensusError::GasLimitInvalidMinimum { child_gas_limit: header.gas_limit })
+        if header.gas_limit > MAXIMUM_GAS_LIMIT {
+            return Err(ConsensusError::GasLimitInvalidMaximum {
+                child_gas_limit: header.gas_limit,
+            });
         }
 
         Ok(())
@@ -63,37 +64,70 @@ impl TaikoBeaconConsensus {
 
 impl Consensus for TaikoBeaconConsensus {
     fn validate_header(&self, header: &SealedHeader) -> Result<(), ConsensusError> {
+        // Check if timestamp is in the future. Clock can drift but this can be consensus issue.
+        let present_timestamp =
+            SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs();
+
+        if header.timestamp > present_timestamp {
+            return Err(ConsensusError::TimestampIsInFuture {
+                timestamp: header.timestamp,
+                present_timestamp,
+            });
+        }
         validate_header_gas(header)?;
         validate_header_base_fee(header, &self.chain_spec)?;
 
+        if !header.is_zero_difficulty() {
+            return Err(ConsensusError::TheMergeDifficultyIsNotZero);
+        }
+
+        if header.nonce != 0 {
+            return Err(ConsensusError::TheMergeNonceIsNotZero);
+        }
+
+        if header.ommers_hash != EMPTY_OMMER_ROOT_HASH {
+            return Err(ConsensusError::TheMergeOmmerRootIsNotEmpty);
+        }
+
+        // Post-merge, the consensus layer is expected to perform checks such that the block
+        // timestamp is a function of the slot. This is different from pre-merge, where blocks
+        // are only allowed to be in the future (compared to the system's clock) by a certain
+        // threshold.
+        //
+        // Block validation with respect to the parent should ensure that the block timestamp
+        // is greater than its parent timestamp.
+
+        // validate header extradata for all networks post merge
+        validate_header_extradata(header)?;
+
         // EIP-4895: Beacon chain push withdrawals as operations
-        if self.chain_spec.is_shanghai_active_at_timestamp(header.timestamp) &&
-            header.withdrawals_root.is_none()
+        if self.chain_spec.is_shanghai_active_at_timestamp(header.timestamp)
+            && header.withdrawals_root.is_none()
         {
-            return Err(ConsensusError::WithdrawalsRootMissing)
-        } else if !self.chain_spec.is_shanghai_active_at_timestamp(header.timestamp) &&
-            header.withdrawals_root.is_some()
+            return Err(ConsensusError::WithdrawalsRootMissing);
+        } else if !self.chain_spec.is_shanghai_active_at_timestamp(header.timestamp)
+            && header.withdrawals_root.is_some()
         {
-            return Err(ConsensusError::WithdrawalsRootUnexpected)
+            return Err(ConsensusError::WithdrawalsRootUnexpected);
         }
 
         // Ensures that EIP-4844 fields are valid once cancun is active.
         if self.chain_spec.is_cancun_active_at_timestamp(header.timestamp) {
             validate_4844_header_standalone(header)?;
         } else if header.blob_gas_used.is_some() {
-            return Err(ConsensusError::BlobGasUsedUnexpected)
+            return Err(ConsensusError::BlobGasUsedUnexpected);
         } else if header.excess_blob_gas.is_some() {
-            return Err(ConsensusError::ExcessBlobGasUnexpected)
+            return Err(ConsensusError::ExcessBlobGasUnexpected);
         } else if header.parent_beacon_block_root.is_some() {
-            return Err(ConsensusError::ParentBeaconBlockRootUnexpected)
+            return Err(ConsensusError::ParentBeaconBlockRootUnexpected);
         }
 
         if self.chain_spec.is_prague_active_at_timestamp(header.timestamp) {
             if header.requests_root.is_none() {
-                return Err(ConsensusError::RequestsRootMissing)
+                return Err(ConsensusError::RequestsRootMissing);
             }
         } else if header.requests_root.is_some() {
-            return Err(ConsensusError::RequestsRootUnexpected)
+            return Err(ConsensusError::RequestsRootUnexpected);
         }
 
         Ok(())
@@ -124,64 +158,9 @@ impl Consensus for TaikoBeaconConsensus {
 
     fn validate_header_with_total_difficulty(
         &self,
-        header: &Header,
-        total_difficulty: U256,
+        _header: &Header,
+        _total_difficulty: U256,
     ) -> Result<(), ConsensusError> {
-        let is_post_merge = self
-            .chain_spec
-            .fork(Hardfork::Paris)
-            .active_at_ttd(total_difficulty, header.difficulty);
-
-        if is_post_merge {
-            if !header.is_zero_difficulty() {
-                return Err(ConsensusError::TheMergeDifficultyIsNotZero)
-            }
-
-            if header.nonce != 0 {
-                return Err(ConsensusError::TheMergeNonceIsNotZero)
-            }
-
-            if header.ommers_hash != EMPTY_OMMER_ROOT_HASH {
-                return Err(ConsensusError::TheMergeOmmerRootIsNotEmpty)
-            }
-
-            // Post-merge, the consensus layer is expected to perform checks such that the block
-            // timestamp is a function of the slot. This is different from pre-merge, where blocks
-            // are only allowed to be in the future (compared to the system's clock) by a certain
-            // threshold.
-            //
-            // Block validation with respect to the parent should ensure that the block timestamp
-            // is greater than its parent timestamp.
-
-            // validate header extradata for all networks post merge
-            validate_header_extradata(header)?;
-
-            // mixHash is used instead of difficulty inside EVM
-            // https://eips.ethereum.org/EIPS/eip-4399#using-mixhash-field-instead-of-difficulty
-        } else {
-            // TODO Consensus checks for old blocks:
-            //  * difficulty, mix_hash & nonce aka PoW stuff
-            // low priority as syncing is done in reverse order
-
-            // Check if timestamp is in the future. Clock can drift but this can be consensus issue.
-            let present_timestamp =
-                SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs();
-
-            if header.exceeds_allowed_future_timestamp(present_timestamp) {
-                return Err(ConsensusError::TimestampIsInFuture {
-                    timestamp: header.timestamp,
-                    present_timestamp,
-                })
-            }
-
-            // Goerli and early OP exception:
-            //  * If the network is goerli pre-merge, ignore the extradata check, since we do not
-            //  support clique. Same goes for OP blocks below Bedrock.
-            if self.chain_spec.chain != Chain::goerli() && !self.chain_spec.is_optimism() {
-                validate_header_extradata(header)?;
-            }
-        }
-
         Ok(())
     }
 
@@ -208,7 +187,7 @@ fn validate_against_parent_timestamp(
         return Err(ConsensusError::TimestampIsInPast {
             parent_timestamp: parent.timestamp,
             timestamp: header.timestamp,
-        })
+        });
     }
     Ok(())
 }
@@ -221,97 +200,3 @@ fn validate_against_parent_timestamp(
 //     Ok(())
 
 // }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use reth_chainspec::ChainSpecBuilder;
-    use reth_primitives::{proofs, B256};
-
-    fn header_with_gas_limit(gas_limit: u64) -> SealedHeader {
-        let header = Header { gas_limit, ..Default::default() };
-        header.seal(B256::ZERO)
-    }
-
-    #[test]
-    fn test_valid_gas_limit_increase() {
-        let parent = header_with_gas_limit(1024 * 10);
-        let child = header_with_gas_limit(parent.gas_limit + 5);
-
-        assert_eq!(
-            TaikoBeaconConsensus::new(Arc::new(ChainSpec::default()))
-                .validate_against_parent_gas_limit(&child, &parent),
-            Ok(())
-        );
-    }
-
-    #[test]
-    fn test_gas_limit_below_minimum() {
-        let parent = header_with_gas_limit(MINIMUM_GAS_LIMIT);
-        let child = header_with_gas_limit(MINIMUM_GAS_LIMIT - 1);
-
-        assert_eq!(
-            TaikoBeaconConsensus::new(Arc::new(ChainSpec::default()))
-                .validate_against_parent_gas_limit(&child, &parent),
-            Err(ConsensusError::GasLimitInvalidMinimum { child_gas_limit: child.gas_limit })
-        );
-    }
-
-    #[test]
-    fn test_invalid_gas_limit_increase_exceeding_limit() {
-        let parent = header_with_gas_limit(1024 * 10);
-        let child = header_with_gas_limit(parent.gas_limit + parent.gas_limit / 1024 + 1);
-
-        assert_eq!(
-            TaikoBeaconConsensus::new(Arc::new(ChainSpec::default()))
-                .validate_against_parent_gas_limit(&child, &parent),
-            Err(ConsensusError::GasLimitInvalidIncrease {
-                parent_gas_limit: parent.gas_limit,
-                child_gas_limit: child.gas_limit,
-            })
-        );
-    }
-
-    #[test]
-    fn test_valid_gas_limit_decrease_within_limit() {
-        let parent = header_with_gas_limit(1024 * 10);
-        let child = header_with_gas_limit(parent.gas_limit - 5);
-
-        assert_eq!(
-            TaikoBeaconConsensus::new(Arc::new(ChainSpec::default()))
-                .validate_against_parent_gas_limit(&child, &parent),
-            Ok(())
-        );
-    }
-
-    #[test]
-    fn test_invalid_gas_limit_decrease_exceeding_limit() {
-        let parent = header_with_gas_limit(1024 * 10);
-        let child = header_with_gas_limit(parent.gas_limit - parent.gas_limit / 1024 - 1);
-
-        assert_eq!(
-            TaikoBeaconConsensus::new(Arc::new(ChainSpec::default()))
-                .validate_against_parent_gas_limit(&child, &parent),
-            Err(ConsensusError::GasLimitInvalidDecrease {
-                parent_gas_limit: parent.gas_limit,
-                child_gas_limit: child.gas_limit,
-            })
-        );
-    }
-
-    #[test]
-    fn shanghai_block_zero_withdrawals() {
-        // ensures that if shanghai is activated, and we include a block with a withdrawals root,
-        // that the header is valid
-        let chain_spec = Arc::new(ChainSpecBuilder::mainnet().shanghai_activated().build());
-
-        let header = Header {
-            base_fee_per_gas: Some(1337u64),
-            withdrawals_root: Some(proofs::calculate_withdrawals_root(&[])),
-            ..Default::default()
-        }
-        .seal_slow();
-
-        assert_eq!(TaikoBeaconConsensus::new(chain_spec).validate_header(&header), Ok(()));
-    }
-}

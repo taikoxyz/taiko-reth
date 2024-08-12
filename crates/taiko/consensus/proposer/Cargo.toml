@@ -38,3 +38,6 @@ futures-util.workspace = true
 tokio = { workspace = true, features = ["sync", "time"] }
 tokio-stream.workspace = true
 tracing.workspace = true
+
+# misc
+flate2.workspace = true

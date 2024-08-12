@@ -146,6 +146,7 @@ where
                         block_max_gas_limit,
                         max_bytes_per_tx_list,
                         max_transactions_lists,
+                        base_fee,
                         ..
                     } = trigger_args;
                     tx.send(storage.build_and_execute(
@@ -158,6 +159,7 @@ where
                         block_max_gas_limit,
                         max_bytes_per_tx_list,
                         max_transactions_lists,
+                        base_fee,
                     ));
                 }));
             }
