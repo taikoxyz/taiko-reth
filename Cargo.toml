@@ -128,7 +128,8 @@ members = [
     "testing/ef-tests/",
     "testing/testing-utils",
     # Taiko additional crates
-    "crates/taiko/consensus/",
+    "crates/taiko/consensus/consensus",
+    "crates/taiko/consensus/proposer",
     "crates/taiko/engine-primitives/",
     "crates/taiko/evm",
     "crates/taiko/node",
@@ -353,7 +354,8 @@ reth-trie = { path = "crates/trie/trie" }
 reth-trie-common = { path = "crates/trie/common" }
 reth-trie-parallel = { path = "crates/trie/parallel" }
 
-taiko-reth-beacon-consensus = { path = "crates/taiko/consensus" }
+taiko-reth-beacon-consensus = { path = "crates/taiko/consensus/consensus" }
+taiko-reth-proposer-consensus = { path = "crates/taiko/consensus/proposer" }
 taiko-reth-primitives = { path = "crates/taiko/primitives" }
 taiko-reth-provider = { path = "crates/taiko/storage" }
 taiko-reth-evm = { path = "crates/taiko/evm" }

@@ -1,13 +1,24 @@
 use std::collections::BTreeMap;
 
-use crate::result::internal_rpc_err;
+use crate::result::ToRpcResult;
 use alloy_primitives::Address;
 use async_trait::async_trait;
 use jsonrpsee::core::RpcResult;
-use reth_provider::BlockReader;
-use reth_rpc_api::TaikoApiServer;
+use reth_evm::{ConfigureEvm, ConfigureEvmEnv};
+use reth_primitives::{Header, IntoRecoveredTransaction};
+use reth_provider::{
+    BlockNumReader, BlockReader, ChainSpecProvider, EvmEnvProvider, StateProvider,
+    StateProviderFactory,
+};
+use reth_revm::database::StateProviderDatabase;
+use reth_rpc_api::{PreBuiltTxList, TaikoApiServer, TaikoAuthApiServer};
 use reth_rpc_types::{txpool::TxpoolContent, Transaction};
+use reth_rpc_types_compat::transaction::from_recovered;
+use reth_tasks::TaskSpawner;
 use reth_transaction_pool::{AllPoolTransactions, PoolTransaction, TransactionPool};
+use revm::{db::CacheDB, Database, DatabaseCommit, Evm};
+use revm_primitives::{BlockEnv, CfgEnvWithHandlerCfg, EnvWithHandlerCfg, U256};
+use taiko_reth_evm::TaikoEvmConfig;
 use taiko_reth_primitives::L1Origin;
 use taiko_reth_provider::L1OriginReader;
 
@@ -15,150 +26,140 @@ use taiko_reth_provider::L1OriginReader;
 #[derive(Debug)]
 pub struct TaikoApi<Provider, Pool> {
     provider: Provider,
+    evm_config: TaikoEvmConfig,
     pool: Pool,
+    max_gas_limit: u64,
+}
+
+struct TaikoApiInner<Provider, Pool> {
+    provider: Provider,
+    pool: Pool,
+    task_spawner: Box<dyn TaskSpawner>,
 }
 
 impl<Provider, Pool> TaikoApi<Provider, Pool> {
     /// Creates a new instance of `Taiko`.
-    pub const fn new(provider: Provider, pool: Pool) -> Self {
-        Self { provider, pool }
+    pub fn new(provider: Provider, pool: Pool, max_gas_limit: u64) -> Self {
+        Self { provider, evm_config: TaikoEvmConfig::default(), pool, max_gas_limit }
     }
 }
 
 impl<Provider, Pool> TaikoApi<Provider, Pool>
 where
-    Provider: BlockReader + L1OriginReader + 'static,
-    Pool: TransactionPool + 'static,
+    Provider: EvmEnvProvider + BlockNumReader,
 {
-    fn content(&self) -> TxpoolContent {
-        #[inline]
-        fn insert<T: PoolTransaction>(
-            tx: &T,
-            content: &mut BTreeMap<Address, BTreeMap<String, Transaction>>,
-        ) {
-            content.entry(tx.sender()).or_default().insert(
-                tx.nonce().to_string(),
-                reth_rpc_types_compat::transaction::from_recovered(tx.to_recovered_transaction()),
-            );
-        }
+    fn evm<DB: Database>(&self, db: DB) -> RpcResult<Evm<'_, (), DB>> {
+        let mut cfg = CfgEnvWithHandlerCfg::new(Default::default(), Default::default());
+        let mut block_env = BlockEnv::default();
+        let last_block = self.provider.last_block_number().to_rpc_result()?;
+        self.provider
+            .fill_env_at(&mut cfg, &mut block_env, last_block.into(), self.evm_config)
+            .to_rpc_result()?;
+        let env = EnvWithHandlerCfg::new_with_cfg_env(cfg, block_env, Default::default());
 
-        let AllPoolTransactions { pending, queued } = self.pool.all_transactions();
-
-        let mut content = TxpoolContent::default();
-        for pending in pending {
-            insert(&pending.transaction, &mut content.pending);
-        }
-        for queued in queued {
-            insert(&queued.transaction, &mut content.queued);
-        }
-
-        content
+        Ok(self.evm_config.evm_with_env(db, env))
     }
 
-    #[allow(clippy::type_complexity)]
-    fn get_txs(
-        &self,
-        locals: &[String],
-    ) -> (
-        BTreeMap<Address, BTreeMap<String, Transaction>>,
-        BTreeMap<Address, BTreeMap<String, Transaction>>,
-    ) {
-        self.content()
-            .pending
-            .into_iter()
-            .map(|(address, txs)| (address, txs, locals.contains(&address.to_string())))
-            .fold(
-                (
-                    BTreeMap::<Address, BTreeMap<String, Transaction>>::new(),
-                    BTreeMap::<Address, BTreeMap<String, Transaction>>::new(),
-                ),
-                |(mut l, mut r), (address, txs, is_local)| {
-                    if is_local {
-                        l.insert(address, txs);
-                    } else {
-                        r.insert(address, txs);
-                    }
-
-                    (l, r)
-                },
-            )
-    }
-
-    async fn commit_txs(&self, locals: &[String]) -> RpcResult<Vec<Transaction>> {
-        let (_local_txs, _remote_txs) = self.get_txs(&locals);
-        Ok(vec![])
+    fn calc_gas_limit(&self, parent_gas_limit: u64, desired_limit: u64) -> u64 {
+        let delta = parent_gas_limit / 1024 - 1;
+        let mut limit = parent_gas_limit;
+        let desired_limit = std::cmp::max(desired_limit, 5000);
+        if limit < desired_limit {
+            limit = parent_gas_limit + delta;
+            if limit > desired_limit {
+                limit = desired_limit;
+            }
+            return limit;
+        }
+        if limit > desired_limit {
+            limit = parent_gas_limit - delta;
+            if limit < desired_limit {
+                limit = desired_limit;
+            }
+        }
+        limit
     }
 }
 
 #[async_trait]
 impl<Provider, Pool> TaikoApiServer for TaikoApi<Provider, Pool>
 where
-    Provider: BlockReader + L1OriginReader + 'static,
+    Provider: L1OriginReader + 'static,
     Pool: TransactionPool + 'static,
 {
     /// HeadL1Origin returns the latest L2 block's corresponding L1 origin.
     // #[cfg(feature = "taiko")]
     async fn head_l1_origin(&self) -> RpcResult<Option<u64>> {
-        self.provider.get_head_l1_origin().map_err(|_| {
-            internal_rpc_err("taiko_headL1Origin failed to read latest l2 block's L1 origin")
-        })
+        self.provider.get_head_l1_origin().to_rpc_result()
     }
 
     /// L1OriginByID returns the L2 block's corresponding L1 origin.
     // #[cfg(feature = "taiko")]
-    async fn l1_origin_by_id(&self, block_id: u64) -> RpcResult<Option<L1Origin>> {
-        self.provider.get_l1_origin(block_id).map_err(|_| {
-            internal_rpc_err("taiko_l1OriginByID failed to read L1 origin by block id")
-        })
+    async fn l1_origin_by_id(&self, block_id: u64) -> RpcResult<L1Origin> {
+        self.provider.get_l1_origin(block_id).to_rpc_result()
     }
+}
 
-    /// GetL2ParentHeaders
-    // #[cfg(feature = "taiko")]
-    async fn get_l2_parent_headers(
-        &self,
-        block_id: u64,
-    ) -> RpcResult<Vec<reth_primitives::Header>> {
-        let start = if block_id > 256 { block_id - 255 } else { 0 };
-        let mut headers = Vec::with_capacity(256);
-
-        for id in start..=block_id {
-            let option = self.provider.header_by_number(id).map_err(|_| {
-                internal_rpc_err("taiko_getL2ParentHeaders failed to read header by number")
-            })?;
-            let Some(header) = option else {
-                return Err(internal_rpc_err(
-                    "taiko_getL2ParentHeaders failed to find parent header by number",
-                ));
-            };
-            headers.push(header);
-        }
-
-        Ok(headers)
-    }
-
-    // TODO:(petar) implement this function
+#[async_trait]
+impl<Provider, Pool> TaikoAuthApiServer for TaikoApi<Provider, Pool>
+where
+    Provider: StateProviderFactory + ChainSpecProvider + EvmEnvProvider + BlockNumReader + 'static,
+    Pool: TransactionPool + 'static,
+{
     /// TxPoolContent retrieves the transaction pool content with the given upper limits.
-    async fn txpool_content(
+    async fn tx_pool_content(
         &self,
-        _beneficiary: Address,
-        _base_fee: u64,
-        _block_max_gas_limit: u64,
-        _max_bytes_per_tx_list: u64,
-        locals: Vec<String>,
+        beneficiary: Address,
+        base_fee: u64,
+        block_max_gas_limit: u64,
+        max_bytes_per_tx_list: u64,
+        local_accounts: Vec<Address>,
         max_transactions_lists: u64,
-    ) -> RpcResult<Vec<Vec<Transaction>>> {
-        let mut tx_lists = Vec::with_capacity(max_transactions_lists as usize);
+    ) -> RpcResult<Vec<PreBuiltTxList>> {
+        self.tx_pool_content_with_min_tip(
+            beneficiary,
+            base_fee,
+            block_max_gas_limit,
+            max_bytes_per_tx_list,
+            local_accounts,
+            max_transactions_lists,
+            0,
+        )
+        .await
+    }
 
-        for _ in 0..max_transactions_lists {
-            let tx_list = self.commit_txs(&locals).await?;
+    /// TxPoolContent retrieves the transaction pool content with the given upper limits.
+    async fn tx_pool_content_with_min_tip(
+        &self,
+        beneficiary: Address,
+        base_fee: u64,
+        block_max_gas_limit: u64,
+        max_bytes_per_tx_list: u64,
+        local_accounts: Vec<Address>,
+        max_transactions_lists: u64,
+        min_tip: u64,
+    ) -> RpcResult<Vec<PreBuiltTxList>> {
+        let mut best_txs = self.pool.best_transactions();
+        best_txs.skip_blobs();
+        let (locals, remotes): (Vec<_>, Vec<_>) = best_txs
+            .filter(|tx| {
+                tx.effective_tip_per_gas(base_fee).map_or(false, |tip| tip >= min_tip as u128)
+            })
+            .partition(|tx| local_accounts.contains(&tx.sender()));
+        let mut db =
+            CacheDB::new(StateProviderDatabase::new(self.provider.latest().to_rpc_result()?));
+        let mut evm = self.evm(db)?;
+        let chain_spec = self.provider.chain_spec();
+        loop {
+            TaikoEvmConfig::fill_tx_env(evm.tx_mut(), transaction, *sender);
 
-            if tx_list.is_empty() {
-                break;
-            }
+            // set the treasury address
+            evm.tx_mut().taiko.treasury = chain_spec.treasury();
+            evm.transact();
 
-            tx_lists.push(tx_list);
+            db.commit(changes);
         }
 
-        Ok(tx_lists)
+        todo!()
     }
 }

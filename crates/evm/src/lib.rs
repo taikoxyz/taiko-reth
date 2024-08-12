@@ -123,4 +123,9 @@ pub trait ConfigureEvmEnv: Send + Sync + Unpin + Clone + 'static {
         let after_merge = cfg.handler_cfg.spec_id >= SpecId::MERGE;
         fill_block_env(block_env, chain_spec, header, after_merge);
     }
+
+    /// Returns `true` if the EVM should enable the anchor transaction.
+    fn enable_anchor(&self) -> bool {
+        false
+    }
 }

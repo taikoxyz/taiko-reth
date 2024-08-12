@@ -37,6 +37,7 @@ reth-evm-optimism = { workspace = true, optional = true }
 # taiko
 taiko-reth-provider = { workspace = true, optional = true }
 taiko-reth-primitives = { workspace = true, optional = true }
+taiko-reth-evm = { workspace = true, optional = true }
 
 # eth
 alloy-rlp.workspace = true
@@ -112,4 +113,5 @@ taiko = [
     "reth-rpc-engine-api/taiko",
     "dep:taiko-reth-provider",
     "dep:taiko-reth-primitives",
+    "dep:taiko-reth-evm",
 ]

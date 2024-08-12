@@ -8114,6 +8114,7 @@ dependencies = [
  "secp256k1",
  "serde",
  "serde_json",
+ "taiko-reth-evm",
  "taiko-reth-primitives",
  "taiko-reth-provider",
  "tempfile",
@@ -9862,6 +9863,33 @@ dependencies = [
  "reth-db-api",
  "reth-primitives",
  "serde",
+]
+
+[[package]]
+name = "taiko-reth-proposer-consensus"
+version = "1.0.0"
+dependencies = [
+ "futures-util",
+ "reth-beacon-consensus",
+ "reth-chainspec",
+ "reth-consensus",
+ "reth-engine-primitives",
+ "reth-evm",
+ "reth-execution-errors",
+ "reth-execution-types",
+ "reth-network-p2p",
+ "reth-network-peers",
+ "reth-primitives",
+ "reth-provider",
+ "reth-revm",
+ "reth-rpc-types",
+ "reth-stages-api",
+ "reth-tokio-util",
+ "reth-transaction-pool",
+ "taiko-reth-evm",
+ "tokio",
+ "tokio-stream",
+ "tracing",
 ]
 
 [[package]]

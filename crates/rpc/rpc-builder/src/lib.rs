@@ -162,6 +162,7 @@ use crate::{
     eth::{EthHandlersBuilder, EthHandlersConfig},
     metrics::RpcRequestMetrics,
 };
+use clap::builder;
 use error::{ConflictingModules, RpcError, ServerKind};
 use http::{header::AUTHORIZATION, HeaderMap};
 use jsonrpsee::{
@@ -173,6 +174,7 @@ use reth_engine_primitives::EngineTypes;
 use reth_evm::ConfigureEvm;
 use reth_ipc::server::IpcServer;
 use reth_network_api::{noop::NoopNetwork, NetworkInfo, Peers};
+use reth_node_core::args::PayloadBuilderArgs;
 use reth_provider::{
     AccountReader, BlockReader, BlockReaderIdExt, CanonStateSubscriptions, ChainSpecProvider,
     ChangeSetReader, EvmEnvProvider, StateProviderFactory,
@@ -239,6 +241,7 @@ pub async fn launch<Provider, Pool, Network, Tasks, Events, EvmConfig>(
     executor: Tasks,
     events: Events,
     evm_config: EvmConfig,
+    builder: PayloadBuilderArgs,
 ) -> Result<RpcServerHandle, RpcError>
 where
     Provider: ProviderExt,
@@ -251,7 +254,7 @@ where
     let module_config = module_config.into();
     let server_config = server_config.into();
     RpcModuleBuilder::new(provider, pool, network, executor, events, evm_config)
-        .build(module_config)
+        .build(module_config, builder)
         .start_server(server_config)
         .await
 }
@@ -440,6 +443,7 @@ where
     pub fn build_with_auth_server<EngineApi, EngineT>(
         self,
         module_config: TransportRpcModuleConfig,
+        builder: PayloadBuilderArgs,
         engine: EngineApi,
     ) -> (
         TransportRpcModules,
@@ -454,8 +458,9 @@ where
 
         let config = module_config.config.clone().unwrap_or_default();
 
-        let mut registry =
-            RethModuleRegistry::new(provider, pool, network, executor, events, config, evm_config);
+        let mut registry = RethModuleRegistry::new(
+            provider, pool, network, executor, events, config, builder, evm_config,
+        );
 
         let modules = registry.create_transport_rpc_modules(module_config);
 
@@ -495,16 +500,23 @@ where
     pub fn into_registry(
         self,
         config: RpcModuleConfig,
+        builder: PayloadBuilderArgs,
     ) -> RethModuleRegistry<Provider, Pool, Network, Tasks, Events, EvmConfig> {
         let Self { provider, pool, network, executor, events, evm_config } = self;
-        RethModuleRegistry::new(provider, pool, network, executor, events, config, evm_config)
+        RethModuleRegistry::new(
+            provider, pool, network, executor, events, config, builder, evm_config,
+        )
     }
 
     /// Configures all [`RpcModule`]s specific to the given [`TransportRpcModuleConfig`] which can
     /// be used to start the transport server(s).
     ///
     /// See also [`RpcServer::start`]
-    pub fn build(self, module_config: TransportRpcModuleConfig) -> TransportRpcModules<()> {
+    pub fn build(
+        self,
+        module_config: TransportRpcModuleConfig,
+        builder: PayloadBuilderArgs,
+    ) -> TransportRpcModules<()> {
         let mut modules = TransportRpcModules::default();
 
         let Self { provider, pool, network, executor, events, evm_config } = self;
@@ -519,6 +531,7 @@ where
                 executor,
                 events,
                 config.unwrap_or_default(),
+                builder,
                 evm_config,
             );
 
@@ -618,6 +631,8 @@ pub struct RethModuleRegistry<Provider, Pool, Network, Tasks, Events, EvmConfig>
     evm_config: EvmConfig,
     /// Additional settings for handlers.
     config: RpcModuleConfig,
+    /// All payload builder related arguments
+    builder: PayloadBuilderArgs,
     /// Holds a clone of all the eth namespace handlers
     eth: Option<EthHandlers<Provider, Pool, Network, Events, EvmConfig>>,
     /// to put trace calls behind semaphore
@@ -642,6 +657,7 @@ impl<Provider, Pool, Network, Tasks, Events, EvmConfig>
         executor: Tasks,
         events: Events,
         config: RpcModuleConfig,
+        builder: PayloadBuilderArgs,
         evm_config: EvmConfig,
     ) -> Self {
         Self {
@@ -654,6 +670,7 @@ impl<Provider, Pool, Network, Tasks, Events, EvmConfig>
             modules: Default::default(),
             blocking_pool_guard: BlockingTaskGuard::new(config.eth.max_tracing_requests),
             config,
+            builder,
             events,
             eth_raw_transaction_forwarder: None,
         }
@@ -1020,11 +1037,13 @@ where
                                 .into()
                         }
                         #[cfg(feature = "taiko")]
-                        RethRpcModule::Taiko => {
-                            TaikoApi::new(self.provider.clone(), self.pool.clone())
-                                .into_rpc()
-                                .into()
-                        }
+                        RethRpcModule::Taiko => TaikoApi::new(
+                            self.provider.clone(),
+                            self.pool.clone(),
+                            self.builder.clone(),
+                        )
+                        .into_rpc()
+                        .into(),
                     })
                     .clone()
             })
@@ -1298,9 +1317,9 @@ impl RpcServerConfig {
     ///
     /// If no server is configured, no server will be launched on [`RpcServerConfig::start`].
     pub const fn has_server(&self) -> bool {
-        self.http_server_config.is_some() ||
-            self.ws_server_config.is_some() ||
-            self.ipc_server_config.is_some()
+        self.http_server_config.is_some()
+            || self.ws_server_config.is_some()
+            || self.ipc_server_config.is_some()
     }
 
     /// Returns the [`SocketAddr`] of the http server
@@ -1351,9 +1370,9 @@ impl RpcServerConfig {
         )));
 
         // If both are configured on the same port, we combine them into one server.
-        if self.http_addr == self.ws_addr &&
-            self.http_server_config.is_some() &&
-            self.ws_server_config.is_some()
+        if self.http_addr == self.ws_addr
+            && self.http_server_config.is_some()
+            && self.ws_server_config.is_some()
         {
             let cors = match (self.ws_cors_domains.as_ref(), self.http_cors_domains.as_ref()) {
                 (Some(ws_cors), Some(http_cors)) => {
@@ -1883,8 +1902,8 @@ impl RpcServerHandle {
                 "Bearer {}",
                 secret
                     .encode(&Claims {
-                        iat: (SystemTime::now().duration_since(UNIX_EPOCH).unwrap() +
-                            Duration::from_secs(60))
+                        iat: (SystemTime::now().duration_since(UNIX_EPOCH).unwrap()
+                            + Duration::from_secs(60))
                         .as_secs(),
                         exp: None,
                     })

@@ -10,7 +10,7 @@ use reth_evm::{
         BatchExecutor, BlockExecutionError, BlockExecutionInput, BlockExecutionOutput,
         BlockExecutorProvider, BlockValidationError, Executor, ProviderError,
     },
-    ConfigureEvm,
+    ConfigureEvm, ConfigureEvmEnv,
 };
 use reth_execution_types::ExecutionOutcome;
 use reth_primitives::{
@@ -30,9 +30,7 @@ use revm_primitives::{
     db::{Database, DatabaseCommit},
     Address, BlockEnv, CfgEnvWithHandlerCfg, EnvWithHandlerCfg, HashSet, ResultAndState,
 };
-use taiko_reth_beacon_consensus::{
-    check_anchor_tx_with_calldata, validate_block_post_execution, TaikoData,
-};
+use taiko_reth_beacon_consensus::{check_anchor_tx, validate_block_post_execution};
 
 #[cfg(not(feature = "std"))]
 use alloc::{sync::Arc, vec, vec::Vec};
@@ -148,9 +146,8 @@ where
     /// [`EthBlockExecutor::post_execution`].
     fn execute_state_transitions<Ext, DB>(
         &self,
-        block: &BlockWithSenders,
+        block: &mut BlockWithSenders,
         mut evm: Evm<'_, Ext, &mut State<DB>>,
-        taiko_data: TaikoData,
     ) -> Result<TaikoExecuteOutput, BlockExecutionError>
     where
         DB: Database<Error = ProviderError>,
@@ -171,24 +168,40 @@ where
             block.parent_hash,
         )?;
 
+        let treasury = self.chain_spec.treasury();
+
         // execute transactions
         let mut cumulative_gas_used = 0;
-        let mut receipts = Vec::with_capacity(block.body.len());
-        let mut valid_transaction_indices = Vec::new();
-        for (idx, (sender, transaction)) in block.transactions_with_sender().enumerate() {
-            let is_anchor = idx == 0;
+        let mut receipts: Vec<Receipt> = Vec::with_capacity(block.body.len());
+
+        let delete_tx = |block: &mut BlockWithSenders, idx: usize| {
+            block.body.remove(idx);
+            block.senders.remove(idx);
+        };
+
+        let mut idx = 0;
+        while idx < block.body.len() {
+            let sender = block.senders[idx];
+            let transaction = &block.body[idx];
+            let is_anchor = idx == 0 && self.evm_config.enable_anchor();
 
             // verify the anchor tx
             if is_anchor {
-                check_anchor_tx_with_calldata(transaction, *sender, &block.block, &taiko_data)
-                    .map_err(|e| BlockExecutionError::CanonicalRevert { inner: e.to_string() })?;
+                check_anchor_tx(
+                    transaction,
+                    sender,
+                    block.base_fee_per_gas.unwrap_or_default(),
+                    treasury,
+                )
+                .map_err(|e| BlockExecutionError::CanonicalRevert { inner: e.to_string() })?;
             }
 
             // If the signature was not valid, the sender address will have been set to zero
-            if *sender == Address::ZERO {
+            if sender == Address::ZERO {
                 // Signature can be invalid if not taiko or not the anchor tx
                 if !is_anchor {
                     // If the signature is not valid, skip the transaction
+                    delete_tx(block, idx);
                     continue;
                 }
                 // In all other cases, the tx needs to have a valid signature
@@ -197,26 +210,27 @@ where
                 });
             }
 
-            // The sum of the transaction’s gas limit, Tg, and the gas utilized in this block prior,
-            // must be no greater than the block’s gasLimit.
+            // The sum of the transaction's gas limit, Tg, and the gas utilized in this block prior,
+            // must be no greater than the block's gasLimit.
             let block_available_gas = block.header.gas_limit - cumulative_gas_used;
             if transaction.gas_limit() > block_available_gas {
                 if !is_anchor {
+                    delete_tx(block, idx);
                     continue;
                 }
                 return Err(BlockValidationError::TransactionGasLimitMoreThanAvailableBlockGas {
                     transaction_gas_limit: transaction.gas_limit(),
                     block_available_gas,
                 }
-                .into())
+                .into());
             }
 
-            EvmConfig::fill_tx_env(evm.tx_mut(), transaction, *sender);
+            EvmConfig::fill_tx_env(evm.tx_mut(), transaction, sender);
 
             // Set taiko specific data
             evm.tx_mut().taiko.is_anchor = is_anchor;
             // set the treasury address
-            evm.tx_mut().taiko.treasury = taiko_data.l2_contract;
+            evm.tx_mut().taiko.treasury = treasury;
 
             // Execute transaction.
             let ResultAndState { result, state } = match evm.transact().map_err(move |err| {
@@ -234,7 +248,7 @@ where
                             evm.context.evm.journaled_state.spec,
                             HashSet::new(),
                         );
-
+                        delete_tx(block, idx);
                         continue;
                     }
                     return Err(err.into());
@@ -261,8 +275,7 @@ where
                 },
             );
 
-            // Add the tx to the list of valid transactions
-            valid_transaction_indices.push(idx);
+            idx += 1;
         }
 
         let requests = if self.chain_spec.is_prague_active_at_timestamp(block.timestamp) {
@@ -293,20 +306,12 @@ pub struct TaikoBlockExecutor<EvmConfig, DB> {
     executor: TaikoEvmExecutor<EvmConfig>,
     /// The state to use for execution
     state: State<DB>,
-    /// Taiko data
-    taiko_data: Option<TaikoData>,
 }
 
 impl<EvmConfig, DB> TaikoBlockExecutor<EvmConfig, DB> {
     /// Creates a new Ethereum block executor.
     pub const fn new(chain_spec: Arc<ChainSpec>, evm_config: EvmConfig, state: State<DB>) -> Self {
-        Self { executor: TaikoEvmExecutor { chain_spec, evm_config }, state, taiko_data: None }
-    }
-
-    /// Set taiko data
-    pub fn taiko_data(mut self, taiko_data: TaikoData) -> Self {
-        self.taiko_data = Some(taiko_data);
-        self
+        Self { executor: TaikoEvmExecutor { chain_spec, evm_config }, state }
     }
 
     #[inline]
@@ -353,7 +358,7 @@ where
     /// Returns an error if execution fails.
     fn execute_without_verification(
         &mut self,
-        block: &BlockWithSenders,
+        block: &mut BlockWithSenders,
         total_difficulty: U256,
     ) -> Result<TaikoExecuteOutput, BlockExecutionError> {
         // 1. prepare state on new block
@@ -363,7 +368,7 @@ where
         let env = self.evm_env_for_block(&block.header, total_difficulty);
         let output = {
             let evm = self.executor.evm_config.evm_with_env(&mut self.state, env);
-            self.executor.execute_state_transitions(block, evm, self.taiko_data.clone().unwrap())
+            self.executor.execute_state_transitions(block, evm)
         }?;
 
         // 3. apply post execution changes
@@ -637,7 +642,7 @@ mod tests {
         // Now execute a block with the fixed header, ensure that it does not fail
         executor
             .execute_without_verification(
-                &BlockWithSenders {
+                &mut BlockWithSenders {
                     block: Block {
                         header: header.clone(),
                         body: vec![],

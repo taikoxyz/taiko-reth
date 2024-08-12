@@ -22,8 +22,8 @@ use reth_engine_primitives::EngineTypes;
 use reth_execution_errors::{BlockExecutionError, BlockValidationError};
 use reth_execution_types::ExecutionOutcome;
 use reth_primitives::{
-    constants::ETHEREUM_BLOCK_GAS_LIMIT, eip4844::calculate_excess_blob_gas, proofs, Block,
-    BlockBody, BlockHash, BlockHashOrNumber, BlockNumber, BlockWithSenders, Bloom, Header,
+    constants::ETHEREUM_BLOCK_GAS_LIMIT, eip4844::calculate_excess_blob_gas, proofs, Address,
+    Block, BlockBody, BlockHash, BlockHashOrNumber, BlockNumber, BlockWithSenders, Bloom, Header,
     Requests, SealedBlock, SealedHeader, TransactionSigned, Withdrawals, B256, U256,
 };
 use reth_provider::{BlockReaderIdExt, StateProviderFactory, StateRootProvider};
@@ -31,6 +31,7 @@ use reth_revm::database::StateProviderDatabase;
 use reth_transaction_pool::TransactionPool;
 use std::{
     collections::HashMap,
+    ops::Add,
     sync::Arc,
     time::{SystemTime, UNIX_EPOCH},
 };
@@ -38,30 +39,28 @@ use tokio::sync::{mpsc::UnboundedSender, RwLock, RwLockReadGuard, RwLockWriteGua
 use tracing::trace;
 
 mod client;
-mod mode;
 mod task;
 
 pub use crate::client::AutoSealClient;
-pub use mode::{FixedBlockTimeMiner, MiningMode, ReadyTransactionMiner};
 use reth_evm::execute::{BlockExecutionOutput, BlockExecutorProvider, Executor};
-pub use task::MiningTask;
+pub use task::{MiningTask, TriggerResult};
 
 /// A consensus implementation intended for local development and testing purposes.
 #[derive(Debug, Clone)]
 #[allow(dead_code)]
-pub struct AutoSealConsensus {
+pub struct ProposerConsensus {
     /// Configuration
     chain_spec: Arc<ChainSpec>,
 }
 
-impl AutoSealConsensus {
-    /// Create a new instance of [`AutoSealConsensus`]
+impl ProposerConsensus {
+    /// Create a new instance of [`MinerConsensus`]
     pub const fn new(chain_spec: Arc<ChainSpec>) -> Self {
         Self { chain_spec }
     }
 }
 
-impl Consensus for AutoSealConsensus {
+impl Consensus for ProposerConsensus {
     fn validate_header(&self, _header: &SealedHeader) -> Result<(), ConsensusError> {
         Ok(())
     }
@@ -97,31 +96,26 @@ impl Consensus for AutoSealConsensus {
 
 /// Builder type for configuring the setup
 #[derive(Debug)]
-pub struct AutoSealBuilder<Client, Pool, Engine: EngineTypes, EvmConfig> {
+pub struct ProposerBuilder<Client, Pool, EvmConfig> {
     client: Client,
-    consensus: AutoSealConsensus,
+    consensus: ProposerConsensus,
     pool: Pool,
-    mode: MiningMode,
     storage: Storage,
-    to_engine: UnboundedSender<BeaconEngineMessage<Engine>>,
     evm_config: EvmConfig,
 }
 
 // === impl AutoSealBuilder ===
 
-impl<Client, Pool, Engine, EvmConfig> AutoSealBuilder<Client, Pool, Engine, EvmConfig>
+impl<Client, Pool, EvmConfig> ProposerBuilder<Client, Pool, EvmConfig>
 where
     Client: BlockReaderIdExt,
     Pool: TransactionPool,
-    Engine: EngineTypes,
 {
     /// Creates a new builder instance to configure all parts.
     pub fn new(
         chain_spec: Arc<ChainSpec>,
         client: Client,
         pool: Pool,
-        to_engine: UnboundedSender<BeaconEngineMessage<Engine>>,
-        mode: MiningMode,
         evm_config: EvmConfig,
     ) -> Self {
         let latest_header = client
@@ -133,31 +127,20 @@ where
         Self {
             storage: Storage::new(latest_header),
             client,
-            consensus: AutoSealConsensus::new(chain_spec),
+            consensus: ProposerConsensus::new(chain_spec),
             pool,
-            mode,
-            to_engine,
             evm_config,
         }
     }
 
-    /// Sets the [`MiningMode`] it operates in, default is [`MiningMode::Auto`]
-    pub fn mode(mut self, mode: MiningMode) -> Self {
-        self.mode = mode;
-        self
-    }
-
     /// Consumes the type and returns all components
     #[track_caller]
-    pub fn build(
-        self,
-    ) -> (AutoSealConsensus, AutoSealClient, MiningTask<Client, Pool, EvmConfig, Engine>) {
+    pub fn build(self) -> (ProposerConsensus, AutoSealClient, MiningTask<Client, Pool, EvmConfig>) {
         let Self { client, consensus, pool, mode, storage, to_engine, evm_config } = self;
         let auto_client = AutoSealClient::new(storage.clone());
         let task = MiningTask::new(
             Arc::clone(&consensus.chain_spec),
             mode,
-            to_engine,
             storage,
             client,
             pool,
@@ -264,6 +247,8 @@ impl StorageInner {
         withdrawals: Option<&Withdrawals>,
         requests: Option<&Requests>,
         chain_spec: &ChainSpec,
+        beneficiary: Address,
+        block_max_gas_limit: u64,
     ) -> Header {
         // check previous block for base fee
         let base_fee_per_gas = self.headers.get(&self.best_block).and_then(|parent| {
@@ -285,7 +270,7 @@ impl StorageInner {
         let mut header = Header {
             parent_hash: self.best_hash,
             ommers_hash: proofs::calculate_ommers_root(ommers),
-            beneficiary: Default::default(),
+            beneficiary,
             state_root: Default::default(),
             transactions_root: proofs::calculate_transaction_root(transactions),
             receipts_root: Default::default(),
@@ -293,7 +278,7 @@ impl StorageInner {
             logs_bloom: Default::default(),
             difficulty: U256::from(2),
             number: self.best_block + 1,
-            gas_limit: ETHEREUM_BLOCK_GAS_LIMIT,
+            gas_limit: block_max_gas_limit,
             gas_used: 0,
             timestamp,
             mix_hash: Default::default(),
@@ -341,7 +326,11 @@ impl StorageInner {
         provider: &Provider,
         chain_spec: Arc<ChainSpec>,
         executor: &Executor,
-    ) -> Result<(SealedHeader, ExecutionOutcome), BlockExecutionError>
+        beneficiary: Address,
+        block_max_gas_limit: u64,
+        max_bytes_per_tx_list: u64,
+        max_transactions_lists: u64,
+    ) -> Result<Vec<TriggerResult>, BlockExecutionError>
     where
         Executor: BlockExecutorProvider,
         Provider: StateProviderFactory,
@@ -362,6 +351,8 @@ impl StorageInner {
             withdrawals.as_ref(),
             requests.as_ref(),
             &chain_spec,
+            beneficiary,
+            block_max_gas_limit,
         );
 
         let mut block = Block {
@@ -417,12 +408,6 @@ impl StorageInner {
 
         // update receipts root
         header.receipts_root = {
-            #[cfg(feature = "optimism")]
-            let receipts_root = execution_outcome
-                .optimism_receipts_root_slow(header.number, &chain_spec, header.timestamp)
-                .expect("Receipts is present");
-
-            #[cfg(not(feature = "optimism"))]
             let receipts_root =
                 execution_outcome.receipts_root_slow(header.number).expect("Receipts is present");
 

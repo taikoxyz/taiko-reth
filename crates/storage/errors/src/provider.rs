@@ -142,6 +142,10 @@ pub enum ProviderError {
     /// Storage lock error.
     #[error(transparent)]
     StorageLockError(#[from] crate::lockfile::StorageLockError),
+
+    /// L1 origin error
+    #[error("l1 origin not found for block: {0}")]
+    L1OriginNotFound(BlockNumber),
 }
 
 impl From<reth_fs_util::FsPathError> for ProviderError {

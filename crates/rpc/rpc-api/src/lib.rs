@@ -60,7 +60,7 @@ pub mod servers {
     };
 
     #[cfg(feature = "taiko")]
-    pub use crate::taiko::TaikoApiServer;
+    pub use crate::taiko::{PreBuiltTxList, TaikoApiServer, TaikoAuthApiServer};
 }
 
 /// re-export of all client traits

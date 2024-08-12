@@ -111,20 +111,20 @@ pub struct BlockExecutionOutput<T> {
 #[derive(Debug)]
 pub struct BlockExecutionInput<'a, Block> {
     /// The block to execute.
-    pub block: &'a Block,
+    pub block: &'a mut Block,
     /// The total difficulty of the block.
     pub total_difficulty: U256,
 }
 
 impl<'a, Block> BlockExecutionInput<'a, Block> {
     /// Creates a new input.
-    pub const fn new(block: &'a Block, total_difficulty: U256) -> Self {
+    pub fn new(block: &'a mut Block, total_difficulty: U256) -> Self {
         Self { block, total_difficulty }
     }
 }
 
-impl<'a, Block> From<(&'a Block, U256)> for BlockExecutionInput<'a, Block> {
-    fn from((block, total_difficulty): (&'a Block, U256)) -> Self {
+impl<'a, Block> From<(&'a mut Block, U256)> for BlockExecutionInput<'a, Block> {
+    fn from((block, total_difficulty): (&'a mut Block, U256)) -> Self {
         Self::new(block, total_difficulty)
     }
 }
@@ -244,7 +244,7 @@ mod tests {
         let provider = TestExecutorProvider;
         let db = CacheDB::<EmptyDBTyped<ProviderError>>::default();
         let executor = provider.executor(db);
-        let block = Block {
+        let mut block = Block {
             header: Default::default(),
             body: vec![],
             ommers: vec![],
@@ -252,6 +252,6 @@ mod tests {
             requests: None,
         };
         let block = BlockWithSenders::new(block, Default::default()).unwrap();
-        let _ = executor.execute(BlockExecutionInput::new(&block, U256::ZERO));
+        let _ = executor.execute(BlockExecutionInput::new(&mut block, U256::ZERO));
     }
 }

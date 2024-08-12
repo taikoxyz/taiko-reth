@@ -20,7 +20,9 @@ use reth_primitives::{
     Address, Head, Header, TransactionSigned, U256,
 };
 
-use reth_revm::{taiko::handler_register, Database, EvmBuilder};
+use reth_revm::{
+    inspector_handle_register, taiko::handler_register, Database, Evm, EvmBuilder, GetInspector,
+};
 
 pub mod execute;
 
@@ -33,7 +35,10 @@ pub mod eip6110;
 /// Ethereum-related EVM configuration.
 #[derive(Debug, Clone, Copy, Default)]
 #[non_exhaustive]
-pub struct TaikoEvmConfig;
+pub struct TaikoEvmConfig {
+    /// Enable anchor transaction.
+    pub enable_anchor: bool,
+}
 
 impl ConfigureEvmEnv for TaikoEvmConfig {
     fn fill_tx_env(tx_env: &mut TxEnv, transaction: &TransactionSigned, sender: Address) {
@@ -63,18 +68,32 @@ impl ConfigureEvmEnv for TaikoEvmConfig {
         cfg_env.handler_cfg.spec_id = spec_id;
         cfg_env.handler_cfg.is_taiko = true;
     }
+
+    fn enable_anchor(&self) -> bool {
+        self.enable_anchor
+    }
 }
 
 impl ConfigureEvm for TaikoEvmConfig {
     type DefaultExternalContext<'a> = ();
 
-    fn evm<'a, DB: Database + 'a>(
-        &self,
-        db: DB,
-    ) -> reth_revm::Evm<'a, Self::DefaultExternalContext<'a>, DB> {
+    fn evm<'a, DB: Database + 'a>(&self, db: DB) -> Evm<'a, Self::DefaultExternalContext<'a>, DB> {
         EvmBuilder::default()
             .with_db(db)
             .append_handler_register(handler_register::taiko_handle_register)
+            .build()
+    }
+
+    fn evm_with_inspector<'a, DB, I>(&'a self, db: DB, inspector: I) -> Evm<'a, I, DB>
+    where
+        DB: Database + 'a,
+        I: GetInspector<DB>,
+    {
+        EvmBuilder::default()
+            .with_db(db)
+            .with_external_context(inspector)
+            .append_handler_register(handler_register::taiko_handle_register)
+            .append_handler_register(inspector_handle_register)
             .build()
     }
 }

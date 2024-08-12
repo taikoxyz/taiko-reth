@@ -1,11 +1,11 @@
 use jsonrpsee::{core::RpcResult, proc_macros::rpc};
 use reth_primitives::Address;
 use reth_rpc_types::Transaction;
+use serde::{Deserialize, Serialize};
 use taiko_reth_primitives::L1Origin;
 
 /// Taiko rpc interface.
-#[cfg_attr(not(feature = "client"), rpc(server, namespace = "taiko"))]
-#[cfg_attr(feature = "client", rpc(server, client, namespace = "taiko"))]
+#[rpc(server, client, namespace = "taiko")]
 pub trait TaikoApi {
     /// HeadL1Origin returns the latest L2 block's corresponding L1 origin.
     #[method(name = "headL1Origin")]
@@ -13,25 +13,49 @@ pub trait TaikoApi {
 
     /// L1OriginByID returns the L2 block's corresponding L1 origin.
     #[method(name = "l1OriginByID")]
-    async fn l1_origin_by_id(&self, block_id: u64) -> RpcResult<Option<L1Origin>>;
+    async fn l1_origin_by_id(&self, block_id: u64) -> RpcResult<L1Origin>;
 
-    /// GetL2ParentHeaders
-    #[method(name = "getL2ParentHeaders")]
-    async fn get_l2_parent_headers(&self, block_id: u64)
-        -> RpcResult<Vec<reth_primitives::Header>>;
+    /// GetSyncMode returns the node sync mode.
+    #[method(name = "getSyncMode")]
+    async fn get_sync_mode(&self) -> RpcResult<String> {
+        Ok("full".to_string())
+    }
+}
 
-    /// Returns the details of all transactions currently pending for inclusion in the next
-    /// block(s), as well as the ones that are being scheduled for future execution only.
-    ///
-    /// See [here](https://geth.ethereum.org/docs/rpc/ns-txpool#txpool_content) for more details
-    #[method(name = "content")]
-    async fn txpool_content(
+/// Taiko rpc interface.
+#[rpc(server, client, namespace = "taikoAuth")]
+pub trait TaikoAuthApi {
+    /// Get the transaction pool content.
+    #[method(name = "txPoolContent")]
+    async fn tx_pool_content(
         &self,
         beneficiary: Address,
         base_fee: u64,
         block_max_gas_limit: u64,
         max_bytes_per_tx_list: u64,
-        locals: Vec<String>,
+        local_accounts: Vec<Address>,
         max_transactions_lists: u64,
-    ) -> RpcResult<Vec<Vec<Transaction>>>;
+    ) -> RpcResult<Vec<PreBuiltTxList>>;
+
+    /// Get the transaction pool content with the minimum tip.
+    #[method(name = "txPoolContentWithMinTip")]
+    async fn tx_pool_content_with_min_tip(
+        &self,
+        beneficiary: Address,
+        base_fee: u64,
+        block_max_gas_limit: u64,
+        max_bytes_per_tx_list: u64,
+        local_accounts: Vec<Address>,
+        max_transactions_lists: u64,
+        min_tip: u64,
+    ) -> RpcResult<Vec<PreBuiltTxList>>;
+}
+
+/// PreBuiltTxList is a pre-built transaction list based on the latest chain state,
+/// with estimated gas used / bytes.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PreBuiltTxList {
+    pub tx_list: Vec<Transaction>,
+    pub estimated_gas_used: u64,
+    pub bytes_length: u64,
 }

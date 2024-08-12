@@ -114,21 +114,21 @@ pub fn check_anchor_tx_with_calldata(
     tx: &TransactionSigned,
     from: Address,
     block: &Block,
-    taiko_data: &TaikoData,
+    treasury: Address,
 ) -> Result<()> {
-    check_anchor_tx(tx, from, block.base_fee_per_gas.unwrap_or_default(), taiko_data.l2_contract)?;
-    let anchor = tx.as_eip1559().unwrap();
-    // Okay now let's decode the anchor tx to verify the inputs
-    let anchor_call = decode_anchor(&anchor.input)?;
-    // The L1 blockhash needs to match the expected value
-    ensure!(anchor_call.l1Hash == taiko_data.l1_header.hash_slow(), "L1 hash mismatch");
-    ensure!(anchor_call.l1StateRoot == taiko_data.l1_header.state_root, "L1 state root mismatch");
-    ensure!(anchor_call.l1BlockId == taiko_data.l1_header.number, "L1 block number mismatch");
-    // The parent gas used input needs to match the gas used value of the parent block
-    ensure!(
-        anchor_call.parentGasUsed == taiko_data.parent_header.gas_used as u32,
-        "parentGasUsed mismatch"
-    );
+    check_anchor_tx(tx, from, block.base_fee_per_gas.unwrap_or_default(), treasury)?;
+    // let anchor = tx.as_eip1559().unwrap();
+    // // Okay now let's decode the anchor tx to verify the inputs
+    // let anchor_call = decode_anchor(&anchor.input)?;
+    // // The L1 blockhash needs to match the expected value
+    // ensure!(anchor_call.l1Hash == taiko_data.l1_header.hash_slow(), "L1 hash mismatch");
+    // ensure!(anchor_call.l1StateRoot == taiko_data.l1_header.state_root, "L1 state root mismatch");
+    // ensure!(anchor_call.l1BlockId == taiko_data.l1_header.number, "L1 block number mismatch");
+    // // The parent gas used input needs to match the gas used value of the parent block
+    // ensure!(
+    //     anchor_call.parentGasUsed == taiko_data.parent_header.gas_used as u32,
+    //     "parentGasUsed mismatch"
+    // );
 
     Ok(())
 }

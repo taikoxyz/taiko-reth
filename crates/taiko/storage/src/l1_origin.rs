@@ -6,7 +6,7 @@ use reth_db_api::{
 use reth_primitives::BlockNumber;
 use reth_provider::{
     providers::BlockchainProvider, DatabaseProvider, DatabaseProviderFactory,
-    DatabaseProviderRwFactory,
+    DatabaseProviderRwFactory, ProviderError,
 };
 use reth_storage_errors::provider::ProviderResult;
 use taiko_reth_primitives::{HeadL1Origin, HeadL1OriginKey, L1Origin, L1Origins};
@@ -15,7 +15,7 @@ use taiko_reth_primitives::{HeadL1Origin, HeadL1OriginKey, L1Origin, L1Origins};
 #[auto_impl::auto_impl(&, Arc)]
 pub trait L1OriginReader: Send + Sync {
     /// Get the L1 origin for the given block hash.
-    fn get_l1_origin(&self, block_hash: BlockNumber) -> ProviderResult<Option<L1Origin>>;
+    fn get_l1_origin(&self, block_hash: BlockNumber) -> ProviderResult<L1Origin>;
     /// Get the head L1 origin.
     fn get_head_l1_origin(&self) -> ProviderResult<Option<BlockNumber>>;
 }
@@ -30,8 +30,10 @@ pub trait L1OriginWriter: Send + Sync {
 }
 
 impl<TX: DbTx> L1OriginReader for DatabaseProvider<TX> {
-    fn get_l1_origin(&self, block_number: BlockNumber) -> ProviderResult<Option<L1Origin>> {
-        Ok(self.tx_ref().get::<L1Origins>(block_number)?)
+    fn get_l1_origin(&self, block_number: BlockNumber) -> ProviderResult<L1Origin> {
+        self.tx_ref()
+            .get::<L1Origins>(block_number)?
+            .ok_or_else(|| ProviderError::L1OriginNotFound(block_number))
     }
 
     fn get_head_l1_origin(&self) -> ProviderResult<Option<BlockNumber>> {
@@ -53,7 +55,7 @@ impl<DB> L1OriginReader for BlockchainProvider<DB>
 where
     DB: Database,
 {
-    fn get_l1_origin(&self, block_number: BlockNumber) -> ProviderResult<Option<L1Origin>> {
+    fn get_l1_origin(&self, block_number: BlockNumber) -> ProviderResult<L1Origin> {
         self.database_provider_ro()?.get_l1_origin(block_number)
     }
 
