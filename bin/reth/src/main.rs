@@ -29,6 +29,7 @@ fn main() {
     }
 }*/
 
+use alloy_signer::k256::elliptic_curve::rand_core::block;
 use alloy_sol_types::{sol, SolEventInterface, SolInterface};
 use db::Database;
 use execution::execute_block;
@@ -40,10 +41,10 @@ use payload::PayloadTestContext;
 use reth::args::{DiscoveryArgs, NetworkArgs, RpcServerArgs};
 use reth_chainspec::{ChainSpec, ChainSpecBuilder, MAINNET};
 use reth_consensus::Consensus;
-use reth_db::{test_utils::TempDatabase, DatabaseEnv};
+use reth_db::{database_metrics::DatabaseMetrics, test_utils::TempDatabase, DatabaseEnv};
 use reth_execution_types::Chain;
 use reth_exex::{ExExContext, ExExEvent};
-use reth_node_api::{FullNodeTypesAdapter, NodeAddOns};
+use reth_node_api::{FullNodeTypesAdapter, NodeAddOns, NodeTypes};
 //use reth_node_api::{EngineTypes, FullNodeComponents, NodeAddOns};
 use reth_node_builder::{components::Components, rpc::EthApiBuilderProvider, AddOns, FullNode, Node, NodeAdapter, NodeBuilder, NodeComponentsBuilder, NodeConfig, NodeHandle, RethFullAdapter};
 use reth_node_ethereum::{node::EthereumAddOns, EthEvmConfig, EthExecutorProvider, EthereumNode};
@@ -112,13 +113,22 @@ static CHAIN_SPEC: Lazy<Arc<ChainSpec>> = Lazy::new(|| {
 
 struct Rollup<Node: reth_node_api::FullNodeComponents> {
     ctx: ExExContext<Node>,
-    node: TestNodeContext,
+    // node: TestNodeContext,
 }
 
 impl<Node: reth_node_api::FullNodeComponents> Rollup<Node> {
-    fn new(ctx: ExExContext<Node>, node: TestNodeContext) -> eyre::Result<Self> {
-        Ok(Self { ctx, node })
+    fn new(ctx: ExExContext<Node>/* , node: TestNodeContext */) -> eyre::Result<Self> {
+        Ok(Self { ctx/* , node  */})
     }
+
+    async fn fuckoff(self) -> eyre::Result<()> {
+        self.fuckoff2().await
+    }
+
+    async fn fuckoff2(self) -> eyre::Result<()> {
+        Ok(())
+    }
+// }
 
     async fn start(mut self) -> eyre::Result<()> {
         // Process all new chain state notifications
@@ -135,6 +145,7 @@ impl<Node: reth_node_api::FullNodeComponents> Rollup<Node> {
 
         Ok(())
     }
+
 
     /// Process a new chain commit.
     ///
@@ -193,11 +204,21 @@ impl<Node: reth_node_api::FullNodeComponents> Rollup<Node> {
                     let block_number = 10;
                 
                     // // assert the block has been committed to the blockchain
-                    self.node.assert_new_block(tx_hash, block_hash, block_number).await?;
+                    unsafe {
+                        let mut node = MY_STATIC.get_mut().unwrap();
+                        tokio::task::block_in_place(|| {
+                            tokio::runtime::Handle::current().block_on(async move {
+                                // do something async
+                                node.assert_new_block(tx_hash, block_hash, block_number).await.unwrap();
+                            });
+                        });
+                        // node.assert_new_block(tx_hash, block_hash, block_number).await?;
+                        // println!("{:?}", node.inner.evm_config);
+                    }
+
 
                     //let tx_hash = self.node.rpc.inject_tx(raw_tx).await?;
 
-                    println!("{:?}", self.node.inner.evm_config);
 
                     /*if let RollupContractCalls::submitBlock(RollupContract::submitBlockCall {
                         header,
@@ -386,7 +407,25 @@ type Adapter<N> = NodeAdapter<
     >>::Components,
 >;
 
-type TestNodeContext = NodeTestContext<NodeAdapter<FullNodeTypesAdapter<EthereumNode, Arc<TempDatabase<DatabaseEnv>>, BlockchainProvider<Arc<TempDatabase<DatabaseEnv>>>>, Components<FullNodeTypesAdapter<EthereumNode, Arc<TempDatabase<DatabaseEnv>>, BlockchainProvider<Arc<TempDatabase<DatabaseEnv>>>>, Pool<TransactionValidationTaskExecutor<EthTransactionValidator<BlockchainProvider<Arc<TempDatabase<DatabaseEnv>>>, EthPooledTransaction>>, CoinbaseTipOrdering<EthPooledTransaction>, DiskFileBlobStore>, EthEvmConfig, EthExecutorProvider, Arc<dyn Consensus>>>, EthereumAddOns>;
+type TestNodeContext = NodeTestContext<
+        NodeAdapter<
+            FullNodeTypesAdapter<EthereumNode, Arc<TempDatabase<DatabaseEnv>>, BlockchainProvider<Arc<TempDatabase<DatabaseEnv>>>>, 
+            Components<
+                FullNodeTypesAdapter<EthereumNode, Arc<TempDatabase<DatabaseEnv>>, 
+                BlockchainProvider<Arc<TempDatabase<DatabaseEnv>>>>, 
+                Pool<
+                    TransactionValidationTaskExecutor<EthTransactionValidator<BlockchainProvider<Arc<TempDatabase<DatabaseEnv>>>, EthPooledTransaction>>, 
+                    CoinbaseTipOrdering<EthPooledTransaction>, 
+                    DiskFileBlobStore
+                >, 
+                EthEvmConfig, 
+                EthExecutorProvider, 
+                Arc<dyn Consensus>>
+            >, 
+        EthereumAddOns
+    >;
+
+unsafe impl Sync for TestNodeContext {}
 
 /// Type alias for a type of NodeHelper
 pub type NodeHelperType<N, AO> = NodeTestContext<Adapter<N>, AO>;
@@ -449,106 +488,139 @@ where
     Ok((nodes, tasks, Wallet::default().with_chain_id(chain_spec.chain().into())))
 }
 
-fn main() -> eyre::Result<()> {
+struct GGGG<Node: reth_node_api::FullNodeComponents> {
+    ctx: ExExContext<Node>,
+}
+
+impl <Node: reth_node_api::FullNodeComponents> GGGG<Node> {
+    async fn new(ctx: ExExContext<Node>) -> eyre::Result<Self> {
+        Ok(Self { ctx })
+    }
+
+    async fn fuckoff(self) -> eyre::Result<()> {
+        Ok(())
+    }
+}
+
+
+static mut MY_STATIC: Lazy<std::sync::Mutex<TestNodeContext>> = Lazy::new(|| {  
+   std::sync::Mutex::new(futures::executor::block_on(async_init()))
+});  
+
+async fn async_init() -> TestNodeContext {  
+    let (mut nodes, _tasks, _wallet) = setup::<EthereumNode>(
+        1,
+        Arc::new(
+            ChainSpecBuilder::default()
+                .chain(MAINNET.chain)
+                .genesis(serde_json::from_str(include_str!("../../../crates/ethereum/node/tests/assets/genesis.json")).unwrap())
+                .cancun_activated()
+                .build(),
+        ),
+        false,
+    )
+    .await.unwrap();
+    nodes.pop().unwrap()
+}  
+
+fn main() {}
+
+async fn mainn() -> eyre::Result<()> {
     println!("Brecht");
+            
     reth::cli::Cli::parse_args().run(|builder, _| async move {
         let handle = builder
             .node(EthereumNode::default())
-            .install_exex("Rollup", move |ctx| async {
-                //let connection = Connection::open(DATABASE_PATH)?;
+            .install_exex("Rollup", move |ctx| async move {   
+                // let inner_ex = |usize| async move { eyre::Result::Ok(()) };      
 
-                let network_config = NetworkArgs {
-                    discovery: DiscoveryArgs { disable_discovery: true, ..DiscoveryArgs::default() },
-                    ..NetworkArgs::default()
-                };
 
-                let tasks = TaskManager::current();
-                let exec = tasks.executor();
+                // let g = GGGG::new(ctx).await?;
 
-                // let node_config = NodeConfig::test()
-                //     .with_chain(CHAIN_SPEC.clone())
-                //     .with_network(network_config.clone())
-                //     .with_unused_ports()
-                //     .with_rpc(RpcServerArgs::default().with_unused_ports().with_http())
-                //     .set_dev(true);
 
-                // let node_handle: = NodeBuilder::new(node_config.clone())
-                //     .testing_node(exec.clone())
-                //     .node(Default::default())
-                //     .launch()
-                //     .await?;
-
-                // let mut node = NodeTestContext::new(node_handle.node).await?;
-            
-                let (mut nodes, _tasks, _wallet) = setup::<EthereumNode>(
-                    1,
-                    Arc::new(
-                        ChainSpecBuilder::default()
-                            .chain(MAINNET.chain)
-                            .genesis(serde_json::from_str(include_str!("../../../crates/ethereum/node/tests/assets/genesis.json")).unwrap())
-                            .cancun_activated()
-                            .build(),
-                    ),
-                    false,
-                )
-                .await?;
-            
-                let node = nodes.pop().unwrap();
-
-                //Ok((nodes, tasks, Wallet::default().with_chain_id(chain_spec.chain().into())))
-
-                // let wallet = Wallet::default();
-                // let raw_tx = TransactionTestContext::transfer_tx_bytes(1, wallet.inner).await;
-            
-                // // make the node advance
-                // let tx_hash = node.rpc.inject_tx(raw_tx).await?;
-            
-                // // make the node advance
-                // let (payload, _): (EthBuiltPayload, _) = node.advance_block(vec![], eth_payload_attributes).await?;
-            
-                // let block_hash = payload.block().hash();
-                // let block_number = payload.block().number;
-            
-                // // assert the block has been committed to the blockchain
-                // node.assert_new_block(tx_hash, block_hash, block_number).await?;
-            
-
-                // let wallet = Wallet::default();
-                // let raw_tx = TransactionTestContext::transfer_tx_bytes(1, wallet.inner).await;
-            
-                // // make the node advance
-                // let tx_hash = node.rpc.inject_tx(raw_tx).await?;
-            
-                // // make the node advance
-                // let (payload, _) = node.advance_block(vec![], eth_payload_attributes).await?;
-            
-                // let block_hash = payload.block().hash();
-                // let block_number = payload.block().number;
-            
-                // // assert the block has been committed to the blockchain
-                // node.assert_new_block(tx_hash, block_hash, block_number).await?;
-
-                // // setup payload for submission
-                // let envelope_v3: <E as EngineTypes>::ExecutionPayloadV3 = payload.into();
-
-                // // submit payload to engine api
-                // let submission = EngineApiClient::<E>::new_payload_v3(
-                //     &self.engine_api_client,
-                //     envelope_v3.execution_payload(),
-                //     versioned_hashes,
-                //     payload_builder_attributes.parent_beacon_block_root().unwrap(),
+                // let (mut nodes, _tasks, _wallet) = setup::<EthereumNode>(
+                //     1,
+                //     Arc::new(
+                //         ChainSpecBuilder::default()
+                //             .chain(MAINNET.chain)
+                //             .genesis(serde_json::from_str(include_str!("../../../crates/ethereum/node/tests/assets/genesis.json")).unwrap())
+                //             .cancun_activated()
+                //             .build(),
+                //     ),
+                //     false,
                 // )
-                // .await?;
+                // .await.unwrap();
+                // let node = nodes.pop().unwrap();
                 
-                //let f: Pin<Box<dyn Future<Output = Result<(), Error>> + Send>> =
-                //        Box::pin(Rollup::new(ctx, connection, node)?.start());
-                //f
+                // let g = GGGG::new(ctx).await?;
+                // g.fuckoff().await?;
+                
+                // Rollup::new(ctx/* , node */)
+                //     .unwrap()
+                //     .start().await;
 
-                Ok(Rollup::new(ctx, node)?.start())
+                Ok(Rollup::new(ctx)?.start())
+                // Ok(inner_ex(5))
             })
             .launch()
             .await?;
 
+
         handle.wait_for_node_exit().await
     })
+}
+
+type CTXXX = ExExContext<NodeAdapter<FullNodeTypesAdapter<EthereumNode, Arc<DatabaseEnv>, BlockchainProvider<Arc<DatabaseEnv>>>, Components<FullNodeTypesAdapter<EthereumNode, Arc<DatabaseEnv>, BlockchainProvider<Arc<DatabaseEnv>>>, Pool<TransactionValidationTaskExecutor<EthTransactionValidator<BlockchainProvider<Arc<DatabaseEnv>>, EthPooledTransaction>>, CoinbaseTipOrdering<EthPooledTransaction>, DiskFileBlobStore>, EthEvmConfig, EthExecutorProvider, Arc<dyn Consensus>>>>;
+
+pub fn barrrrr<F, R, E, DB, T, CB>( exex_id: impl Into<String>, exex: F)
+where
+    F: FnOnce(ExExContext<NodeAdapter<RethFullAdapter<DB, T>, CB::Components>>) -> R
+        + Send
+        + 'static,
+    
+    DB: reth_db_api::Database + DatabaseMetrics + reth_db::database_metrics::DatabaseMetadata + Clone + Unpin + 'static,
+    T: NodeTypes,
+    CB: NodeComponentsBuilder<RethFullAdapter<DB, T>>,
+
+    R: Future<Output = eyre::Result<E>> + Send,
+    E: Future<Output = eyre::Result<()>> + Send,
+{
+}
+
+pub fn barrrr<F, R, E>( exex_id: impl Into<String>, exex: F)
+where
+    F: FnOnce(usize) -> R
+        + Send
+        + 'static,
+    R: Future<Output = eyre::Result<E>> + Send,
+    E: Future<Output = eyre::Result<()>> + Send,
+{
+}
+
+fn test() {
+    // let inner = |usize| async move { eyre::Result::Ok(()) };
+
+    barrrr("test",  |ctx| async move { 
+        let inner_ex = |usize| async move { eyre::Result::Ok(()) };
+        let (mut nodes, _tasks, _wallet) = setup::<EthereumNode>(
+            1,
+            Arc::new(
+                ChainSpecBuilder::default()
+                    .chain(MAINNET.chain)
+                    .genesis(serde_json::from_str(include_str!("../../../crates/ethereum/node/tests/assets/genesis.json")).unwrap())
+                    .cancun_activated()
+                    .build(),
+            ),
+            false,
+        )
+        .await?;
+    
+        let node = nodes.pop().unwrap();
+        // Rollup::new(ctx, node)
+        //     .unwrap()
+        //     .start()
+        //     .await;
+
+        // Ok(Rollup::new(ctx, node)?.start())
+        Ok(inner_ex(5))});
 }

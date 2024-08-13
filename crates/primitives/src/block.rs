@@ -487,6 +487,8 @@ pub struct SealedBlockWithSenders {
     pub senders: Vec<Address>,
 }
 
+unsafe impl Sync for SealedBlockWithSenders {}
+
 impl SealedBlockWithSenders {
     /// New sealed block with sender. Return none if len of tx and senders does not match
     pub fn new(block: SealedBlock, senders: Vec<Address>) -> Option<Self> {

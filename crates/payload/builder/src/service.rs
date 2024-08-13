@@ -100,6 +100,8 @@ pub struct PayloadBuilderHandle<Engine: PayloadTypes> {
     to_service: mpsc::UnboundedSender<PayloadServiceCommand<Engine>>,
 }
 
+unsafe impl<Engine> Sync for PayloadBuilderHandle<Engine> where Engine: PayloadTypes {}
+
 // === impl PayloadBuilderHandle ===
 
 impl<Engine> PayloadBuilderHandle<Engine>
