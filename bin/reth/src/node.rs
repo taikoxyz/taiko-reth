@@ -214,7 +214,6 @@ where
         Ok(())
     }
 
-
     /// Asserts that a new block has been added to the blockchain
     /// and the tx has been included in the block.
     ///
@@ -227,24 +226,24 @@ where
     ) -> eyre::Result<()> {
         // get head block from notifications stream and verify the tx has been pushed to the
         // pool is actually present in the canonical block
-        // let head = self.engine_api.canonical_stream.next().await.unwrap();
-        // let tx = head.tip().transactions().next();
-        // assert_eq!(tx.unwrap().hash().as_slice(), tip_tx_hash.as_slice());
+        let head = self.engine_api.canonical_stream.next().await.unwrap();
+        let tx = head.tip().transactions().next();
+        assert_eq!(tx.unwrap().hash().as_slice(), tip_tx_hash.as_slice());
 
-        // loop {
-        //     // wait for the block to commit
-        //     tokio::time::sleep(std::time::Duration::from_millis(20)).await;
-        //     if let Some(latest_block) =
-        //         self.inner.provider.block_by_number_or_tag(BlockNumberOrTag::Latest)?
-        //     {
-        //         if latest_block.number == block_number {
-        //             // make sure the block hash we submitted via FCU engine api is the new latest
-        //             // block using an RPC call
-        //             assert_eq!(latest_block.hash_slow(), block_hash);
-        //             break
-        //         }
-        //     }
-        // }
+        loop {
+            // wait for the block to commit
+            tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+            if let Some(latest_block) =
+                self.inner.provider.block_by_number_or_tag(BlockNumberOrTag::Latest)?
+            {
+                if latest_block.number == block_number {
+                    // make sure the block hash we submitted via FCU engine api is the new latest
+                    // block using an RPC call
+                    assert_eq!(latest_block.hash_slow(), block_hash);
+                    break
+                }
+            }
+        }
         Ok(())
     }
 }
