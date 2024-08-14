@@ -55,7 +55,10 @@ pub trait TaikoAuthApi {
 /// with estimated gas used / bytes.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PreBuiltTxList {
+    /// The list of transactions.
     pub tx_list: Vec<Transaction>,
+    /// The estimated gas used.
     pub estimated_gas_used: u64,
+    /// The estimated bytes length.
     pub bytes_length: u64,
 }

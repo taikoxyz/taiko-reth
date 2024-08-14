@@ -148,6 +148,7 @@ impl<Node: FullNodeComponents> ExtendRpcModules<Node> for () {
 /// Helper wrapper type to encapsulate the [`RethModuleRegistry`] over components trait.
 #[derive(Debug)]
 pub struct RpcRegistry<Node: FullNodeComponents> {
+    #[allow(clippy::type_complexity)]
     pub(crate) registry: RethModuleRegistry<
         Node::Provider,
         Node::Pool,
@@ -155,6 +156,7 @@ pub struct RpcRegistry<Node: FullNodeComponents> {
         TaskExecutor,
         Node::Provider,
         Node::Evm,
+        Node::Executor,
     >,
 }
 
@@ -166,6 +168,7 @@ impl<Node: FullNodeComponents> Deref for RpcRegistry<Node> {
         TaskExecutor,
         Node::Provider,
         Node::Evm,
+        Node::Executor,
     >;
 
     fn deref(&self) -> &Self::Target {
@@ -271,6 +274,7 @@ where
         .with_events(node.provider().clone())
         .with_executor(node.task_executor().clone())
         .with_evm_config(node.evm_config().clone())
+        .with_block_executor(node.block_executor().clone())
         .build_with_auth_server(module_config, engine_api);
 
     let mut registry = RpcRegistry { registry };
