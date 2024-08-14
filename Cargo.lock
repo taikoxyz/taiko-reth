@@ -8114,7 +8114,6 @@ dependencies = [
  "secp256k1",
  "serde",
  "serde_json",
- "taiko-reth-evm",
  "taiko-reth-primitives",
  "taiko-reth-proposer-consensus",
  "taiko-reth-provider",

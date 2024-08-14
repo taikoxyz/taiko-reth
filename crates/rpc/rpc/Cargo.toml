@@ -37,7 +37,6 @@ reth-evm-optimism = { workspace = true, optional = true }
 # taiko
 taiko-reth-provider = { workspace = true, optional = true }
 taiko-reth-primitives = { workspace = true, optional = true }
-taiko-reth-evm = { workspace = true, optional = true }
 taiko-reth-proposer-consensus = { workspace = true, optional = true }
 
 # eth
@@ -114,6 +113,5 @@ taiko = [
     "reth-rpc-engine-api/taiko",
     "dep:taiko-reth-provider",
     "dep:taiko-reth-primitives",
-    "dep:taiko-reth-evm",
     "dep:taiko-reth-proposer-consensus",
 ]
