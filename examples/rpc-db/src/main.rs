@@ -33,7 +33,7 @@ use reth::{
     blockchain_tree::noop::NoopBlockchainTree, providers::test_utils::TestCanonStateSubscriptions,
     tasks::TokioTaskExecutor,
 };
-use reth_node_ethereum::EthEvmConfig;
+use reth_node_ethereum::{EthEvmConfig, EthExecutorProvider};
 use std::{path::Path, sync::Arc};
 
 // Custom rpc extension
@@ -67,6 +67,7 @@ async fn main() -> eyre::Result<()> {
         .with_noop_network()
         .with_executor(TokioTaskExecutor::default())
         .with_evm_config(EthEvmConfig::default())
+        .with_block_executor(EthExecutorProvider::mainnet())
         .with_events(TestCanonStateSubscriptions::default());
 
     // Pick which namespaces to expose.
