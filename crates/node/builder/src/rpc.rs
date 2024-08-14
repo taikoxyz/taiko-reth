@@ -271,7 +271,7 @@ where
         .with_events(node.provider().clone())
         .with_executor(node.task_executor().clone())
         .with_evm_config(node.evm_config().clone())
-        .build_with_auth_server(module_config, engine_api, config.builder.clone());
+        .build_with_auth_server(module_config, engine_api);
 
     let mut registry = RpcRegistry { registry };
     let ctx = RpcContext {

@@ -19,6 +19,7 @@ use flate2::write::ZlibEncoder;
 use flate2::Compression;
 use reth_chainspec::ChainSpec;
 use reth_consensus::{Consensus, ConsensusError, PostExecutionInput};
+use reth_errors::RethError;
 use reth_execution_errors::{BlockExecutionError, BlockValidationError};
 use reth_primitives::{
     eip4844::calculate_excess_blob_gas, proofs, transaction::TransactionSignedList, Address, Block,
@@ -95,35 +96,33 @@ impl Consensus for ProposerConsensus {
 
 /// Builder type for configuring the setup
 #[derive(Debug)]
-pub struct ProposerBuilder<Client, Pool, EvmConfig> {
-    client: Client,
+pub struct ProposerBuilder<Provider, Pool, BlockExecutor> {
+    provider: Provider,
     consensus: ProposerConsensus,
     pool: Pool,
-    evm_config: EvmConfig,
+    block_executor: BlockExecutor,
 }
 
-// === impl AutoSealBuilder ===
-
-impl<Client, Pool, EvmConfig> ProposerBuilder<Client, Pool, EvmConfig>
+impl<Provider, Pool, BlockExecutor> ProposerBuilder<Provider, Pool, BlockExecutor>
 where
     Pool: TransactionPool,
 {
     /// Creates a new builder instance to configure all parts.
     pub fn new(
         chain_spec: Arc<ChainSpec>,
-        client: Client,
+        provider: Provider,
         pool: Pool,
-        evm_config: EvmConfig,
+        block_executor: BlockExecutor,
     ) -> Self {
-        Self { client, consensus: ProposerConsensus::new(chain_spec), pool, evm_config }
+        Self { provider, consensus: ProposerConsensus::new(chain_spec), pool, block_executor }
     }
 
     /// Consumes the type and returns all components
     #[track_caller]
     pub fn build(
         self,
-    ) -> (ProposerConsensus, ProposerClient, ProposerTask<Client, Pool, EvmConfig>) {
-        let Self { client, consensus, pool, evm_config } = self;
+    ) -> (ProposerConsensus, ProposerClient, ProposerTask<Provider, Pool, BlockExecutor>) {
+        let Self { provider: client, consensus, pool, block_executor: evm_config } = self;
         let (trigger_args_tx, trigger_args_rx) = tokio::sync::mpsc::unbounded_channel();
         let auto_client = ProposerClient::new(trigger_args_tx);
         let task = ProposerTask::new(
@@ -155,7 +154,7 @@ pub struct TaskArgs {
     /// Minimum tip
     pub min_tip: u64,
 
-    tx: oneshot::Sender<Result<Vec<TaskResult>, BlockExecutionError>>,
+    tx: oneshot::Sender<Result<Vec<TaskResult>, RethError>>,
 }
 
 /// Result of the trigger
@@ -266,7 +265,7 @@ impl Storage {
         max_bytes_per_tx_list: u64,
         max_transactions_lists: u64,
         base_fee: u64,
-    ) -> Result<Vec<TaskResult>, BlockExecutionError>
+    ) -> Result<Vec<TaskResult>, RethError>
     where
         Executor: BlockExecutorProvider,
         Provider: StateProviderFactory + BlockReaderIdExt,

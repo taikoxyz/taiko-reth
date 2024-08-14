@@ -251,7 +251,7 @@ mod tests {
             withdrawals: None,
             requests: None,
         };
-        let block = BlockWithSenders::new(block, Default::default()).unwrap();
+        let mut block = BlockWithSenders::new(block, Default::default()).unwrap();
         let _ = executor.execute(BlockExecutionInput::new(&mut block, U256::ZERO));
     }
 }

@@ -59,4 +59,4 @@ pub mod result;
 #[cfg(feature = "taiko")]
 mod taiko;
 #[cfg(feature = "taiko")]
-pub use taiko::TaikoApi;
+pub use taiko::{TaikoApi, TaikoAuthApi};

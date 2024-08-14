@@ -1,7 +1,7 @@
 //! This includes download client implementations for auto sealing miners.
 
 use crate::{TaskArgs, TaskResult};
-use reth_execution_errors::BlockExecutionError;
+use reth_errors::RethError;
 use reth_primitives::Address;
 use std::fmt::Debug;
 use tokio::sync::{mpsc::UnboundedSender, oneshot};
@@ -23,7 +23,7 @@ impl ProposerClient {
 
     /// get transactions from pool
     #[allow(clippy::too_many_arguments)]
-    pub async fn build_transactions_lists(
+    pub async fn tx_pool_content_with_min_tip(
         &self,
         beneficiary: Address,
         base_fee: u64,
@@ -32,7 +32,7 @@ impl ProposerClient {
         local_accounts: Vec<Address>,
         max_transactions_lists: u64,
         min_tip: u64,
-    ) -> Result<Vec<TaskResult>, BlockExecutionError> {
+    ) -> Result<Vec<TaskResult>, RethError> {
         let (tx, rx) = oneshot::channel();
         self.trigger_args_tx
             .send(TaskArgs {

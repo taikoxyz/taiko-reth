@@ -3,7 +3,7 @@ use futures_util::{future::BoxFuture, FutureExt};
 use reth_chainspec::ChainSpec;
 use reth_evm::execute::BlockExecutorProvider;
 use reth_primitives::IntoRecoveredTransaction;
-use reth_provider::{BlockReaderIdExt, CanonChainTracker, StateProviderFactory};
+use reth_provider::{BlockReaderIdExt, StateProviderFactory};
 use reth_transaction_pool::{TransactionPool, ValidPoolTransaction};
 use std::{
     collections::VecDeque,
@@ -15,11 +15,11 @@ use std::{
 use tokio::sync::mpsc::UnboundedReceiver;
 
 /// A Future that listens for new ready transactions and puts new blocks into storage
-pub struct ProposerTask<Client, Pool: TransactionPool, Executor> {
+pub struct ProposerTask<Provider, Pool: TransactionPool, Executor> {
     /// The configured chain spec
     chain_spec: Arc<ChainSpec>,
     /// The client used to interact with the state
-    client: Client,
+    provider: Provider,
     /// Single active future that inserts a new block into `storage`
     insert_task: Option<BoxFuture<'static, ()>>,
     /// Pool where transactions are stored
@@ -37,19 +37,19 @@ pub struct ProposerTask<Client, Pool: TransactionPool, Executor> {
 
 // === impl MiningTask ===
 
-impl<Executor, Client, Pool: TransactionPool> ProposerTask<Client, Pool, Executor> {
+impl<Executor, Provider, Pool: TransactionPool> ProposerTask<Provider, Pool, Executor> {
     /// Creates a new instance of the task
     #[allow(clippy::too_many_arguments)]
     pub(crate) fn new(
         chain_spec: Arc<ChainSpec>,
-        client: Client,
+        provider: Provider,
         pool: Pool,
         block_executor: Executor,
         trigger_args_rx: UnboundedReceiver<TaskArgs>,
     ) -> Self {
         Self {
             chain_spec,
-            client,
+            provider,
             insert_task: None,
             pool,
             queued: Default::default(),
@@ -59,9 +59,9 @@ impl<Executor, Client, Pool: TransactionPool> ProposerTask<Client, Pool, Executo
     }
 }
 
-impl<Executor, Client, Pool> Future for ProposerTask<Client, Pool, Executor>
+impl<Executor, Provider, Pool> Future for ProposerTask<Provider, Pool, Executor>
 where
-    Client: StateProviderFactory + BlockReaderIdExt + CanonChainTracker + Clone + Unpin + 'static,
+    Provider: StateProviderFactory + BlockReaderIdExt + Clone + Unpin + 'static,
     Pool: TransactionPool + Unpin + 'static,
     <Pool as TransactionPool>::Transaction: IntoRecoveredTransaction,
     Executor: BlockExecutorProvider,
@@ -100,7 +100,7 @@ where
                 // ready to queue in new insert task;
                 let (trigger_args, txs) = this.queued.pop_front().expect("not empty");
 
-                let client = this.client.clone();
+                let client = this.provider.clone();
                 let chain_spec = Arc::clone(&this.chain_spec);
                 let executor = this.block_executor.clone();
 
