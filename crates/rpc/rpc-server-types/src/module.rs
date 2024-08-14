@@ -258,9 +258,6 @@ pub enum RethRpcModule {
     /// `taiko_` module
     #[cfg(feature = "taiko")]
     Taiko,
-    /// `taikoAuth_` module
-    #[cfg(feature = "taiko")]
-    TaikoAuth,
     /// For single non-standard `eth_` namespace call `eth_callBundle`
     ///
     /// This is separate from [`RethRpcModule::Eth`] because it is a non standardized call that

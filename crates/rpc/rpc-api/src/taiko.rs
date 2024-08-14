@@ -51,7 +51,7 @@ pub trait TaikoAuthApi {
     ) -> RpcResult<Vec<PreBuiltTxList>>;
 }
 
-/// PreBuiltTxList is a pre-built transaction list based on the latest chain state,
+/// `PreBuiltTxList` is a pre-built transaction list based on the latest chain state,
 /// with estimated gas used / bytes.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PreBuiltTxList {

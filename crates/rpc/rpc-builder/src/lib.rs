@@ -934,6 +934,18 @@ where
         let engine_eth = EngineEthApi::new(eth_handlers.api.clone(), eth_handlers.filter);
         module.merge(engine_eth.into_rpc()).expect("No conflicting methods");
 
+        // taikoAuth
+        #[cfg(feature = "taiko")]
+        {
+            let taiko_auth = TaikoAuthApi::new(
+                self.provider.clone(),
+                self.pool.clone(),
+                self.block_executor.clone(),
+                Box::new(self.executor.clone()),
+            );
+            module.merge(taiko_auth.into_rpc()).expect("No conflicting methods");
+        }
+
         AuthRpcModule { inner: module }
     }
 
@@ -1084,15 +1096,6 @@ where
                         RethRpcModule::Taiko => {
                             TaikoApi::new(self.provider.clone()).into_rpc().into()
                         }
-                        #[cfg(feature = "taiko")]
-                        RethRpcModule::TaikoAuth => TaikoAuthApi::new(
-                            self.provider.clone(),
-                            self.pool.clone(),
-                            self.block_executor.clone(),
-                            Box::new(self.executor.clone()),
-                        )
-                        .into_rpc()
-                        .into(),
                     })
                     .clone()
             })
