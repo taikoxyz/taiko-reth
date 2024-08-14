@@ -1,7 +1,9 @@
 //! Compatibility functions for rpc `Transaction` type.
 
 use alloy_rpc_types::request::{TransactionInput, TransactionRequest};
-use reth_primitives::{Address, BlockNumber, TransactionSignedEcRecovered, TxKind, TxType, B256};
+use reth_primitives::{
+    Address, BlockNumber, TransactionSigned, TransactionSignedEcRecovered, TxKind, TxType, B256,
+};
 use reth_rpc_types::Transaction;
 use signature::from_primitive_signature;
 pub use typed::*;
@@ -28,6 +30,12 @@ pub fn from_recovered_with_block_context(
 /// environment related fields to `None`.
 pub fn from_recovered(tx: TransactionSignedEcRecovered) -> Transaction {
     fill(tx, None, None, None, None)
+}
+
+/// Create a new rpc transaction result for a _pending_ signed transaction, setting block
+/// environment related fields to `None`.
+pub fn from_signed(tx: TransactionSigned) -> Option<Transaction> {
+    tx.into_ecrecovered().map(|tx| fill(tx, None, None, None, None))
 }
 
 /// Create a new rpc transaction result for a _pending_ signed transaction, setting block

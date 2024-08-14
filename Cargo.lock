@@ -9869,6 +9869,7 @@ dependencies = [
 name = "taiko-reth-proposer-consensus"
 version = "1.0.0"
 dependencies = [
+ "alloy-rlp",
  "flate2",
  "futures-util",
  "reth-beacon-consensus",
@@ -9884,6 +9885,7 @@ dependencies = [
  "reth-provider",
  "reth-revm",
  "reth-rpc-types",
+ "reth-rpc-types-compat",
  "reth-stages-api",
  "reth-tokio-util",
  "reth-transaction-pool",

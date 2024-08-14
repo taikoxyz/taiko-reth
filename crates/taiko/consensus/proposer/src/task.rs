@@ -1,10 +1,9 @@
-use crate::Storage;
+use crate::{Storage, TriggerArgs};
 use futures_util::{future::BoxFuture, FutureExt};
 use reth_chainspec::ChainSpec;
 use reth_evm::execute::BlockExecutorProvider;
-use reth_execution_errors::BlockExecutionError;
-use reth_primitives::{Address, IntoRecoveredTransaction, TransactionSignedEcRecovered};
-use reth_provider::{CanonChainTracker, StateProviderFactory};
+use reth_primitives::IntoRecoveredTransaction;
+use reth_provider::{BlockReaderIdExt, CanonChainTracker, StateProviderFactory};
 use reth_transaction_pool::{TransactionPool, ValidPoolTransaction};
 use std::{
     collections::VecDeque,
@@ -13,38 +12,20 @@ use std::{
     sync::Arc,
     task::{Context, Poll},
 };
-use tokio::sync::{mpsc::UnboundedReceiver, oneshot};
-
-pub struct TriggerArgs {
-    pub beneficiary: Address,
-    pub base_fee: u64,
-    pub block_max_gas_limit: u64,
-    pub max_bytes_per_tx_list: u64,
-    pub local_accounts: Vec<Address>,
-    pub max_transactions_lists: u64,
-    pub min_tip: u64,
-    pub tx: oneshot::Sender<Result<Vec<TriggerResult>, BlockExecutionError>>,
-}
-
-pub struct TriggerResult {
-    pub txs: Vec<TransactionSignedEcRecovered>,
-    pub estimated_gas_used: u64,
-    pub bytes_length: u64,
-}
+use tokio::sync::mpsc::UnboundedReceiver;
 
 /// A Future that listens for new ready transactions and puts new blocks into storage
-pub struct MiningTask<Client, Pool: TransactionPool, Executor> {
+pub struct ProposerTask<Client, Pool: TransactionPool, Executor> {
     /// The configured chain spec
     chain_spec: Arc<ChainSpec>,
     /// The client used to interact with the state
     client: Client,
     /// Single active future that inserts a new block into `storage`
     insert_task: Option<BoxFuture<'static, ()>>,
-    /// Shared storage to insert new blocks
-    storage: Storage,
     /// Pool where transactions are stored
     pool: Pool,
     /// backlog of sets of transactions ready to be mined
+    #[allow(clippy::type_complexity)]
     queued: VecDeque<(
         TriggerArgs,
         Vec<Arc<ValidPoolTransaction<<Pool as TransactionPool>::Transaction>>>,
@@ -56,12 +37,11 @@ pub struct MiningTask<Client, Pool: TransactionPool, Executor> {
 
 // === impl MiningTask ===
 
-impl<Executor, Client, Pool: TransactionPool> MiningTask<Client, Pool, Executor> {
+impl<Executor, Client, Pool: TransactionPool> ProposerTask<Client, Pool, Executor> {
     /// Creates a new instance of the task
     #[allow(clippy::too_many_arguments)]
     pub(crate) fn new(
         chain_spec: Arc<ChainSpec>,
-        storage: Storage,
         client: Client,
         pool: Pool,
         block_executor: Executor,
@@ -71,7 +51,6 @@ impl<Executor, Client, Pool: TransactionPool> MiningTask<Client, Pool, Executor>
             chain_spec,
             client,
             insert_task: None,
-            storage,
             pool,
             queued: Default::default(),
             block_executor,
@@ -80,9 +59,9 @@ impl<Executor, Client, Pool: TransactionPool> MiningTask<Client, Pool, Executor>
     }
 }
 
-impl<Executor, Client, Pool> Future for MiningTask<Client, Pool, Executor>
+impl<Executor, Client, Pool> Future for ProposerTask<Client, Pool, Executor>
 where
-    Client: StateProviderFactory + CanonChainTracker + Clone + Unpin + 'static,
+    Client: StateProviderFactory + BlockReaderIdExt + CanonChainTracker + Clone + Unpin + 'static,
     Pool: TransactionPool + Unpin + 'static,
     <Pool as TransactionPool>::Transaction: IntoRecoveredTransaction,
     Executor: BlockExecutorProvider,
@@ -118,8 +97,7 @@ where
                     break;
                 }
 
-                // ready to queue in new insert task
-                let storage = this.storage.clone();
+                // ready to queue in new insert task;
                 let (trigger_args, txs) = this.queued.pop_front().expect("not empty");
 
                 let client = this.client.clone();
@@ -129,14 +107,9 @@ where
                 // Create the mining future that creates a block, notifies the engine that drives
                 // the pipeline
                 this.insert_task = Some(Box::pin(async move {
-                    let mut storage = storage.write().await;
-
                     let txs: Vec<_> = txs
                         .into_iter()
-                        .map(|tx| {
-                            let recovered = tx.to_recovered_transaction();
-                            recovered.into_signed()
-                        })
+                        .map(|tx| tx.to_recovered_transaction().into_signed())
                         .collect();
                     let ommers = vec![];
 
@@ -149,7 +122,7 @@ where
                         base_fee,
                         ..
                     } = trigger_args;
-                    tx.send(storage.build_and_execute(
+                    let _ = tx.send(Storage::build_and_execute(
                         txs,
                         ommers,
                         &client,
@@ -180,7 +153,7 @@ where
 }
 
 impl<Client, Pool: TransactionPool, EvmConfig: std::fmt::Debug> std::fmt::Debug
-    for MiningTask<Client, Pool, EvmConfig>
+    for ProposerTask<Client, Pool, EvmConfig>
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("MiningTask").finish_non_exhaustive()

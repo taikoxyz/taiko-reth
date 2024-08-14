@@ -17,36 +17,32 @@
 
 use flate2::write::ZlibEncoder;
 use flate2::Compression;
-use reth_beacon_consensus::BeaconEngineMessage;
 use reth_chainspec::ChainSpec;
 use reth_consensus::{Consensus, ConsensusError, PostExecutionInput};
-use reth_engine_primitives::EngineTypes;
 use reth_execution_errors::{BlockExecutionError, BlockValidationError};
-use reth_execution_types::ExecutionOutcome;
 use reth_primitives::{
-    constants::ETHEREUM_BLOCK_GAS_LIMIT, eip4844::calculate_excess_blob_gas, proofs, Address,
-    Block, BlockBody, BlockHash, BlockHashOrNumber, BlockNumber, BlockWithSenders, Bloom, Header,
-    Requests, SealedBlock, SealedHeader, TransactionSigned, Withdrawals, B256, U256,
+    eip4844::calculate_excess_blob_gas, proofs, transaction::TransactionSignedList, Address, Block,
+    BlockWithSenders, Header, Requests, SealedBlock, SealedHeader, TransactionSigned, Withdrawals,
+    U256,
 };
-use reth_provider::{BlockReaderIdExt, StateProviderFactory, StateRootProvider};
+use reth_provider::{BlockReaderIdExt, StateProviderFactory};
 use reth_revm::database::StateProviderDatabase;
+use reth_rpc_types::Transaction;
 use reth_transaction_pool::TransactionPool;
 use std::{
-    collections::HashMap,
-    io::Write,
-    ops::Add,
+    io::{self, Write},
     sync::Arc,
     time::{SystemTime, UNIX_EPOCH},
 };
-use tokio::sync::{mpsc::UnboundedSender, RwLock, RwLockReadGuard, RwLockWriteGuard};
+use tokio::sync::oneshot;
 use tracing::trace;
 
 mod client;
 mod task;
 
-pub use crate::client::AutoSealClient;
+pub use crate::client::ProposerClient;
 use reth_evm::execute::{BlockExecutionOutput, BlockExecutorProvider, Executor};
-pub use task::{MiningTask, TriggerResult};
+pub use task::ProposerTask;
 
 /// A consensus implementation intended for local development and testing purposes.
 #[derive(Debug, Clone)]
@@ -103,7 +99,6 @@ pub struct ProposerBuilder<Client, Pool, EvmConfig> {
     client: Client,
     consensus: ProposerConsensus,
     pool: Pool,
-    storage: Storage,
     evm_config: EvmConfig,
 }
 
@@ -111,7 +106,6 @@ pub struct ProposerBuilder<Client, Pool, EvmConfig> {
 
 impl<Client, Pool, EvmConfig> ProposerBuilder<Client, Pool, EvmConfig>
 where
-    Client: BlockReaderIdExt,
     Pool: TransactionPool,
 {
     /// Creates a new builder instance to configure all parts.
@@ -121,139 +115,82 @@ where
         pool: Pool,
         evm_config: EvmConfig,
     ) -> Self {
-        let latest_header = client
-            .latest_header()
-            .ok()
-            .flatten()
-            .unwrap_or_else(|| chain_spec.sealed_genesis_header());
-
-        Self {
-            storage: Storage::new(latest_header),
-            client,
-            consensus: ProposerConsensus::new(chain_spec),
-            pool,
-            evm_config,
-        }
+        Self { client, consensus: ProposerConsensus::new(chain_spec), pool, evm_config }
     }
 
     /// Consumes the type and returns all components
     #[track_caller]
-    pub fn build(self) -> (ProposerConsensus, AutoSealClient, MiningTask<Client, Pool, EvmConfig>) {
-        let Self { client, consensus, pool, mode, storage, to_engine, evm_config } = self;
-        let auto_client = AutoSealClient::new(storage.clone());
-        let task = MiningTask::new(
+    pub fn build(
+        self,
+    ) -> (ProposerConsensus, ProposerClient, ProposerTask<Client, Pool, EvmConfig>) {
+        let Self { client, consensus, pool, evm_config } = self;
+        let (trigger_args_tx, trigger_args_rx) = tokio::sync::mpsc::unbounded_channel();
+        let auto_client = ProposerClient::new(trigger_args_tx);
+        let task = ProposerTask::new(
             Arc::clone(&consensus.chain_spec),
-            mode,
-            storage,
             client,
             pool,
             evm_config,
+            trigger_args_rx,
         );
         (consensus, auto_client, task)
     }
 }
 
-/// In memory storage
-#[derive(Debug, Clone, Default)]
-pub(crate) struct Storage {
-    inner: Arc<RwLock<StorageInner>>,
+/// Arguments for the trigger
+#[derive(Debug)]
+pub struct TriggerArgs {
+    /// Address of the beneficiary
+    pub beneficiary: Address,
+    /// Base fee
+    pub base_fee: u64,
+    /// Maximum gas limit for the block
+    pub block_max_gas_limit: u64,
+    /// Maximum bytes per transaction list
+    pub max_bytes_per_tx_list: u64,
+    /// Local accounts
+    pub local_accounts: Vec<Address>,
+    /// Maximum number of transactions lists
+    pub max_transactions_lists: u64,
+    /// Minimum tip
+    pub min_tip: u64,
+
+    tx: oneshot::Sender<Result<Vec<TriggerResult>, BlockExecutionError>>,
 }
 
-// == impl Storage ===
+/// Result of the trigger
+#[derive(Debug)]
+pub struct TriggerResult {
+    /// Transactions
+    pub txs: Vec<Transaction>,
+    /// Estimated gas used
+    pub estimated_gas_used: u64,
+    /// Bytes length
+    pub bytes_length: u64,
+}
+
+#[derive(Debug, Clone, Default)]
+struct Storage;
 
 impl Storage {
-    /// Initializes the [Storage] with the given best block. This should be initialized with the
-    /// highest block in the chain, if there is a chain already stored on-disk.
-    fn new(best_block: SealedHeader) -> Self {
-        let (header, best_hash) = best_block.split();
-        let mut storage = StorageInner {
-            best_hash,
-            total_difficulty: header.difficulty,
-            best_block: header.number,
-            ..Default::default()
-        };
-        storage.headers.insert(header.number, header);
-        storage.bodies.insert(best_hash, BlockBody::default());
-        Self { inner: Arc::new(RwLock::new(storage)) }
-    }
-
-    /// Returns the write lock of the storage
-    pub(crate) async fn write(&self) -> RwLockWriteGuard<'_, StorageInner> {
-        self.inner.write().await
-    }
-
-    /// Returns the read lock of the storage
-    pub(crate) async fn read(&self) -> RwLockReadGuard<'_, StorageInner> {
-        self.inner.read().await
-    }
-}
-
-/// In-memory storage for the chain the auto seal engine is building.
-#[derive(Default, Debug)]
-pub(crate) struct StorageInner {
-    /// Headers buffered for download.
-    pub(crate) headers: HashMap<BlockNumber, Header>,
-    /// A mapping between block hash and number.
-    pub(crate) hash_to_number: HashMap<BlockHash, BlockNumber>,
-    /// Bodies buffered for download.
-    pub(crate) bodies: HashMap<BlockHash, BlockBody>,
-    /// Tracks best block
-    pub(crate) best_block: u64,
-    /// Tracks hash of best block
-    pub(crate) best_hash: B256,
-    /// The total difficulty of the chain until this block
-    pub(crate) total_difficulty: U256,
-}
-
-// === impl StorageInner ===
-
-impl StorageInner {
-    /// Returns the block hash for the given block number if it exists.
-    pub(crate) fn block_hash(&self, num: u64) -> Option<BlockHash> {
-        self.hash_to_number.iter().find_map(|(k, v)| num.eq(v).then_some(*k))
-    }
-
-    /// Returns the matching header if it exists.
-    pub(crate) fn header_by_hash_or_number(
-        &self,
-        hash_or_num: BlockHashOrNumber,
-    ) -> Option<Header> {
-        let num = match hash_or_num {
-            BlockHashOrNumber::Hash(hash) => self.hash_to_number.get(&hash).copied()?,
-            BlockHashOrNumber::Number(num) => num,
-        };
-        self.headers.get(&num).cloned()
-    }
-
-    /// Inserts a new header+body pair
-    pub(crate) fn insert_new_block(&mut self, mut header: Header, body: BlockBody) {
-        header.number = self.best_block + 1;
-        header.parent_hash = self.best_hash;
-
-        self.best_hash = header.hash_slow();
-        self.best_block = header.number;
-        self.total_difficulty += header.difficulty;
-
-        trace!(target: "consensus::auto", num=self.best_block, hash=?self.best_hash, "inserting new block");
-        self.headers.insert(header.number, header);
-        self.bodies.insert(self.best_hash, body);
-        self.hash_to_number.insert(self.best_hash, self.best_block);
-    }
-
     /// Fills in pre-execution header fields based on the current best block and given
     /// transactions.
-    pub(crate) fn build_header_template(
-        &self,
+    #[allow(clippy::too_many_arguments)]
+    fn build_header_template<Provider>(
         timestamp: u64,
         transactions: &[TransactionSigned],
         ommers: &[Header],
+        provider: &Provider,
         withdrawals: Option<&Withdrawals>,
         requests: Option<&Requests>,
         chain_spec: &ChainSpec,
         beneficiary: Address,
         block_max_gas_limit: u64,
         base_fee: u64,
-    ) -> Header {
+    ) -> Result<Header, BlockExecutionError>
+    where
+        Provider: BlockReaderIdExt,
+    {
         let base_fee_per_gas = Some(base_fee);
 
         let blob_gas_used = if chain_spec.is_cancun_active_at_timestamp(timestamp) {
@@ -267,9 +204,10 @@ impl StorageInner {
         } else {
             None
         };
-
+        let latest_block =
+            provider.latest_header().map_err(BlockExecutionError::LatestBlock)?.unwrap();
         let mut header = Header {
-            parent_hash: self.best_hash,
+            parent_hash: latest_block.hash(),
             ommers_hash: proofs::calculate_ommers_root(ommers),
             beneficiary,
             state_root: Default::default(),
@@ -278,7 +216,7 @@ impl StorageInner {
             withdrawals_root: withdrawals.map(|w| proofs::calculate_withdrawals_root(w)),
             logs_bloom: Default::default(),
             difficulty: U256::ZERO,
-            number: self.best_block + 1,
+            number: latest_block.number + 1,
             gas_limit: block_max_gas_limit,
             gas_used: 0,
             timestamp,
@@ -293,35 +231,31 @@ impl StorageInner {
         };
 
         if chain_spec.is_cancun_active_at_timestamp(timestamp) {
-            let parent = self.headers.get(&self.best_block);
-            header.parent_beacon_block_root =
-                parent.and_then(|parent| parent.parent_beacon_block_root);
+            header.parent_beacon_block_root = latest_block.parent_beacon_block_root;
             header.blob_gas_used = Some(0);
 
-            let (parent_excess_blob_gas, parent_blob_gas_used) = match parent {
-                Some(parent_block)
-                    if chain_spec.is_cancun_active_at_timestamp(parent_block.timestamp) =>
-                {
+            let (parent_excess_blob_gas, parent_blob_gas_used) =
+                if chain_spec.is_cancun_active_at_timestamp(latest_block.timestamp) {
                     (
-                        parent_block.excess_blob_gas.unwrap_or_default(),
-                        parent_block.blob_gas_used.unwrap_or_default(),
+                        latest_block.excess_blob_gas.unwrap_or_default(),
+                        latest_block.blob_gas_used.unwrap_or_default(),
                     )
-                }
-                _ => (0, 0),
-            };
+                } else {
+                    (0, 0)
+                };
+
             header.excess_blob_gas =
                 Some(calculate_excess_blob_gas(parent_excess_blob_gas, parent_blob_gas_used))
         }
 
-        header
+        Ok(header)
     }
 
     /// Builds and executes a new block with the given transactions, on the provided executor.
     ///
     /// This returns the header of the executed block, as well as the poststate from execution.
     #[allow(clippy::too_many_arguments)]
-    pub(crate) fn build_and_execute<Provider, Executor>(
-        &mut self,
+    fn build_and_execute<Provider, Executor>(
         transactions: Vec<TransactionSigned>,
         ommers: Vec<Header>,
         provider: &Provider,
@@ -335,7 +269,7 @@ impl StorageInner {
     ) -> Result<Vec<TriggerResult>, BlockExecutionError>
     where
         Executor: BlockExecutorProvider,
-        Provider: StateProviderFactory,
+        Provider: StateProviderFactory + BlockReaderIdExt,
     {
         let timestamp = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_secs();
 
@@ -346,27 +280,22 @@ impl StorageInner {
         let requests =
             chain_spec.is_prague_active_at_timestamp(timestamp).then_some(Requests::default());
 
-        let header = self.build_header_template(
+        let header = Self::build_header_template(
             timestamp,
             &transactions,
             &ommers,
+            provider,
             withdrawals.as_ref(),
             requests.as_ref(),
             &chain_spec,
             beneficiary,
             block_max_gas_limit,
             base_fee,
-        );
+        )?;
 
-        let mut block = Block {
-            header,
-            body: transactions,
-            ommers: ommers.clone(),
-            withdrawals: withdrawals.clone(),
-            requests: requests.clone(),
-        }
-        .with_recovered_senders()
-        .ok_or(BlockExecutionError::Validation(BlockValidationError::SenderRecoveryError))?;
+        let mut block = Block { header, body: transactions, ommers, withdrawals, requests }
+            .with_recovered_senders()
+            .ok_or(BlockExecutionError::Validation(BlockValidationError::SenderRecoveryError))?;
 
         trace!(target: "consensus::auto", transactions=?&block.body, "executing transactions");
 
@@ -375,53 +304,61 @@ impl StorageInner {
         );
 
         // execute the block
-        let BlockExecutionOutput {
-            state,
-            receipts,
-            requests: block_execution_requests,
-            gas_used,
-            ..
-        } = executor.executor(&mut db).execute((&mut block, U256::ZERO).into())?;
-        let execution_outcome = ExecutionOutcome::new(
-            state,
-            receipts.into(),
-            block.number,
-            vec![block_execution_requests.into()],
-        );
+        let BlockExecutionOutput { receipts, .. } =
+            executor.executor(&mut db).execute((&mut block, U256::ZERO).into())?;
+        let Block { body, .. } = block.block;
 
-        // todo(onbjerg): we should not pass requests around as this is building a block, which
-        // means we need to extract the requests from the execution output and compute the requests
-        // root here
+        let mut tx_lists = vec![];
+        let mut chunk_start = 0;
+        let mut last_compressed_buf = None;
+        let mut gas_used_start = 0;
+        for idx in 0..body.len() {
+            if let Some((txs_range, estimated_gas_used, compressed_buf)) = {
+                let compressed_buf = encode_and_compress_tx_list(&body[chunk_start..=idx])
+                    .map_err(BlockExecutionError::other)?;
 
-        let Block { mut header, body, .. } = block.block;
-        let body = BlockBody { transactions: body, ommers, withdrawals, requests };
+                if idx - chunk_start >= max_transactions_lists as usize
+                    || compressed_buf.len() > max_bytes_per_tx_list as usize
+                {
+                    // the first transaction is too large, so we need to split it
+                    if idx == chunk_start {
+                        gas_used_start = receipts[idx].cumulative_gas_used;
+                        chunk_start += 1;
+                        None
+                    } else {
+                        // next chunk if reach the max_transactions_lists or max_bytes_per_tx_list
+                        // and use previous transaction's status
+                        let estimated_gas_used =
+                            receipts[idx - 1].cumulative_gas_used - gas_used_start;
+                        gas_used_start = receipts[idx - 1].cumulative_gas_used;
+                        let range = chunk_start..idx;
+                        chunk_start = idx;
+                        Some((range, estimated_gas_used, last_compressed_buf.clone()))
+                    }
+                } else {
+                    last_compressed_buf = Some(compressed_buf);
+                    None
+                }
+            } {
+                tx_lists.push(TriggerResult {
+                    txs: body[txs_range]
+                        .iter()
+                        .cloned()
+                        .map(|tx| reth_rpc_types_compat::transaction::from_signed(tx).unwrap())
+                        .collect(),
+                    estimated_gas_used,
+                    bytes_length: compressed_buf.map_or(0, |b| b.len() as u64),
+                });
+            }
+        }
 
-        trace!(target: "consensus::auto", ?execution_outcome, ?header, ?body, "executed block, calculating state root and completing header");
-
-        // now we need to update certain header fields with the results of the execution
-        header.state_root = db.state_root(execution_outcome.state())?;
-        header.gas_used = gas_used;
-
-        let receipts = execution_outcome.receipts_by_block(header.number);
-
-        // update logs bloom
-        let receipts_with_bloom =
-            receipts.iter().map(|r| r.as_ref().unwrap().bloom_slow()).collect::<Vec<Bloom>>();
-        header.logs_bloom = receipts_with_bloom.iter().fold(Bloom::ZERO, |bloom, r| bloom | *r);
-
-        // update receipts root
-        header.receipts_root =
-            execution_outcome.receipts_root_slow(header.number).expect("Receipts is present");
-
-        trace!(target: "consensus::auto", root=?header.state_root, ?body, "calculated root");
-
-        // finally insert into storage
-        self.insert_new_block(header.clone(), body);
-
-        // set new header with hash that should have been updated by insert_new_block
-        let new_header = header.seal(self.best_hash);
-        let mut e = ZlibEncoder::new(Vec::new(), Compression::default());
-        e.write_all(buf);
-        Ok((new_header, execution_outcome))
+        Ok(tx_lists)
     }
+}
+
+fn encode_and_compress_tx_list(txs: &[TransactionSigned]) -> io::Result<Vec<u8>> {
+    let encoded_buf = alloy_rlp::encode(TransactionSignedList(txs));
+    let mut encoder = ZlibEncoder::new(Vec::new(), Compression::default());
+    encoder.write_all(&encoded_buf)?;
+    encoder.finish()
 }
