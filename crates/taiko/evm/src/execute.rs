@@ -10,7 +10,7 @@ use reth_evm::{
         BatchExecutor, BlockExecutionError, BlockExecutionInput, BlockExecutionOutput,
         BlockExecutorProvider, BlockValidationError, Executor, ProviderError,
     },
-    ConfigureEvm, ConfigureEvmEnv,
+    ConfigureEvm,
 };
 use reth_execution_types::ExecutionOutcome;
 use reth_primitives::{

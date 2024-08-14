@@ -1,4 +1,4 @@
-use crate::{Storage, TriggerArgs};
+use crate::{Storage, TaskArgs};
 use futures_util::{future::BoxFuture, FutureExt};
 use reth_chainspec::ChainSpec;
 use reth_evm::execute::BlockExecutorProvider;
@@ -27,12 +27,12 @@ pub struct ProposerTask<Client, Pool: TransactionPool, Executor> {
     /// backlog of sets of transactions ready to be mined
     #[allow(clippy::type_complexity)]
     queued: VecDeque<(
-        TriggerArgs,
+        TaskArgs,
         Vec<Arc<ValidPoolTransaction<<Pool as TransactionPool>::Transaction>>>,
     )>,
     /// The type used for block execution
     block_executor: Executor,
-    trigger_args_rx: UnboundedReceiver<TriggerArgs>,
+    trigger_args_rx: UnboundedReceiver<TaskArgs>,
 }
 
 // === impl MiningTask ===
@@ -45,7 +45,7 @@ impl<Executor, Client, Pool: TransactionPool> ProposerTask<Client, Pool, Executo
         client: Client,
         pool: Pool,
         block_executor: Executor,
-        trigger_args_rx: UnboundedReceiver<TriggerArgs>,
+        trigger_args_rx: UnboundedReceiver<TaskArgs>,
     ) -> Self {
         Self {
             chain_spec,
@@ -113,7 +113,7 @@ where
                         .collect();
                     let ommers = vec![];
 
-                    let TriggerArgs {
+                    let TaskArgs {
                         tx,
                         beneficiary,
                         block_max_gas_limit,

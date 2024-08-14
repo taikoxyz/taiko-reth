@@ -1,6 +1,6 @@
 //! This includes download client implementations for auto sealing miners.
 
-use crate::{TriggerArgs, TriggerResult};
+use crate::{TaskArgs, TaskResult};
 use reth_execution_errors::BlockExecutionError;
 use reth_primitives::Address;
 use std::fmt::Debug;
@@ -13,11 +13,11 @@ use tokio::sync::{mpsc::UnboundedSender, oneshot};
 /// blocks in memory.
 #[derive(Debug, Clone)]
 pub struct ProposerClient {
-    trigger_args_tx: UnboundedSender<TriggerArgs>,
+    trigger_args_tx: UnboundedSender<TaskArgs>,
 }
 
 impl ProposerClient {
-    pub(crate) const fn new(trigger_args_tx: UnboundedSender<TriggerArgs>) -> Self {
+    pub(crate) const fn new(trigger_args_tx: UnboundedSender<TaskArgs>) -> Self {
         Self { trigger_args_tx }
     }
 
@@ -32,10 +32,10 @@ impl ProposerClient {
         local_accounts: Vec<Address>,
         max_transactions_lists: u64,
         min_tip: u64,
-    ) -> Result<Vec<TriggerResult>, BlockExecutionError> {
+    ) -> Result<Vec<TaskResult>, BlockExecutionError> {
         let (tx, rx) = oneshot::channel();
         self.trigger_args_tx
-            .send(TriggerArgs {
+            .send(TaskArgs {
                 beneficiary,
                 base_fee,
                 block_max_gas_limit,

@@ -15,7 +15,7 @@ workspace = true
 reth-chainspec = { workspace = true, features = ["taiko"] }
 reth-evm.workspace = true
 reth-primitives = { workspace = true, features = ["taiko"] }
-reth-revm.workspace = true
+reth-revm = { workspace = true, features = ["taiko"] }
 reth-prune-types.workspace = true
 reth-execution-types.workspace = true
 

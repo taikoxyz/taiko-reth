@@ -139,7 +139,7 @@ where
 
 /// Arguments for the trigger
 #[derive(Debug)]
-pub struct TriggerArgs {
+pub struct TaskArgs {
     /// Address of the beneficiary
     pub beneficiary: Address,
     /// Base fee
@@ -155,12 +155,12 @@ pub struct TriggerArgs {
     /// Minimum tip
     pub min_tip: u64,
 
-    tx: oneshot::Sender<Result<Vec<TriggerResult>, BlockExecutionError>>,
+    tx: oneshot::Sender<Result<Vec<TaskResult>, BlockExecutionError>>,
 }
 
 /// Result of the trigger
 #[derive(Debug)]
-pub struct TriggerResult {
+pub struct TaskResult {
     /// Transactions
     pub txs: Vec<Transaction>,
     /// Estimated gas used
@@ -266,7 +266,7 @@ impl Storage {
         max_bytes_per_tx_list: u64,
         max_transactions_lists: u64,
         base_fee: u64,
-    ) -> Result<Vec<TriggerResult>, BlockExecutionError>
+    ) -> Result<Vec<TaskResult>, BlockExecutionError>
     where
         Executor: BlockExecutorProvider,
         Provider: StateProviderFactory + BlockReaderIdExt,
@@ -320,14 +320,14 @@ impl Storage {
                 if idx - chunk_start >= max_transactions_lists as usize
                     || compressed_buf.len() > max_bytes_per_tx_list as usize
                 {
-                    // the first transaction is too large, so we need to split it
+                    // the first transaction in chunk is too large, so we need to skip it
                     if idx == chunk_start {
                         gas_used_start = receipts[idx].cumulative_gas_used;
                         chunk_start += 1;
                         None
                     } else {
-                        // next chunk if reach the max_transactions_lists or max_bytes_per_tx_list
-                        // and use previous transaction's status
+                        // current chunk reaches the max_transactions_lists or max_bytes_per_tx_list
+                        // and use previous transaction's data
                         let estimated_gas_used =
                             receipts[idx - 1].cumulative_gas_used - gas_used_start;
                         gas_used_start = receipts[idx - 1].cumulative_gas_used;
@@ -340,7 +340,7 @@ impl Storage {
                     None
                 }
             } {
-                tx_lists.push(TriggerResult {
+                tx_lists.push(TaskResult {
                     txs: body[txs_range]
                         .iter()
                         .cloned()
