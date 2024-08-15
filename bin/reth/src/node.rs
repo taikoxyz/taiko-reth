@@ -224,9 +224,11 @@ where
         block_hash: B256,
         block_number: BlockNumber,
     ) -> eyre::Result<()> {
+        println!("brecht start assert new block");
         // get head block from notifications stream and verify the tx has been pushed to the
         // pool is actually present in the canonical block
         let head = self.engine_api.canonical_stream.next().await.unwrap();
+        println!("brecht head: {:?}", head);
         let tx = head.tip().transactions().next();
         assert_eq!(tx.unwrap().hash().as_slice(), tip_tx_hash.as_slice());
 

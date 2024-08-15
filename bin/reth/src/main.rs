@@ -179,6 +179,17 @@ impl<Node: reth_node_api::FullNodeComponents> Rollup<Node> {
                 
                     // make the node advance
                     //let tx_hash = self.node.rpc.inject_tx(raw_tx).await?;
+
+
+                    println!("tx_hash start");
+
+                    let tx_hash = tokio::task::block_in_place(|| {
+                        tokio::runtime::Handle::current().block_on({
+                            self.node.rpc.inject_tx(raw_tx)
+                        })
+                    }).unwrap();
+
+                    println!("tx_hash start");
                 
                     // make the node advance
                     //let (payload, _): (EthBuiltPayload, _) = self.node.advance_block(vec![], eth_payload_attributes).await?;
@@ -188,12 +199,38 @@ impl<Node: reth_node_api::FullNodeComponents> Rollup<Node> {
 
                     // println!("L2 block number: {}", block_number);
 
-                    let tx_hash = B256::default();
-                    let block_hash = B256::default();
-                    let block_number = 10;
+                    //let tx_hash = B256::default();
+                    //let block_hash = B256::default();
+                    //let block_number = 10;
                 
                     // // assert the block has been committed to the blockchain
-                    self.node.assert_new_block(tx_hash, block_hash, block_number).await?;
+                    //self.node.assert_new_block(tx_hash, block_hash, block_number).await?;
+
+                    println!("payload start");
+
+                    let (payload, _): (EthBuiltPayload, _) = tokio::task::block_in_place(|| {
+                        tokio::runtime::Handle::current().block_on({
+                            self.node.advance_block(vec![], eth_payload_attributes)
+                        })
+                    }).unwrap();
+
+                    println!("payload end");
+
+                    let block_hash = payload.block().hash();
+                    let block_number = payload.block().number;
+
+                    println!("block_hash: {:?}", block_hash);
+                    println!("block_number: {:?}", block_number);
+
+                    let res = tokio::task::block_in_place(|| {
+                        tokio::runtime::Handle::current().block_on({
+                            // do something async
+                            println!("assert_new_block");
+                            self.node.assert_new_block(tx_hash, block_hash, block_number)
+                        })
+                    });
+
+                    println!("assert_new_block done: {:?}", res);
 
                     //let tx_hash = self.node.rpc.inject_tx(raw_tx).await?;
 
@@ -452,18 +489,65 @@ where
 fn main() -> eyre::Result<()> {
     println!("Brecht");
     reth::cli::Cli::parse_args().run(|builder, _| async move {
+
+        // let (mut nodes, _tasks, _wallet) = setup::<EthereumNode>(
+        //     1,
+        //     Arc::new(
+        //         ChainSpecBuilder::default()
+        //             .chain(MAINNET.chain)
+        //             .genesis(serde_json::from_str(include_str!("../../../crates/ethereum/node/tests/assets/genesis.json")).unwrap())
+        //             .cancun_activated()
+        //             .build(),
+        //     ),
+        //     false,
+        // )
+        // .await?;
+    
+        // let node = nodes.pop().unwrap();
+
+    let tasks = TaskManager::current();
+    let exec = tasks.executor();
+
+    let network_config = NetworkArgs {
+        discovery: DiscoveryArgs { disable_discovery: true, ..DiscoveryArgs::default() },
+        ..NetworkArgs::default()
+    };
+
+    let chain_spec = ChainSpecBuilder::default()
+             .chain(MAINNET.chain)
+             .genesis(serde_json::from_str(include_str!("../../../crates/ethereum/node/tests/assets/genesis.json")).unwrap())
+             .cancun_activated()
+             .build();
+
+    let node_config = NodeConfig::test()
+        .with_chain(chain_spec.clone())
+        .with_network(network_config.clone())
+        .with_unused_ports()
+        .with_rpc(RpcServerArgs::default().with_unused_ports().with_http())
+        .set_dev(false);
+
+    let NodeHandle { node, node_exit_future: _ } = NodeBuilder::new(node_config.clone())
+        .testing_node(exec.clone())
+        .node(Default::default())
+        .launch()
+        .await?;
+
+    //node.state_by_block_id(block_id)
+
+    let node = NodeTestContext::new(node).await?;
+
         let handle = builder
             .node(EthereumNode::default())
             .install_exex("Rollup", move |ctx| async {
                 //let connection = Connection::open(DATABASE_PATH)?;
 
-                let network_config = NetworkArgs {
-                    discovery: DiscoveryArgs { disable_discovery: true, ..DiscoveryArgs::default() },
-                    ..NetworkArgs::default()
-                };
+                // let network_config = NetworkArgs {
+                //     discovery: DiscoveryArgs { disable_discovery: true, ..DiscoveryArgs::default() },
+                //     ..NetworkArgs::default()
+                // };
 
-                let tasks = TaskManager::current();
-                let exec = tasks.executor();
+                // //let tasks = TaskManager::current();
+                // let exec = tasks.executor();
 
                 // let node_config = NodeConfig::test()
                 //     .with_chain(CHAIN_SPEC.clone())
@@ -480,20 +564,7 @@ fn main() -> eyre::Result<()> {
 
                 // let mut node = NodeTestContext::new(node_handle.node).await?;
             
-                let (mut nodes, _tasks, _wallet) = setup::<EthereumNode>(
-                    1,
-                    Arc::new(
-                        ChainSpecBuilder::default()
-                            .chain(MAINNET.chain)
-                            .genesis(serde_json::from_str(include_str!("../../../crates/ethereum/node/tests/assets/genesis.json")).unwrap())
-                            .cancun_activated()
-                            .build(),
-                    ),
-                    false,
-                )
-                .await?;
-            
-                let node = nodes.pop().unwrap();
+                
 
                 //Ok((nodes, tasks, Wallet::default().with_chain_id(chain_spec.chain().into())))
 
