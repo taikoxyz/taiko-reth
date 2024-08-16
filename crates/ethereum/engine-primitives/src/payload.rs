@@ -55,6 +55,11 @@ impl EthBuiltPayload {
         &self.block
     }
 
+    /// Returns the built block(sealed) as mutable
+    pub fn mut_block(&mut self) -> &mut SealedBlock {
+        &mut self.block
+    }
+
     /// Fees of the block
     pub const fn fees(&self) -> U256 {
         self.fees

@@ -119,7 +119,7 @@ fn configure_evm<'a>(
 /// - If the transaction is a blob-carrying one, decode the blobs either using the local transaction
 ///   pool, or querying Blobscan.
 /// - If the transaction is a regular one, decode the block data directly.
-async fn decode_transactions<Pool: TransactionPool>(
+pub async fn decode_transactions<Pool: TransactionPool>(
     pool: &Pool,
     tx: &TransactionSigned,
     block_data: Bytes,

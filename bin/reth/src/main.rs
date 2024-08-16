@@ -47,7 +47,7 @@ use reth_node_api::{FullNodeTypesAdapter, NodeAddOns};
 //use reth_node_api::{EngineTypes, FullNodeComponents, NodeAddOns};
 use reth_node_builder::{components::Components, rpc::EthApiBuilderProvider, AddOns, FullNode, Node, NodeAdapter, NodeBuilder, NodeComponentsBuilder, NodeConfig, NodeHandle, RethFullAdapter};
 use reth_node_ethereum::{node::EthereumAddOns, EthEvmConfig, EthExecutorProvider, EthereumNode};
-use reth_primitives::{address, alloy_primitives, Address, Genesis, SealedBlockWithSenders, TransactionSigned, B256};
+use reth_primitives::{address, alloy_primitives, Address, Genesis, SealedBlockWithSenders, TransactionSigned, B256, SealedBlock, transaction::WithEncoded, BlockBody};
 use reth_provider::{providers::BlockchainProvider, CanonStateSubscriptions};
 use reth_rpc_api::{eth::{helpers::AddDevSigners, FullEthApiServer}, EngineApiClient};
 use reth_tasks::TaskManager;
@@ -58,6 +58,7 @@ use rusqlite::Connection;
 use transaction::TransactionTestContext;
 use wallet::Wallet;
 use std::{future::Future, marker::PhantomData, pin::Pin, sync::Arc};
+use crate::execution::decode_transactions;
 
 //use alloy_primitives::{Address, B256};
 use reth::rpc::types::engine::PayloadAttributes;
@@ -109,6 +110,97 @@ static CHAIN_SPEC: Lazy<Arc<ChainSpec>> = Lazy::new(|| {
             .build(),
     )
 });
+
+fn print_block_data(block: &SealedBlock) {
+    println!("Printing Block Data:");
+    println!("Header:");
+    println!("  Parent Hash: {:?}", block.header.parent_hash);
+    println!("  Ommers Hash: {:?}", block.header.ommers_hash);
+    println!("  Beneficiary: {:?}", block.header.beneficiary);
+    println!("  State Root: {:?}", block.header.state_root);
+    println!("  Transactions Root: {:?}", block.header.transactions_root);
+    println!("  Receipts Root: {:?}", block.header.receipts_root);
+    println!("  Logs Bloom: {:?}", block.header.logs_bloom);
+    println!("  Difficulty: {:?}", block.header.difficulty);
+    println!("  Number: {:?}", block.header.number);
+    println!("  Gas Limit: {:?}", block.header.gas_limit);
+    println!("  Gas Used: {:?}", block.header.gas_used);
+    println!("  Timestamp: {:?}", block.header.timestamp);
+    println!("  Extra Data: {:?}", block.header.extra_data);
+    println!("  Mix Hash: {:?}", block.header.mix_hash);
+    println!("  Nonce: {:?}", block.header.nonce);
+    println!("  Base Fee Per Gas: {:?}", block.header.base_fee_per_gas);
+    println!("  Withdrawals Root: {:?}", block.header.withdrawals_root);
+    println!("  Blob Gas Used: {:?}", block.header.blob_gas_used);
+    println!("  Excess Blob Gas: {:?}", block.header.excess_blob_gas);
+    println!("  Parent Beacon Block Root: {:?}", block.header.parent_beacon_block_root);
+
+    println!("Body:");
+    println!("  Number of Transactions: {}", block.body.len());
+    for (i, tx) in block.body.iter().enumerate() {
+        println!("  Transaction {}:", i);
+        println!("    Hash: {:?}", tx.hash());
+        println!("    Nonce: {:?}", tx.nonce());
+        // Add more transaction fields as needed
+    }
+
+    println!("Ommers:");
+    println!("  Number of Ommers: {}", block.ommers.len());
+    for (i, ommer) in block.ommers.iter().enumerate() {
+        println!("  Ommer {}:", i);
+        println!("    Hash: {:?}", ommer.ommers_hash);
+        println!("    Number: {:?}", ommer.number);
+        // Add more ommer fields as needed
+    }
+
+    println!("Withdrawals:");
+    if let Some(withdrawals) = &block.withdrawals {
+        println!("  Number of Withdrawals: {}", withdrawals.len());
+        for (i, withdrawal) in withdrawals.iter().enumerate() {
+            println!("  Withdrawal {}:", i);
+            println!("    Index: {:?}", withdrawal.index);
+            println!("    Validator Index: {:?}", withdrawal.validator_index);
+            println!("    Address: {:?}", withdrawal.address);
+            println!("    Amount: {:?}", withdrawal.amount);
+        }
+    } else {
+        println!("  No withdrawals");
+    }
+
+    println!("Requests:");
+    if let Some(requests) = &block.requests {
+        println!("  Number of Requests: {}", requests.0.len());
+        // Add more details about requests if needed
+    } else {
+        println!("  No requests");
+    }
+}
+
+// Modify the TXN list
+fn modify_payload_block(block: &mut SealedBlock, new_transactions: Vec<(TransactionSigned, Address)>) -> SealedBlock {
+    // Unseal the header
+    let mut header = block.header.clone().unseal();
+
+    // Create a new body with the new transactions
+    let txns: Vec<TransactionSigned> = new_transactions.into_iter().map(|(tx, _)| tx).collect();
+
+    // Update other relevant header fields
+    header.gas_used = txns.iter().map(|tx| tx.gas_limit()).sum();
+
+    let body = BlockBody {
+        transactions: txns,
+        ommers: block.ommers.clone(),
+        withdrawals: None,
+        requests: None,
+    };
+    
+    // Recalculate the block hash
+    // Create a new sealed header
+    let new_sealed_header = header.seal_slow();
+
+    // Create and return a new sealed block
+    SealedBlock::new(new_sealed_header, body)
+}
 
 struct Rollup<Node: reth_node_api::FullNodeComponents> {
     ctx: ExExContext<Node>,
@@ -182,6 +274,7 @@ impl<Node: reth_node_api::FullNodeComponents> Rollup<Node> {
 
 
                     println!("tx_hash start");
+                    let copy_tx_list_bytes: reth_primitives::Bytes = tx_list.clone();
 
                     let tx_hash = tokio::task::block_in_place(|| {
                         tokio::runtime::Handle::current().block_on({
@@ -219,8 +312,31 @@ impl<Node: reth_node_api::FullNodeComponents> Rollup<Node> {
                     let block_hash = payload.block().hash();
                     let block_number = payload.block().number;
 
-                    println!("block_hash: {:?}", block_hash);
-                    println!("block_number: {:?}", block_number);
+                    let mut payload_clone = payload.clone();
+                    let block = payload_clone.mut_block(); 
+                    println!("Printing payload data start");
+                    print_block_data(block);
+                    // println!("block_hash: {:?}", block_hash);
+                    // println!("block_number: {:?}", block_number);
+
+                    println!("Printing payload data end");
+
+                    let decoded_l2_transaction: Vec<(TransactionSigned, Address)> = decode_transactions(
+                        self.ctx.pool(),
+                        tx,
+                        tx_list
+                    ).await?;
+
+                    println!("Modify payload block");
+                    let new_block = modify_payload_block(block, decoded_l2_transaction);
+                    
+                    println!("Modify payload blockend");
+
+                    println!("Printing payload data again");
+                    // println!("block_hash: {:?}", block_hash);
+                    // println!("block_number: {:?}", block_number);
+
+                    println!("Printing payload data end");
 
                     let res = tokio::task::block_in_place(|| {
                         tokio::runtime::Handle::current().block_on({
@@ -247,7 +363,7 @@ impl<Node: reth_node_api::FullNodeComponents> Rollup<Node> {
                             self.ctx.pool(),
                             tx,
                             &block_metadata,
-                            tx_list,
+                            copy_tx_list_bytes,
                             //blockDataHash,
                         )
                         .await
