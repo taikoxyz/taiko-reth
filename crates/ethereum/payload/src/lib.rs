@@ -297,6 +297,8 @@ where
 
     let block_number = initialized_block_env.number.to::<u64>();
 
+    println!("brecht: payload builder: {:?}", attributes.transactions);
+
     // apply eip-4788 pre block contract call
     pre_block_beacon_root_contract_call(
         &mut db,
@@ -433,6 +435,12 @@ where
 
         // append transaction to the list of executed transactions
         executed_txs.push(tx.into_signed());
+    }
+
+    // Using fixed transaction list if it's set
+    if attributes.transactions.is_some() {
+        println!("Using fixed tx list");
+        executed_txs = attributes.transactions.unwrap();
     }
 
     // check if we have a better block

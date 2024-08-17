@@ -1,6 +1,7 @@
 use futures_util::StreamExt;
 use reth::api::{BuiltPayload, EngineTypes, PayloadBuilderAttributes};
 use reth_payload_builder::{Events, PayloadBuilderHandle, PayloadId};
+use reth_primitives::TransactionSigned;
 use tokio_stream::wrappers::BroadcastStream;
 
 /// Helper for payload operations
@@ -8,6 +9,7 @@ pub struct PayloadTestContext<E: EngineTypes> {
     pub payload_event_stream: BroadcastStream<Events<E>>,
     payload_builder: PayloadBuilderHandle<E>,
     pub timestamp: u64,
+    pub transactions: Vec<TransactionSigned>,
 }
 
 impl<E: EngineTypes> PayloadTestContext<E> {
@@ -16,16 +18,16 @@ impl<E: EngineTypes> PayloadTestContext<E> {
         let payload_events = payload_builder.subscribe().await?;
         let payload_event_stream = payload_events.into_stream();
         // Cancun timestamp
-        Ok(Self { payload_event_stream, payload_builder, timestamp: 1710338135 })
+        Ok(Self { payload_event_stream, payload_builder, timestamp: 1710338135, transactions: Vec::new() })
     }
 
     /// Creates a new payload job from static attributes
     pub async fn new_payload(
         &mut self,
-        attributes_generator: impl Fn(u64) -> E::PayloadBuilderAttributes,
+        attributes_generator: impl Fn(u64, Vec<TransactionSigned>) -> E::PayloadBuilderAttributes,
     ) -> eyre::Result<E::PayloadBuilderAttributes> {
         self.timestamp += 1;
-        let attributes: E::PayloadBuilderAttributes = attributes_generator(self.timestamp);
+        let attributes: E::PayloadBuilderAttributes = attributes_generator(self.timestamp, self.transactions.clone());
         self.payload_builder.new_payload(attributes.clone()).await.unwrap();
         Ok(attributes)
     }

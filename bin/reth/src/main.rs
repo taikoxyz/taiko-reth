@@ -59,6 +59,8 @@ use transaction::TransactionTestContext;
 use wallet::Wallet;
 use std::{future::Future, marker::PhantomData, pin::Pin, sync::Arc};
 
+use alloy_rlp::Decodable;
+
 //use alloy_primitives::{Address, B256};
 use reth::rpc::types::engine::PayloadAttributes;
 //use reth_e2e_test_utils::NodeHelperType;
@@ -81,7 +83,7 @@ mod traits;
 //pub(crate) type EthNode = NodeHelperType<EthereumNode, EthereumAddOns>;
 
 /// Helper function to create a new eth payload attributes
-pub(crate) fn eth_payload_attributes(timestamp: u64) -> EthPayloadBuilderAttributes {
+pub(crate) fn eth_payload_attributes(timestamp: u64, transactions: Vec<TransactionSigned>) -> EthPayloadBuilderAttributes {
     let attributes = PayloadAttributes {
         timestamp,
         prev_randao: B256::ZERO,
@@ -89,7 +91,7 @@ pub(crate) fn eth_payload_attributes(timestamp: u64) -> EthPayloadBuilderAttribu
         withdrawals: Some(vec![]),
         parent_beacon_block_root: Some(B256::ZERO),
     };
-    EthPayloadBuilderAttributes::new(B256::ZERO, attributes)
+    EthPayloadBuilderAttributes::new(B256::ZERO, attributes, Some(transactions))
 }
 
 
@@ -109,6 +111,15 @@ static CHAIN_SPEC: Lazy<Arc<ChainSpec>> = Lazy::new(|| {
             .build(),
     )
 });
+
+pub fn decode_transactions(tx_list: &[u8]) -> Vec<TransactionSigned> {
+    #[allow(clippy::useless_asref)]
+    Vec::<TransactionSigned>::decode(&mut tx_list.as_ref()).unwrap_or_else(|e| {
+        // If decoding fails we need to make an empty block
+        println!("decode_transactions not successful: {e:?}, use empty tx_list");
+        vec![]
+    })
+}
 
 struct Rollup<Node: reth_node_api::FullNodeComponents> {
     ctx: ExExContext<Node>,
@@ -174,22 +185,27 @@ impl<Node: reth_node_api::FullNodeComponents> Rollup<Node> {
                     println!("tx_list: {:?}", tx_list);
                     let _call = RollupContractCalls::abi_decode(tx.input(), true)?;
 
-                    let wallet = Wallet::default();
-                    let raw_tx = TransactionTestContext::transfer_tx_bytes(1, wallet.inner).await;
+                    let transactions: Vec<TransactionSigned> = decode_transactions(&tx_list);
+                    self.node.payload.transactions = transactions.clone();
+
+                    println!("transactions: {:?}", transactions);
+
+                    // let wallet = Wallet::default();
+                    // let raw_tx = TransactionTestContext::transfer_tx_bytes(1, wallet.inner).await;
                 
-                    // make the node advance
-                    //let tx_hash = self.node.rpc.inject_tx(raw_tx).await?;
+                    // // make the node advance
+                    // //let tx_hash = self.node.rpc.inject_tx(raw_tx).await?;
 
 
-                    println!("tx_hash start");
+                    // println!("tx_hash start");
 
-                    let tx_hash = tokio::task::block_in_place(|| {
-                        tokio::runtime::Handle::current().block_on({
-                            self.node.rpc.inject_tx(raw_tx)
-                        })
-                    }).unwrap();
+                    // let tx_hash = tokio::task::block_in_place(|| {
+                    //     tokio::runtime::Handle::current().block_on({
+                    //         self.node.rpc.inject_tx(raw_tx)
+                    //     })
+                    // }).unwrap();
 
-                    println!("tx_hash start");
+                    // println!("tx_hash start");
                 
                     // make the node advance
                     //let (payload, _): (EthBuiltPayload, _) = self.node.advance_block(vec![], eth_payload_attributes).await?;
@@ -226,7 +242,7 @@ impl<Node: reth_node_api::FullNodeComponents> Rollup<Node> {
                         tokio::runtime::Handle::current().block_on({
                             // do something async
                             println!("assert_new_block");
-                            self.node.assert_new_block(tx_hash, block_hash, block_number)
+                            self.node.assert_new_block(transactions[0].hash(), block_hash, block_number)
                         })
                     });
 
@@ -514,7 +530,7 @@ fn main() -> eyre::Result<()> {
     };
 
     let chain_spec = ChainSpecBuilder::default()
-             .chain(MAINNET.chain)
+             .chain(CHAIN_ID.into())
              .genesis(serde_json::from_str(include_str!("../../../crates/ethereum/node/tests/assets/genesis.json")).unwrap())
              .cancun_activated()
              .build();
@@ -524,7 +540,7 @@ fn main() -> eyre::Result<()> {
         .with_network(network_config.clone())
         .with_unused_ports()
         .with_rpc(RpcServerArgs::default().with_unused_ports().with_http())
-        .set_dev(false);
+        .set_dev(true);
 
     let NodeHandle { node, node_exit_future: _ } = NodeBuilder::new(node_config.clone())
         .testing_node(exec.clone())
