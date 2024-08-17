@@ -187,54 +187,19 @@ impl<Node: reth_node_api::FullNodeComponents> Rollup<Node> {
 
                     let transactions: Vec<TransactionSigned> = decode_transactions(&tx_list);
                     self.node.payload.transactions = transactions.clone();
-
                     println!("transactions: {:?}", transactions);
-
-                    // let wallet = Wallet::default();
-                    // let raw_tx = TransactionTestContext::transfer_tx_bytes(1, wallet.inner).await;
-                
-                    // // make the node advance
-                    // //let tx_hash = self.node.rpc.inject_tx(raw_tx).await?;
-
-
-                    // println!("tx_hash start");
-
-                    // let tx_hash = tokio::task::block_in_place(|| {
-                    //     tokio::runtime::Handle::current().block_on({
-                    //         self.node.rpc.inject_tx(raw_tx)
-                    //     })
-                    // }).unwrap();
-
-                    // println!("tx_hash start");
-                
-                    // make the node advance
-                    //let (payload, _): (EthBuiltPayload, _) = self.node.advance_block(vec![], eth_payload_attributes).await?;
-                
-                    // let block_hash = payload.block().hash();
-                    // let block_number = payload.block().number;
-
-                    // println!("L2 block number: {}", block_number);
-
-                    //let tx_hash = B256::default();
-                    //let block_hash = B256::default();
-                    //let block_number = 10;
-                
-                    // // assert the block has been committed to the blockchain
-                    //self.node.assert_new_block(tx_hash, block_hash, block_number).await?;
-
+            
+                    // submit the block
                     println!("payload start");
-
                     let (payload, _): (EthBuiltPayload, _) = tokio::task::block_in_place(|| {
                         tokio::runtime::Handle::current().block_on({
                             self.node.advance_block(vec![], eth_payload_attributes)
                         })
                     }).unwrap();
-
                     println!("payload end");
 
                     let block_hash = payload.block().hash();
                     let block_number = payload.block().number;
-
                     println!("block_hash: {:?}", block_hash);
                     println!("block_number: {:?}", block_number);
 
@@ -247,10 +212,6 @@ impl<Node: reth_node_api::FullNodeComponents> Rollup<Node> {
                     });
 
                     println!("assert_new_block done: {:?}", res);
-
-                    //let tx_hash = self.node.rpc.inject_tx(raw_tx).await?;
-
-                    println!("{:?}", self.node.inner.evm_config);
 
                     /*if let RollupContractCalls::submitBlock(RollupContract::submitBlockCall {
                         header,
@@ -291,36 +252,6 @@ impl<Node: reth_node_api::FullNodeComponents> Rollup<Node> {
                         }
                     //}
                 }
-                // A deposit of ETH to the rollup contract. The deposit is added to the recipient's
-                // balance and committed into the database.
-                /*RollupContractEvents::Enter(RollupContract::Enter {
-                    rollupChainId,
-                    token,
-                    rollupRecipient,
-                    amount,
-                }) => {
-                    if rollupChainId != U256::from(CHAIN_ID) {
-                        error!(tx_hash = %tx.recalculate_hash(), "Invalid rollup chain ID");
-                        continue;
-                    }
-                    if token != Address::ZERO {
-                        error!(tx_hash = %tx.recalculate_hash(), "Only ETH deposits are supported");
-                        continue;
-                    }
-
-                    self.db.upsert_account(rollupRecipient, |account| {
-                        let mut account = account.unwrap_or_default();
-                        account.balance += amount;
-                        Ok(account)
-                    })?;
-
-                    info!(
-                        tx_hash = %tx.recalculate_hash(),
-                        %amount,
-                        recipient = %rollupRecipient,
-                        "Deposit",
-                    );
-                }*/
                 _ => (),
             }
         }
