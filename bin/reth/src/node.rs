@@ -65,7 +65,7 @@ where
     }
 
     /// Establish a connection to the node
-    pub async fn connect(&mut self, node: &mut NodeTestContext<Node, AddOns>) {
+    pub async fn connect(&mut self, node: &mut Self) {
         self.network.add_peer(node.network.record()).await;
         node.network.next_session_established().await;
         self.network.next_session_established().await;
@@ -194,9 +194,7 @@ where
                     assert_eq!(latest_block.hash_slow(), expected_block_hash);
                     break
                 }
-                if wait_finish_checkpoint {
-                    panic!("Finish checkpoint matches, but could not fetch block.");
-                }
+                assert!(!wait_finish_checkpoint, "Finish checkpoint matches, but could not fetch block.")
             }
         }
         Ok(())

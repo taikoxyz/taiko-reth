@@ -70,7 +70,7 @@ pub struct GwynethPayloadAttributes {
     pub inner: EthPayloadAttributes,
     /// Transactions is a field for rollups: the transactions list is forced into the block
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub transactions: Option<Vec<Bytes>>,
+    pub transactions: Option<Vec<TransactionSigned>>,
     /// If set, this sets the exact gas limit the block produced with.
     #[serde(skip_serializing_if = "Option::is_none", with = "alloy_serde::quantity::opt")]
     pub gas_limit: Option<u64>,
@@ -130,11 +130,8 @@ impl PayloadBuilderAttributes for GwynethPayloadBuilderAttributes {
             .transactions
             .unwrap_or_default()
             .into_iter()
-            .map(|data| {
-                TransactionSigned::decode_enveloped(&mut data.as_ref())
-                    .map(|tx| WithEncoded::new(data, tx))
-            })
-            .collect::<Result<_, _>>()?;
+            .map(|tx| WithEncoded::new(tx.envelope_encoded(), tx))
+            .collect();
 
         Ok(Self {
             inner: EthPayloadBuilderAttributes::new(parent, attributes.inner),
@@ -209,7 +206,7 @@ impl EngineTypes for GwynethEngineTypes {
 
 #[derive(Debug, Clone, Default)]
 #[non_exhaustive]
-struct GwynethNode;
+pub struct GwynethNode;
 
 /// Configure the node types
 impl NodeTypes for GwynethNode {
