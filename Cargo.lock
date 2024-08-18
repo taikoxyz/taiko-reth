@@ -3465,6 +3465,45 @@ dependencies = [
 ]
 
 [[package]]
+name = "gwyneth"
+version = "1.0.3"
+dependencies = [
+ "alloy-rlp",
+ "alloy-serde 0.2.0",
+ "eyre",
+ "futures",
+ "reth-auto-seal-consensus",
+ "reth-basic-payload-builder",
+ "reth-beacon-consensus",
+ "reth-chainspec",
+ "reth-consensus",
+ "reth-ethereum-engine",
+ "reth-ethereum-engine-primitives",
+ "reth-ethereum-payload-builder",
+ "reth-evm-ethereum",
+ "reth-exex",
+ "reth-network",
+ "reth-node-api",
+ "reth-node-builder",
+ "reth-node-core",
+ "reth-node-ethereum",
+ "reth-node-events",
+ "reth-payload-builder",
+ "reth-provider",
+ "reth-rpc",
+ "reth-rpc-engine-api",
+ "reth-rpc-types",
+ "reth-tasks",
+ "reth-tokio-util",
+ "reth-tracing",
+ "reth-transaction-pool",
+ "serde",
+ "thiserror",
+ "tokio",
+ "tokio-stream",
+]
+
+[[package]]
 name = "h2"
 version = "0.4.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6321,6 +6360,7 @@ dependencies = [
  "foundry-blob-explorers",
  "futures",
  "futures-util",
+ "gwyneth",
  "itertools 0.13.0",
  "jsonrpsee",
  "libc",

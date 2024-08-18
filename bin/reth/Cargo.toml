@@ -13,6 +13,9 @@ default-run = "reth"
 workspace = true
 
 [dependencies]
+
+gwyneth.workspace = true
+
 # reth
 reth-chainspec.workspace = true
 reth-config.workspace = true
@@ -136,7 +139,6 @@ reth-rpc-layer.workspace = true
 reth-tokio-util.workspace = true
 reth-stages-types.workspace = true
 reth-network-peers.workspace = true
-#reth-node-ethereum.workspace = true
 
 jsonrpsee.workspace = true
 

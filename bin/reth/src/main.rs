@@ -47,6 +47,7 @@ use reth_node_api::{FullNodeTypesAdapter, NodeAddOns};
 //use reth_node_api::{EngineTypes, FullNodeComponents, NodeAddOns};
 use reth_node_builder::{components::Components, rpc::EthApiBuilderProvider, AddOns, FullNode, Node, NodeAdapter, NodeBuilder, NodeComponentsBuilder, NodeConfig, NodeHandle, RethFullAdapter};
 use reth_node_ethereum::{node::EthereumAddOns, EthEvmConfig, EthExecutorProvider, EthereumNode};
+use reth_node_optimism::OptimismPayloadBuilderAttributes;
 use reth_primitives::{address, alloy_primitives, Address, Genesis, SealedBlockWithSenders, TransactionSigned, B256};
 use reth_provider::{providers::BlockchainProvider, CanonStateSubscriptions};
 use reth_rpc_api::{eth::{helpers::AddDevSigners, FullEthApiServer}, EngineApiClient};
@@ -58,6 +59,7 @@ use rusqlite::Connection;
 use transaction::TransactionTestContext;
 use wallet::Wallet;
 use std::{future::Future, marker::PhantomData, pin::Pin, sync::Arc};
+use alloy_rlp::Decodable;
 
 //use alloy_primitives::{Address, B256};
 use reth::rpc::types::engine::PayloadAttributes;
@@ -81,7 +83,7 @@ mod traits;
 //pub(crate) type EthNode = NodeHelperType<EthereumNode, EthereumAddOns>;
 
 /// Helper function to create a new eth payload attributes
-pub(crate) fn eth_payload_attributes(timestamp: u64) -> EthPayloadBuilderAttributes {
+pub(crate) fn gwyneth_payload_attributes(timestamp: u64) -> EthPayloadBuilderAttributes {
     let attributes = PayloadAttributes {
         timestamp,
         prev_randao: B256::ZERO,
@@ -161,6 +163,11 @@ impl<Node: reth_node_api::FullNodeComponents> Rollup<Node> {
         // let node = nodes.pop().unwrap();
 
         for (_, tx, event) in events {
+            
+            // TODO: Don't emit ProposeBlock event but directely 
+            //  read the function call RollupContractCalls to extract Txs
+            // let _call = RollupContractCalls::abi_decode(tx.input(), true)?;
+
             match event {
                 // A new block is submitted to the rollup contract.
                 // The block is executed on top of existing rollup state and committed into the
@@ -172,27 +179,22 @@ impl<Node: reth_node_api::FullNodeComponents> Rollup<Node> {
                 }) => {
                     println!("block_number: {:?}", block_number);
                     println!("tx_list: {:?}", tx_list);
-                    let _call = RollupContractCalls::abi_decode(tx.input(), true)?;
+                    let tx_list: Vec<TransactionSigned>= Vec::<TransactionSigned>::decode(&mut tx_list.to_vec().as_slice())?;
 
-                    let wallet = Wallet::default();
-                    let raw_tx = TransactionTestContext::transfer_tx_bytes(1, wallet.inner).await;
-                
-                    // make the node advance
-                    //let tx_hash = self.node.rpc.inject_tx(raw_tx).await?;
-
+                    // self.node.new_payload(attributes_generator)
 
                     println!("tx_hash start");
 
-                    let tx_hash = tokio::task::block_in_place(|| {
-                        tokio::runtime::Handle::current().block_on({
-                            self.node.rpc.inject_tx(raw_tx)
-                        })
-                    }).unwrap();
+                    // let tx_hash = tokio::task::block_in_place(|| {
+                    //     tokio::runtime::Handle::current().block_on({
+                    //         self.node.rpc.inject_tx(raw_tx)
+                    //     })
+                    // }).unwrap();
 
                     println!("tx_hash start");
                 
                     // make the node advance
-                    //let (payload, _): (EthBuiltPayload, _) = self.node.advance_block(vec![], eth_payload_attributes).await?;
+                    let (payload, _): (EthBuiltPayload, _) = self.node.advance_block(vec![], gwyneth_payload_attributes).await?;
                 
                     // let block_hash = payload.block().hash();
                     // let block_number = payload.block().number;
@@ -210,7 +212,7 @@ impl<Node: reth_node_api::FullNodeComponents> Rollup<Node> {
 
                     let (payload, _): (EthBuiltPayload, _) = tokio::task::block_in_place(|| {
                         tokio::runtime::Handle::current().block_on({
-                            self.node.advance_block(vec![], eth_payload_attributes)
+                            self.node.advance_block(vec![], gwyneth_payload_attributes)
                         })
                     }).unwrap();
 
@@ -423,7 +425,8 @@ type Adapter<N> = NodeAdapter<
     >>::Components,
 >;
 
-type TestNodeContext = NodeTestContext<NodeAdapter<FullNodeTypesAdapter<EthereumNode, Arc<TempDatabase<DatabaseEnv>>, BlockchainProvider<Arc<TempDatabase<DatabaseEnv>>>>, Components<FullNodeTypesAdapter<EthereumNode, Arc<TempDatabase<DatabaseEnv>>, BlockchainProvider<Arc<TempDatabase<DatabaseEnv>>>>, Pool<TransactionValidationTaskExecutor<EthTransactionValidator<BlockchainProvider<Arc<TempDatabase<DatabaseEnv>>>, EthPooledTransaction>>, CoinbaseTipOrdering<EthPooledTransaction>, DiskFileBlobStore>, EthEvmConfig, EthExecutorProvider, Arc<dyn Consensus>>>, EthereumAddOns>;
+use gwyneth::GwynethNode;
+type TestNodeContext = NodeTestContext<NodeAdapter<FullNodeTypesAdapter<GwynethNode, Arc<TempDatabase<DatabaseEnv>>, BlockchainProvider<Arc<TempDatabase<DatabaseEnv>>>>, Components<FullNodeTypesAdapter<GwynethNode, Arc<TempDatabase<DatabaseEnv>>, BlockchainProvider<Arc<TempDatabase<DatabaseEnv>>>>, Pool<TransactionValidationTaskExecutor<EthTransactionValidator<BlockchainProvider<Arc<TempDatabase<DatabaseEnv>>>, EthPooledTransaction>>, CoinbaseTipOrdering<EthPooledTransaction>, DiskFileBlobStore>, EthEvmConfig, EthExecutorProvider, Arc<dyn Consensus>>>, EthereumAddOns>;
 
 /// Type alias for a type of NodeHelper
 pub type NodeHelperType<N, AO> = NodeTestContext<Adapter<N>, AO>;
