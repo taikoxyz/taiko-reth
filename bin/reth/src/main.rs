@@ -57,8 +57,6 @@ mod network;
 mod payload;
 mod rpc;
 mod node;
-mod transaction;
-mod wallet;
 mod engine_api;
 mod traits;
 
