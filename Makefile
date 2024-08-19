@@ -31,6 +31,7 @@ EF_TESTS_DIR := ./testing/ef-tests/ethereum-tests
 
 # The docker image name
 DOCKER_IMAGE_NAME ?= ghcr.io/paradigmxyz/reth
+TAIKO_DOCKER_IMAGE_NAME ?= us-docker.pkg.dev/evmchain/images/taiko-reth
 
 # Features in reth/op-reth binary crate other than "ethereum" and "optimism"
 BIN_OTHER_FEATURES := asm-keccak jemalloc jemalloc-prof min-error-logs min-warn-logs min-info-logs min-debug-logs min-trace-logs
@@ -337,8 +338,8 @@ define taiko_docker_build_push
 
 	docker buildx build --file ./DockerfileTaiko.cross . \
 		--platform linux/amd64,linux/arm64 \
-		--tag $(DOCKER_IMAGE_NAME):$(1) \
-		--tag $(DOCKER_IMAGE_NAME):$(2) \
+		--tag $(TAIKO_DOCKER_IMAGE_NAME):$(1) \
+		--tag $(TAIKO_DOCKER_IMAGE_NAME):$(2) \
 		--provenance=false \
 		--push
 endef
