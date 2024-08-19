@@ -81,6 +81,13 @@ pub fn decode_anchor(bytes: &[u8]) -> Result<anchorCall> {
     anchorCall::abi_decode(bytes, true).map_err(|e| anyhow!(e))
 }
 
+/// decodes an ontake block's extradata, returns `basefee_ratio` configurations,
+/// the corresponding enocding function in protocol is `LibProposing._encodeGasConfigs`.
+pub fn decode_ontake_extra_data(extradata: &[u8]) -> u8 {
+    let basefee_ratio = U256::from_be_slice(extradata);
+    basefee_ratio.try_into().unwrap()
+}
+
 /// Verifies the anchor tx correctness
 pub fn check_anchor_tx(
     tx: &TransactionSigned,

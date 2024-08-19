@@ -46,7 +46,12 @@ rand.workspace = true
 
 [features]
 default = ["std"]
-taiko = ["dep:strum", "dep:num_enum", "dep:revm-primitives"]
+taiko = [
+    "dep:strum",
+    "dep:num_enum",
+    "dep:revm-primitives",
+    "reth-ethereum-forks/taiko",
+]
 optimism = ["reth-ethereum-forks/optimism"]
 std = []
 arbitrary = ["alloy-chains/arbitrary"]

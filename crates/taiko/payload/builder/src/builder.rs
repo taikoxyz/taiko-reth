@@ -25,7 +25,7 @@ use reth_revm::{
     },
 };
 use reth_transaction_pool::TransactionPool;
-use taiko_reth_beacon_consensus::check_anchor_tx;
+use taiko_reth_beacon_consensus::{check_anchor_tx, decode_ontake_extra_data};
 use taiko_reth_engine_primitives::{TaikoBuiltPayload, TaikoPayloadBuilderAttributes};
 use taiko_reth_evm::{eip6110::parse_deposits_from_receipts, TaikoEvmConfig};
 use taiko_reth_primitives::L1Origin;
@@ -238,6 +238,8 @@ where
         alloy_rlp::Decodable::decode(&mut attributes.block_metadata.tx_list.as_ref())
             .map_err(|_| PayloadBuilderError::other(TaikoPayloadBuilderError::FailedToDecodeTx))?;
 
+    let basefee_ratio = decode_ontake_extra_data(&attributes.block_metadata.extra_data);
+
     let mut receipts = Vec::new();
     for (idx, tx) in transactions.into_iter().enumerate() {
         let is_anchor = idx == 0;
@@ -249,12 +251,12 @@ where
                     TaikoPayloadBuilderError::FailedToExecuteAnchor,
                 ));
             }
-            continue
+            continue;
         }
 
         // check if the job was cancelled, if so we can exit early
         if cancel.is_cancelled() {
-            return Ok(BuildOutcome::Cancelled)
+            return Ok(BuildOutcome::Cancelled);
         }
 
         // the EIP-4844 can still fit in the block
@@ -267,7 +269,7 @@ where
                 // for regular transactions above.
                 trace!(target: "payload_builder", tx=?tx.hash, ?sum_blob_gas_used, ?tx_blob_gas, "skipping blob transaction because it would exceed the max data gas per block");
                 // anchor tx can't be a blob tx
-                continue
+                continue;
             }
         }
 
@@ -277,9 +279,9 @@ where
             Ok(tx) => tx,
             Err(err) => {
                 if is_anchor {
-                    return Err(err)
+                    return Err(err);
                 } else {
-                    continue
+                    continue;
                 }
             }
         };
@@ -300,6 +302,7 @@ where
             let mut tx_env = tx_env_with_recovered(tx);
             tx_env.taiko.is_anchor = is_anchor;
             tx_env.taiko.treasury = chain_spec.treasury();
+            tx_env.taiko.basefee_ratio = basefee_ratio;
             tx_env
         };
         let env = EnvWithHandlerCfg::new_with_cfg_env(
@@ -320,9 +323,9 @@ where
                         evm.context.evm.journaled_state.spec,
                         Default::default(),
                     );
-                    continue
+                    continue;
                 }
-                return Err(PayloadBuilderError::EvmExecutionError(err))
+                return Err(PayloadBuilderError::EvmExecutionError(err));
             }
         };
         // drop evm so db is released.

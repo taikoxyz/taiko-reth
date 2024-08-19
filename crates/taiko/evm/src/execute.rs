@@ -30,7 +30,9 @@ use revm_primitives::{
     db::{Database, DatabaseCommit},
     Address, BlockEnv, CfgEnvWithHandlerCfg, EnvWithHandlerCfg, HashSet, ResultAndState,
 };
-use taiko_reth_beacon_consensus::{check_anchor_tx, validate_block_post_execution};
+use taiko_reth_beacon_consensus::{
+    check_anchor_tx, decode_ontake_extra_data, validate_block_post_execution,
+};
 
 #[cfg(not(feature = "std"))]
 use alloc::{sync::Arc, vec, vec::Vec};
@@ -169,6 +171,7 @@ where
         )?;
 
         let treasury = self.chain_spec.treasury();
+        let basefee_ratio = decode_ontake_extra_data(&block.extra_data);
 
         // execute transactions
         let mut cumulative_gas_used = 0;
@@ -231,6 +234,8 @@ where
             evm.tx_mut().taiko.is_anchor = is_anchor;
             // set the treasury address
             evm.tx_mut().taiko.treasury = treasury;
+            // set the basefee ratio
+            evm.tx_mut().taiko.basefee_ratio = basefee_ratio;
 
             // Execute transaction.
             let ResultAndState { result, state } = match evm.transact().map_err(move |err| {

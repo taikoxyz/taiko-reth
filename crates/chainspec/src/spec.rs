@@ -296,13 +296,26 @@ pub static TAIKO_INTERNAL_L2_A: Lazy<Arc<ChainSpec>> = Lazy::new(|| {
         chain: TaikoNamedChain::TaikoInternalL2A.into(),
         genesis: get_taiko_genesis(TaikoNamedChain::TaikoInternalL2A),
         hardforks: BTreeMap::from([
+            (Hardfork::Frontier, ForkCondition::Block(0)),
+            (Hardfork::Homestead, ForkCondition::Block(0)),
+            (Hardfork::Dao, ForkCondition::Block(0)),
+            (Hardfork::Tangerine, ForkCondition::Block(0)),
+            (Hardfork::SpuriousDragon, ForkCondition::Block(0)),
+            (Hardfork::Byzantium, ForkCondition::Block(0)),
+            (Hardfork::Constantinople, ForkCondition::Block(0)),
+            (Hardfork::Petersburg, ForkCondition::Block(0)),
+            (Hardfork::Istanbul, ForkCondition::Block(0)),
+            (Hardfork::Berlin, ForkCondition::Block(0)),
+            (Hardfork::London, ForkCondition::Block(0)),
             (
                 Hardfork::Paris,
-                ForkCondition::TTD { fork_block: None, total_difficulty: U256::ZERO },
+                ForkCondition::TTD { fork_block: None, total_difficulty: U256::from(0) },
             ),
-            (Hardfork::London, ForkCondition::Block(0)),
-            (Hardfork::Shanghai, ForkCondition::Block(0)),
-            (Hardfork::Cancun, ForkCondition::Never),
+            (Hardfork::Shanghai, ForkCondition::Timestamp(0)),
+            #[cfg(feature = "taiko")]
+            (Hardfork::Hekla, ForkCondition::Block(0)),
+            #[cfg(feature = "taiko")]
+            (Hardfork::Ontake, ForkCondition::Block(20)), //todo
         ]),
         base_fee_params: BaseFeeParamsKind::Constant(BaseFeeParams {
             max_change_denominator: 8,
@@ -320,13 +333,24 @@ pub static TAIKO_TESTNET: Lazy<Arc<ChainSpec>> = Lazy::new(|| {
         chain: TaikoNamedChain::Katla.into(),
         genesis: get_taiko_genesis(TaikoNamedChain::Katla),
         hardforks: BTreeMap::from([
+            (Hardfork::Frontier, ForkCondition::Block(0)),
+            (Hardfork::Homestead, ForkCondition::Block(0)),
+            (Hardfork::Dao, ForkCondition::Block(0)),
+            (Hardfork::Tangerine, ForkCondition::Block(0)),
+            (Hardfork::SpuriousDragon, ForkCondition::Block(0)),
+            (Hardfork::Byzantium, ForkCondition::Block(0)),
+            (Hardfork::Constantinople, ForkCondition::Block(0)),
+            (Hardfork::Petersburg, ForkCondition::Block(0)),
+            (Hardfork::Istanbul, ForkCondition::Block(0)),
+            (Hardfork::Berlin, ForkCondition::Block(0)),
+            (Hardfork::London, ForkCondition::Block(0)),
             (
                 Hardfork::Paris,
-                ForkCondition::TTD { fork_block: None, total_difficulty: U256::ZERO },
+                ForkCondition::TTD { fork_block: None, total_difficulty: U256::from(0) },
             ),
-            (Hardfork::London, ForkCondition::Block(0)),
-            (Hardfork::Shanghai, ForkCondition::Block(0)),
-            (Hardfork::Cancun, ForkCondition::Never),
+            (Hardfork::Shanghai, ForkCondition::Timestamp(0)),
+            #[cfg(feature = "taiko")]
+            (Hardfork::Hekla, ForkCondition::Block(0)),
         ]),
         base_fee_params: BaseFeeParamsKind::Constant(BaseFeeParams {
             max_change_denominator: 8,
@@ -341,18 +365,29 @@ pub static TAIKO_TESTNET: Lazy<Arc<ChainSpec>> = Lazy::new(|| {
 #[cfg(feature = "taiko")]
 pub static TAIKO_HEKLA: Lazy<Arc<ChainSpec>> = Lazy::new(|| {
     ChainSpec {
-        chain: 167009.into(),
+        chain: TaikoNamedChain::Hekla.into(),
         genesis: get_taiko_genesis(TaikoNamedChain::Hekla),
         genesis_hash: None,
         paris_block_and_final_difficulty: None,
         hardforks: BTreeMap::from([
+            (Hardfork::Frontier, ForkCondition::Block(0)),
+            (Hardfork::Homestead, ForkCondition::Block(0)),
+            (Hardfork::Dao, ForkCondition::Block(0)),
+            (Hardfork::Tangerine, ForkCondition::Block(0)),
+            (Hardfork::SpuriousDragon, ForkCondition::Block(0)),
+            (Hardfork::Byzantium, ForkCondition::Block(0)),
+            (Hardfork::Constantinople, ForkCondition::Block(0)),
+            (Hardfork::Petersburg, ForkCondition::Block(0)),
+            (Hardfork::Istanbul, ForkCondition::Block(0)),
+            (Hardfork::Berlin, ForkCondition::Block(0)),
+            (Hardfork::London, ForkCondition::Block(0)),
             (
                 Hardfork::Paris,
-                ForkCondition::TTD { fork_block: None, total_difficulty: U256::ZERO },
+                ForkCondition::TTD { fork_block: None, total_difficulty: U256::from(0) },
             ),
-            (Hardfork::London, ForkCondition::Block(0)),
-            (Hardfork::Shanghai, ForkCondition::Block(0)),
-            (Hardfork::Cancun, ForkCondition::default()),
+            (Hardfork::Shanghai, ForkCondition::Timestamp(0)),
+            #[cfg(feature = "taiko")]
+            (Hardfork::Hekla, ForkCondition::Block(0)),
         ]),
         deposit_contract: None,
         ..Default::default()
@@ -364,18 +399,32 @@ pub static TAIKO_HEKLA: Lazy<Arc<ChainSpec>> = Lazy::new(|| {
 #[cfg(feature = "taiko")]
 pub static TAIKO_MAINNET: Lazy<Arc<ChainSpec>> = Lazy::new(|| {
     ChainSpec {
-        chain: 167000.into(),
+        chain: TaikoNamedChain::Mainnet.into(),
         genesis: get_taiko_genesis(TaikoNamedChain::Mainnet),
         genesis_hash: None,
         paris_block_and_final_difficulty: None,
         hardforks: BTreeMap::from([
+            (Hardfork::Frontier, ForkCondition::Block(0)),
+            (Hardfork::Homestead, ForkCondition::Block(0)),
+            (Hardfork::Dao, ForkCondition::Block(0)),
+            (Hardfork::Tangerine, ForkCondition::Block(0)),
+            (Hardfork::SpuriousDragon, ForkCondition::Block(0)),
+            (Hardfork::Byzantium, ForkCondition::Block(0)),
+            (Hardfork::Constantinople, ForkCondition::Block(0)),
+            (Hardfork::Petersburg, ForkCondition::Block(0)),
+            (Hardfork::Istanbul, ForkCondition::Block(1561651)),
+            (Hardfork::Berlin, ForkCondition::Block(4460644)),
+            (Hardfork::London, ForkCondition::Block(5062605)),
+            (Hardfork::Istanbul, ForkCondition::Block(0)),
+            (Hardfork::Berlin, ForkCondition::Block(0)),
+            (Hardfork::London, ForkCondition::Block(0)),
             (
                 Hardfork::Paris,
-                ForkCondition::TTD { fork_block: None, total_difficulty: U256::ZERO },
+                ForkCondition::TTD { fork_block: None, total_difficulty: U256::from(0) },
             ),
-            (Hardfork::London, ForkCondition::Block(0)),
-            (Hardfork::Shanghai, ForkCondition::Block(0)),
-            (Hardfork::Cancun, ForkCondition::default()),
+            (Hardfork::Shanghai, ForkCondition::Timestamp(0)),
+            #[cfg(feature = "taiko")]
+            (Hardfork::Hekla, ForkCondition::Block(0)),
         ]),
         deposit_contract: None,
         ..Default::default()
@@ -478,14 +527,14 @@ impl ChainSpec {
         matches!(
             self.chain.kind(),
             ChainKind::Named(
-                NamedChain::Mainnet |
-                    NamedChain::Morden |
-                    NamedChain::Ropsten |
-                    NamedChain::Rinkeby |
-                    NamedChain::Goerli |
-                    NamedChain::Kovan |
-                    NamedChain::Holesky |
-                    NamedChain::Sepolia
+                NamedChain::Mainnet
+                    | NamedChain::Morden
+                    | NamedChain::Ropsten
+                    | NamedChain::Rinkeby
+                    | NamedChain::Goerli
+                    | NamedChain::Kovan
+                    | NamedChain::Holesky
+                    | NamedChain::Sepolia
             )
         )
     }
@@ -502,6 +551,13 @@ impl ChainSpec {
     #[cfg(not(feature = "optimism"))]
     pub const fn is_optimism(&self) -> bool {
         self.chain.is_optimism()
+    }
+
+    /// Returns `true` if this is a Taiko chain.
+    #[inline]
+    pub const fn is_taiko(&self) -> bool {
+        let id = self.chain.id();
+        id >= 167000 && id <= 168000
     }
 
     /// Returns `true` if this chain is Optimism mainnet.
@@ -618,7 +674,7 @@ impl ChainSpec {
                 // given timestamp.
                 for (fork, params) in bf_params.iter().rev() {
                     if self.is_fork_active_at_block(*fork, block_number) {
-                        return *params
+                        return *params;
                     }
                 }
 
@@ -781,8 +837,8 @@ impl ChainSpec {
             // We filter out TTD-based forks w/o a pre-known block since those do not show up in the
             // fork filter.
             Some(match condition {
-                ForkCondition::Block(block) |
-                ForkCondition::TTD { fork_block: Some(block), .. } => ForkFilterKey::Block(block),
+                ForkCondition::Block(block)
+                | ForkCondition::TTD { fork_block: Some(block), .. } => ForkFilterKey::Block(block),
                 ForkCondition::Timestamp(time) => ForkFilterKey::Time(time),
                 _ => return None,
             })
@@ -800,8 +856,8 @@ impl ChainSpec {
         for (_, cond) in self.forks_iter() {
             // handle block based forks and the sepolia merge netsplit block edge case (TTD
             // ForkCondition with Some(block))
-            if let ForkCondition::Block(block) |
-            ForkCondition::TTD { fork_block: Some(block), .. } = cond
+            if let ForkCondition::Block(block)
+            | ForkCondition::TTD { fork_block: Some(block), .. } = cond
             {
                 if cond.active_at_head(head) {
                     if block != current_applied {
