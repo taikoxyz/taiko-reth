@@ -35,7 +35,7 @@ pub const SUPPORTED_CHAINS: &[&str] = &["testnet", "internal_devnet_a", "mainnet
 
 /// Helper to parse a [Duration] from seconds
 pub fn parse_duration_from_secs(arg: &str) -> eyre::Result<Duration, std::num::ParseIntError> {
-    let seconds: u64 = arg.parse()?;
+    let seconds = arg.parse()?;
     Ok(Duration::from_secs(seconds))
 }
 
@@ -84,7 +84,7 @@ pub fn chain_value_parser(s: &str) -> eyre::Result<Arc<ChainSpec>, eyre::Error> 
                     if s.contains('{') {
                         s.to_string()
                     } else {
-                        return Err(io_err.into()) // assume invalid path
+                        return Err(io_err.into()); // assume invalid path
                     }
                 }
             };
