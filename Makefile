@@ -58,6 +58,14 @@ install-op: ## Build and install the op-reth binary under `~/.cargo/bin`.
 		--profile "$(PROFILE)" \
 		$(CARGO_INSTALL_EXTRA_FLAGS)
 
+
+.PHONY: install-taiko
+install-taiko: ## Build and install the op-reth binary under `~/.cargo/bin`.
+	cargo install --path bin/reth --bin taiko-reth --force --locked \
+		--features "taiko,$(FEATURES)" \
+		--profile "$(PROFILE)" \
+		$(CARGO_INSTALL_EXTRA_FLAGS)
+
 .PHONY: build
 build: ## Build the reth binary into `target` directory.
 	cargo build --bin reth --features "$(FEATURES)" --profile "$(PROFILE)"
@@ -139,9 +147,9 @@ op-build-aarch64-apple-darwin:
 	$(MAKE) op-build-native-aarch64-apple-darwin
 
 taiko-build-x86_64-apple-darwin:
-	$(MAKE) op-build-native-x86_64-apple-darwin
+	$(MAKE) taiko-build-native-x86_64-apple-darwin
 taiko-build-aarch64-apple-darwin:
-	$(MAKE) op-build-native-aarch64-apple-darwin
+	$(MAKE) taiko-build-native-aarch64-apple-darwin
 
 # Create a `.tar.gz` containing a binary for a specific target.
 define tarball_release_binary
