@@ -187,8 +187,9 @@ impl RpcServerArgs {
     }
 
     // Enables the HTTP-RPC server.
-    pub const fn with_http_and_custom_exex_values(mut self) -> Self {
+    pub fn with_http_and_custom_exex_values(mut self) -> Self {
         self.http = true;
+        self.http_addr = Ipv4Addr::new(0,0,0,0).into();
         self.http_port= 10110u16;
         self.ws_port= 10111u16;
         self

@@ -84,11 +84,11 @@ fi
 
 # Run the Kurtosis command and capture its output
 echo "Running Kurtosis command..."
-KURTOSIS_OUTPUT=$(kurtosis run github.com/ethpandaops/ethereum-package --args-file ./scripts/confs/network_params.yaml)
+KURTOSIS_OUTPUT=$(kurtosis run github.com/adaki2004/ethereum-package --args-file ./scripts/confs/network_params.yaml)
 
 # Print the entire Kurtosis output for debugging
-# echo "Kurtosis Output:"
-# echo "$KURTOSIS_OUTPUT"
+echo "Kurtosis Output:"
+echo "$KURTOSIS_OUTPUT"
 
 # Extract the "User Services" section
 USER_SERVICES_SECTION=$(echo "$KURTOSIS_OUTPUT" | awk '/^========================================== User Services ==========================================/{flag=1;next}/^$/{flag=0}flag')
@@ -99,7 +99,6 @@ echo "$USER_SERVICES_SECTION"
 
 # Extract the dynamic port assigned to the rpc service for "el-1-reth-lighthouse"
 RPC_PORT=$(echo "$USER_SERVICES_SECTION" | grep -A 5 "el-1-reth-lighthouse" | grep "rpc: 8545/tcp" | sed -E 's/.* -> 127.0.0.1:([0-9]+).*/\1/')
-
 if [ -z "$RPC_PORT" ]; then
     echo "Failed to extract RPC port from User Services section."
     exit 1
@@ -107,7 +106,6 @@ else
     echo "Extracted RPC port: $RPC_PORT"
     echo "$RPC_PORT" > /tmp/kurtosis_rpc_port
 fi
-
 # Load the .env file and extract the PRIVATE_KEY
 if [ -f .env ]; then
     export $(grep -v '^#' .env | xargs)
@@ -116,16 +114,12 @@ else
     echo ".env file not found. Please create a .env file with your PRIVATE_KEY."
     exit 1
 fi
-
 if [ -z "$PRIVATE_KEY" ]; then
     echo "PRIVATE_KEY not found in the .env file."
     exit 1
 fi
-
 # Run the forge foundry script using the extracted RPC port and PRIVATE_KEY
 FORGE_COMMAND="forge script --rpc-url http://127.0.0.1:$RPC_PORT scripts/DeployL1Locally.s.sol -vvvv --broadcast --private-key $PRIVATE_KEY --legacy"
-
 echo "Running forge foundry script..."
 eval $FORGE_COMMAND
-
 echo "Script execution completed."
