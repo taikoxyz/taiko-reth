@@ -278,7 +278,7 @@ fn main() -> eyre::Result<()> {
             .with_chain(chain_spec.clone())
             .with_network(network_config.clone())
             .with_unused_ports()
-            .with_rpc(RpcServerArgs::default().with_unused_ports().with_http())
+            .with_rpc(RpcServerArgs::default().with_unused_ports().with_http_and_custom_exex_values())
             .set_dev(true);
 
         let NodeHandle { node, node_exit_future: _ } = NodeBuilder::new(node_config.clone())

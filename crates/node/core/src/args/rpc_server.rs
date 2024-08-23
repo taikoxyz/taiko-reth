@@ -186,6 +186,14 @@ impl RpcServerArgs {
         self
     }
 
+    // Enables the HTTP-RPC server.
+    pub const fn with_http_and_custom_exex_values(mut self) -> Self {
+        self.http = true;
+        self.http_port= 10110u16;
+        self.ws_port= 10111u16;
+        self
+    }
+
     /// Enables the WS-RPC server.
     pub const fn with_ws(mut self) -> Self {
         self.ws = true;
@@ -274,19 +282,19 @@ impl RpcServerArgs {
 impl Default for RpcServerArgs {
     fn default() -> Self {
         Self {
-            http: false,
+            http: true,
             http_addr: Ipv4Addr::LOCALHOST.into(),
             http_port: constants::DEFAULT_HTTP_RPC_PORT,
             http_api: None,
             http_corsdomain: None,
-            ws: false,
-            ws_addr: Ipv4Addr::LOCALHOST.into(),
+            ws: true,
+            ws_addr: Ipv4Addr::LOCALHOST.into(),//Ipv4Addr::new(0,0,0,0).into(),
             ws_port: constants::DEFAULT_WS_RPC_PORT,
             ws_allowed_origins: None,
             ws_api: None,
             ipcdisable: false,
             ipcpath: constants::DEFAULT_IPC_ENDPOINT.to_string(),
-            auth_addr: Ipv4Addr::LOCALHOST.into(),
+            auth_addr: Ipv4Addr::LOCALHOST.into(),//Ipv4Addr::new(0,0,0,0).into(),
             auth_port: constants::DEFAULT_AUTH_PORT,
             auth_jwtsecret: None,
             auth_ipc: false,
