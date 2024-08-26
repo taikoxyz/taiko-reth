@@ -88,6 +88,7 @@ where
         let mut chain = Vec::with_capacity(length as usize);
         for i in 0..length {
             let raw_tx = tx_generator(i).await;
+            println!("Dani debug: advance()'s inject_tx");
             let tx_hash = self.rpc.inject_tx(raw_tx).await?;
             let (payload, eth_attr) = self.advance_block(vec![], attributes_generator).await?;
             let block_hash = payload.block().hash();

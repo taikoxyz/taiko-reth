@@ -28,6 +28,7 @@ where
     /// Injects a raw transaction into the node tx pool via RPC server
     pub async fn inject_tx(&mut self, raw_tx: Bytes) -> EthResult<B256> {
         let eth_api = self.inner.eth_api();
+        println!("Dani debug: Why not called? {:?}", raw_tx); // -> Not called most prob. because it is called during actual L2 execution. So the call to advance_block() in our main() will call it.
         eth_api.send_raw_transaction(raw_tx).await
     }
 

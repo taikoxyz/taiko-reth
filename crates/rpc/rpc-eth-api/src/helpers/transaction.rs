@@ -6,8 +6,8 @@ use std::{fmt, ops::Deref, sync::Arc};
 use alloy_dyn_abi::TypedData;
 use futures::Future;
 use reth_primitives::{
-    Address, BlockId, Bytes, FromRecoveredPooledTransaction, IntoRecoveredTransaction, Receipt,
-    SealedBlockWithSenders, TransactionMeta, TransactionSigned, TxHash, TxKind, B256, U256,
+    Address, BlockId, Bytes, FromRecoveredPooledTransaction, IntoRecoveredTransaction, Receipt,Signature,
+    SealedBlockWithSenders, TransactionMeta, TransactionSigned, TxHash, TxKind, B256, U256, PooledTransactionsElementEcRecovered, PooledTransactionsElement, transaction::extract_chain_id,
 };
 use reth_provider::{BlockReaderIdExt, ReceiptProvider, TransactionsProvider};
 use reth_rpc_eth_types::{
@@ -23,6 +23,7 @@ use reth_rpc_types::{
 };
 use reth_rpc_types_compat::transaction::from_recovered_with_block_context;
 use reth_transaction_pool::{TransactionOrigin, TransactionPool};
+use revm_primitives::{alloy_primitives::private::alloy_rlp::{self, Decodable}};
 
 use super::EthSigner;
 
@@ -231,11 +232,30 @@ pub trait EthTransactions: LoadTransaction {
         }
     }
 
+    fn get_chain_id(tx: &PooledTransactionsElementEcRecovered) -> alloy_rlp::Result<Option<u64>> {
+        // Get the signature from the transaction
+        let signature = tx.signature();
+        
+        // Get the v value from the signature
+        let v = signature.v(None);  // We pass None as we don't know the chain_id yet
+        
+        // Use the public extract_chain_id function
+        let (_, chain_id) = extract_chain_id(v)?;
+        
+        Ok(chain_id)
+    }
+
     /// Decodes and recovers the transaction and submits it to the pool.
     ///
     /// Returns the hash of the transaction.
     fn send_raw_transaction(&self, tx: Bytes) -> impl Future<Output = EthResult<B256>> + Send {
         async move {
+
+            // It seems that both the 8545 RPC server (L1) and 10110 (L2 dedicated RPC) is routing into here BUT the send ether (sendATxnToL2Rpc.py) execution is happening on the correct chain.
+            // We (as builders) somehow gotta:
+            // 1. recognize the source (?) -> If L2 rpc/port then route towards the builder and not yet build L2 blocks
+            // 2. If block builder is full (or profitable, or some other sophisticated mechanism (?)) then flush towards TaikoL1 as calldata (or blob), then the 'BlockProposed' event is what will trigger the L2 execution.
+            println!("Dani debug: Raw txn bytes:{:?}", tx);
             // On optimism, transactions are forwarded directly to the sequencer to be included in
             // blocks that it builds.
             if let Some(client) = self.raw_tx_forwarder().as_ref() {
@@ -244,6 +264,23 @@ pub trait EthTransactions: LoadTransaction {
             }
 
             let recovered = recover_raw_transaction(tx)?;
+
+            match Self::get_chain_id(&recovered) {
+                Ok(maybe_chain_id) => {
+                    if let Some(chain_id) = maybe_chain_id {
+                        println!("Transaction is on network with chain ID: {}", chain_id);
+                        // Perform your special logic here based on chain_id
+                    } else {
+                        println!("Transaction is pre-EIP-155 (no chain ID)");
+                        // Handle pre-EIP-155 transactions (no chain ID)
+                    }
+                },
+                Err(e) => {
+                    eprintln!("Error decoding chain ID: {:?}", e);
+                    // Handle RLP decoding error
+                }
+            }
+            
             let pool_transaction =
                 <Self::Pool as TransactionPool>::Transaction::from_recovered_pooled_transaction(
                     recovered,
@@ -252,6 +289,8 @@ pub trait EthTransactions: LoadTransaction {
             // submit the transaction to the pool with a `Local` origin
             let hash =
                 self.pool().add_transaction(TransactionOrigin::Local, pool_transaction).await?;
+            
+            println!("Dani debug: TXN hash:{:?}", hash);
 
             Ok(hash)
         }
