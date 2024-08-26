@@ -5,7 +5,8 @@ use crate::ChainSpec;
 use alloy_chains::Chain;
 use alloy_genesis::{ChainConfig, Genesis, GenesisAccount};
 use once_cell::sync::Lazy;
-use revm_primitives::{Address, Bytes, FixedBytes, U256};
+use revm_primitives::{Address, Bytes, FixedBytes, B256, U256};
+use serde::{Deserialize, Serialize};
 
 impl ChainSpec {
     /// Returns the treasury address for the chain.
@@ -116,14 +117,14 @@ pub(crate) fn get_taiko_genesis(chain: TaikoNamedChain) -> Genesis {
         TaikoNamedChain::Hekla => include_str!("../res/genesis/taiko/hekla.json"),
     };
 
-    let alloc: BTreeMap<Address, GenesisAccount> =
+    let alloc: BTreeMap<Address, TaikoGenesisAccount> =
         serde_json::from_str(alloc_str).expect("Invalid alloc json");
     let mut config = TAIKO_CHAIN_CONFIG.clone();
     config.chain_id = chain as u64;
 
     Genesis {
         config,
-        alloc,
+        alloc: alloc.into_iter().map(|(k, v)| (k, v.into())).collect(),
         nonce: 0,
         timestamp: 0,
         extra_data: Bytes::new(),
@@ -135,5 +136,40 @@ pub(crate) fn get_taiko_genesis(chain: TaikoNamedChain) -> Genesis {
         excess_blob_gas: None,
         blob_gas_used: Some(0),
         number: Some(0),
+    }
+}
+
+/// An account in the state of the genesis block.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TaikoGenesisAccount {
+    /// The nonce of the account at genesis.
+    #[serde(skip_serializing_if = "Option::is_none", with = "alloy_serde::quantity::opt", default)]
+    pub nonce: Option<u64>,
+    /// The balance of the account at genesis.
+    pub balance: U256,
+    /// The account's bytecode at genesis.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub code: Option<Bytes>,
+    /// The account's storage at genesis.
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "alloy_serde::storage::deserialize_storage_map"
+    )]
+    pub storage: Option<BTreeMap<B256, B256>>,
+    /// The account's private key. Should only be used for testing.
+    #[serde(rename = "secretKey", default, skip_serializing_if = "Option::is_none")]
+    pub private_key: Option<B256>,
+}
+
+impl From<TaikoGenesisAccount> for GenesisAccount {
+    fn from(account: TaikoGenesisAccount) -> Self {
+        Self {
+            nonce: account.nonce,
+            balance: account.balance,
+            code: account.code,
+            storage: account.storage,
+            private_key: account.private_key,
+        }
     }
 }
