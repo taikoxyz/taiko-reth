@@ -175,7 +175,7 @@ where
                     transaction_gas_limit: transaction.gas_limit(),
                     block_available_gas,
                 }
-                .into())
+                .into());
             }
 
             EvmConfig::fill_tx_env(evm.tx_mut(), transaction, *sender);
@@ -542,7 +542,7 @@ mod tests {
             .executor(StateProviderDatabase::new(&db))
             .execute(
                 (
-                    &BlockWithSenders {
+                    &mut BlockWithSenders {
                         block: Block {
                             header: header.clone(),
                             body: vec![],
@@ -573,7 +573,7 @@ mod tests {
         // Now execute a block with the fixed header, ensure that it does not fail
         executor
             .execute_without_verification(
-                &BlockWithSenders {
+                &mut BlockWithSenders {
                     block: Block {
                         header: header.clone(),
                         body: vec![],
@@ -639,7 +639,7 @@ mod tests {
             .batch_executor(StateProviderDatabase::new(&db), PruneModes::none())
             .execute_and_verify_one(
                 (
-                    &BlockWithSenders {
+                    &mut BlockWithSenders {
                         block: Block {
                             header,
                             body: vec![],
@@ -693,7 +693,7 @@ mod tests {
         executor
             .execute_and_verify_one(
                 (
-                    &BlockWithSenders {
+                    &mut BlockWithSenders {
                         block: Block {
                             header,
                             body: vec![],
@@ -738,7 +738,7 @@ mod tests {
         let _err = executor
             .execute_and_verify_one(
                 (
-                    &BlockWithSenders {
+                    &mut BlockWithSenders {
                         block: Block {
                             header: header.clone(),
                             body: vec![],
@@ -765,7 +765,7 @@ mod tests {
         executor
             .execute_and_verify_one(
                 (
-                    &BlockWithSenders {
+                    &mut BlockWithSenders {
                         block: Block {
                             header,
                             body: vec![],
@@ -825,7 +825,7 @@ mod tests {
         executor
             .execute_and_verify_one(
                 (
-                    &BlockWithSenders {
+                    &mut BlockWithSenders {
                         block: Block {
                             header: header.clone(),
                             body: vec![],
@@ -896,7 +896,7 @@ mod tests {
         executor
             .execute_and_verify_one(
                 (
-                    &BlockWithSenders {
+                    &mut BlockWithSenders {
                         block: Block {
                             header,
                             body: vec![],
@@ -947,7 +947,7 @@ mod tests {
         executor
             .execute_and_verify_one(
                 (
-                    &BlockWithSenders {
+                    &mut BlockWithSenders {
                         block: Block {
                             header,
                             body: vec![],
@@ -1005,7 +1005,7 @@ mod tests {
         executor
             .execute_and_verify_one(
                 (
-                    &BlockWithSenders {
+                    &mut BlockWithSenders {
                         block: Block {
                             header,
                             body: vec![],
@@ -1069,7 +1069,7 @@ mod tests {
         executor
             .execute_and_verify_one(
                 (
-                    &BlockWithSenders {
+                    &mut BlockWithSenders {
                         block: Block {
                             header,
                             body: vec![],
@@ -1124,7 +1124,7 @@ mod tests {
         executor
             .execute_and_verify_one(
                 (
-                    &BlockWithSenders {
+                    &mut BlockWithSenders {
                         block: Block {
                             header,
                             body: vec![],
@@ -1163,7 +1163,7 @@ mod tests {
         executor
             .execute_and_verify_one(
                 (
-                    &BlockWithSenders {
+                    &mut BlockWithSenders {
                         block: Block {
                             header,
                             body: vec![],
@@ -1205,7 +1205,7 @@ mod tests {
         executor
             .execute_and_verify_one(
                 (
-                    &BlockWithSenders {
+                    &mut BlockWithSenders {
                         block: Block {
                             header,
                             body: vec![],
@@ -1295,7 +1295,7 @@ mod tests {
         let BlockExecutionOutput { receipts, requests, .. } = executor
             .execute(
                 (
-                    &Block {
+                    &mut Block {
                         header,
                         body: vec![tx],
                         ommers: vec![],
@@ -1383,7 +1383,7 @@ mod tests {
         // Execute the block and capture the result
         let exec_result = executor.execute(
             (
-                &Block {
+                &mut Block {
                     header,
                     body: vec![tx],
                     ommers: vec![],

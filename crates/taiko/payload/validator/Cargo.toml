@@ -18,3 +18,6 @@ reth-primitives = { workspace = true, features = ["taiko"] }
 reth-rpc-types.workspace = true
 reth-rpc-types-compat.workspace = true
 taiko-reth-engine-primitives.workspace = true
+
+# misc
+tracing.workspace = true

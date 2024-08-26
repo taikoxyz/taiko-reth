@@ -238,8 +238,6 @@ where
         alloy_rlp::Decodable::decode(&mut attributes.block_metadata.tx_list.as_ref())
             .map_err(|_| PayloadBuilderError::other(TaikoPayloadBuilderError::FailedToDecodeTx))?;
 
-    let basefee_ratio = decode_ontake_extra_data(&attributes.block_metadata.extra_data);
-
     let mut receipts = Vec::new();
     for (idx, tx) in transactions.into_iter().enumerate() {
         let is_anchor = idx == 0;
@@ -302,7 +300,10 @@ where
             let mut tx_env = tx_env_with_recovered(tx);
             tx_env.taiko.is_anchor = is_anchor;
             tx_env.taiko.treasury = chain_spec.treasury();
-            tx_env.taiko.basefee_ratio = basefee_ratio;
+            if chain_spec.is_ontake_fork(block_number) {
+                tx_env.taiko.basefee_ratio =
+                    decode_ontake_extra_data(&attributes.block_metadata.extra_data);
+            }
             tx_env
         };
         let env = EnvWithHandlerCfg::new_with_cfg_env(

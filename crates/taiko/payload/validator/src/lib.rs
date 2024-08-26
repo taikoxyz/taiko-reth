@@ -14,6 +14,7 @@ use reth_rpc_types::{engine::MaybeCancunPayloadFields, PayloadError};
 use reth_rpc_types_compat::engine::payload::try_into_block;
 use std::sync::Arc;
 use taiko_reth_engine_primitives::TaikoExecutionPayload;
+use tracing::debug;
 
 /// Execution payload validator.;
 #[derive(Clone, Debug)]
@@ -111,16 +112,16 @@ impl TaikoExecutionPayloadValidator {
         let expected_hash = payload.block_hash();
 
         // First parse the block
-        let sealed_block = if payload.payload_inner.as_v1().transactions.is_empty() &&
-            (payload.payload_inner.withdrawals().is_none() ||
-                payload.payload_inner.withdrawals().is_some_and(|w| w.is_empty()))
+        let sealed_block = if payload.payload_inner.as_v1().transactions.is_empty()
+            && (payload.payload_inner.withdrawals().is_none()
+                || payload.payload_inner.withdrawals().is_some_and(|w| w.is_empty()))
         {
             create_taiko_block(payload, cancun_fields.parent_beacon_block_root())?.seal_slow()
         } else {
             try_into_block(payload.payload_inner, cancun_fields.parent_beacon_block_root())?
                 .seal_slow()
         };
-
+        debug!(target: "taiko_payload_validator", "Sealed block: {:?}", sealed_block);
         // Ensure the hash included in the payload matches the block hash
         if expected_hash != sealed_block.hash() {
             return Err(PayloadError::BlockHash {
@@ -132,39 +133,39 @@ impl TaikoExecutionPayloadValidator {
         if self.is_cancun_active_at_timestamp(sealed_block.timestamp) {
             if sealed_block.header.blob_gas_used.is_none() {
                 // cancun active but blob gas used not present
-                return Err(PayloadError::PostCancunBlockWithoutBlobGasUsed)
+                return Err(PayloadError::PostCancunBlockWithoutBlobGasUsed);
             }
             if sealed_block.header.excess_blob_gas.is_none() {
                 // cancun active but excess blob gas not present
-                return Err(PayloadError::PostCancunBlockWithoutExcessBlobGas)
+                return Err(PayloadError::PostCancunBlockWithoutExcessBlobGas);
             }
             if cancun_fields.as_ref().is_none() {
                 // cancun active but cancun fields not present
-                return Err(PayloadError::PostCancunWithoutCancunFields)
+                return Err(PayloadError::PostCancunWithoutCancunFields);
             }
         } else {
             if sealed_block.has_blob_transactions() {
                 // cancun not active but blob transactions present
-                return Err(PayloadError::PreCancunBlockWithBlobTransactions)
+                return Err(PayloadError::PreCancunBlockWithBlobTransactions);
             }
             if sealed_block.header.blob_gas_used.is_some() {
                 // cancun not active but blob gas used present
-                return Err(PayloadError::PreCancunBlockWithBlobGasUsed)
+                return Err(PayloadError::PreCancunBlockWithBlobGasUsed);
             }
             if sealed_block.header.excess_blob_gas.is_some() {
                 // cancun not active but excess blob gas present
-                return Err(PayloadError::PreCancunBlockWithExcessBlobGas)
+                return Err(PayloadError::PreCancunBlockWithExcessBlobGas);
             }
             if cancun_fields.as_ref().is_some() {
                 // cancun not active but cancun fields present
-                return Err(PayloadError::PreCancunWithCancunFields)
+                return Err(PayloadError::PreCancunWithCancunFields);
             }
         }
 
         let shanghai_active = self.is_shanghai_active_at_timestamp(sealed_block.timestamp);
         if !shanghai_active && sealed_block.withdrawals.is_some() {
             // shanghai not active but withdrawals present
-            return Err(PayloadError::PreShanghaiBlockWithWitdrawals)
+            return Err(PayloadError::PreShanghaiBlockWithWitdrawals);
         }
 
         // EIP-4844 checks

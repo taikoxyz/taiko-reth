@@ -560,6 +560,12 @@ impl ChainSpec {
         id >= 167000 && id <= 168000
     }
 
+    /// Returns `true` if ontake fork is active at the given block number.
+    #[inline]
+    pub fn is_ontake_fork(&self, block_number: u64) -> bool {
+        self.is_fork_active_at_block(Hardfork::Ontake, block_number)
+    }
+
     /// Returns `true` if this chain is Optimism mainnet.
     #[inline]
     pub fn is_optimism_mainnet(&self) -> bool {

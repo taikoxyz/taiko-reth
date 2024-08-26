@@ -9853,6 +9853,7 @@ dependencies = [
  "reth-rpc-types",
  "reth-rpc-types-compat",
  "taiko-reth-engine-primitives",
+ "tracing",
 ]
 
 [[package]]
