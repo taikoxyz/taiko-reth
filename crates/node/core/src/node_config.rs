@@ -213,13 +213,6 @@ impl NodeConfig {
     /// Set the rpc args for the node
     pub fn with_rpc(mut self, rpc: RpcServerArgs) -> Self {
         self.rpc = rpc;
-        let new_rpc = self.rpc.clone();
-        
-        println!("Server details:");
-
-        println!("{:?}", new_rpc.http_addr);
-        println!("{:?}", new_rpc.http_port);
-    
         self
     }
 
