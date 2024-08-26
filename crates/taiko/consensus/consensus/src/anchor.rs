@@ -85,7 +85,8 @@ pub fn decode_anchor(bytes: &[u8]) -> Result<anchorCall> {
 /// the corresponding enocding function in protocol is `LibProposing._encodeGasConfigs`.
 pub fn decode_ontake_extra_data(extradata: &[u8]) -> u8 {
     let basefee_ratio = U256::from_be_slice(extradata);
-    basefee_ratio.try_into().unwrap()
+    let val: u64 = basefee_ratio.try_into().unwrap();
+    val as u8
 }
 
 /// Verifies the anchor tx correctness

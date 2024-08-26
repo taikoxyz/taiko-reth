@@ -29,7 +29,7 @@ impl ProposerClient {
         base_fee: u64,
         block_max_gas_limit: u64,
         max_bytes_per_tx_list: u64,
-        local_accounts: Vec<Address>,
+        local_accounts: Option<Vec<Address>>,
         max_transactions_lists: u64,
         min_tip: u64,
     ) -> Result<Vec<TaskResult>, RethError> {

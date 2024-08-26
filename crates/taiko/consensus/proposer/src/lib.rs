@@ -148,7 +148,7 @@ pub struct TaskArgs {
     /// Maximum bytes per transaction list
     pub max_bytes_per_tx_list: u64,
     /// Local accounts
-    pub local_accounts: Vec<Address>,
+    pub local_accounts: Option<Vec<Address>>,
     /// Maximum number of transactions lists
     pub max_transactions_lists: u64,
     /// Minimum tip

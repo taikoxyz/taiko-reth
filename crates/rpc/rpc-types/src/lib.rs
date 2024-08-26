@@ -41,9 +41,29 @@ pub use alloy_rpc_types_admin as admin;
 // re-export txpool
 pub use alloy_rpc_types_txpool as txpool;
 
+/// Ethereum specific types for the engine API.
+pub mod engine {
+
+    pub use crate::eth::engine::*;
+
+    use alloy_rpc_types::Withdrawal;
+    use serde::{Deserialize, Serialize};
+
+    /// This is the input to `engine_newPayloadV2`, which may or may not have a withdrawals field.
+    #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    pub struct ExecutionPayloadInputV2 {
+        /// The V1 execution payload
+        #[serde(flatten)]
+        pub execution_payload: ExecutionPayloadV1,
+        /// The payload withdrawals
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub withdrawals: Option<Vec<Withdrawal>>,
+    }
+}
+
 // Ethereum specific rpc types related to typed transaction requests and the engine API.
 pub use eth::{
-    engine,
     engine::{
         ExecutionPayload, ExecutionPayloadV1, ExecutionPayloadV2, ExecutionPayloadV3, PayloadError,
     },

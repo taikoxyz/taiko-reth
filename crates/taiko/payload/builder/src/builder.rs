@@ -84,10 +84,10 @@ where
             ..
         } = config;
 
-        debug!(target: "payload_builder", parent_hash = ?parent_block.hash(), parent_number = parent_block.number, "building empty payload");
+        debug!(target: "taiko_payload_builder", parent_hash = ?parent_block.hash(), parent_number = parent_block.number, "building empty payload");
 
         let state = client.state_by_block_hash(parent_block.hash()).map_err(|err| {
-                warn!(target: "payload_builder", parent_hash=%parent_block.hash(), %err, "failed to get state for empty payload");
+                warn!(target: "taiko_payload_builder", parent_hash=%parent_block.hash(), %err, "failed to get state for empty payload");
                 err
             })?;
         let mut db = State::builder()
@@ -108,13 +108,13 @@ where
                 &initialized_block_env,
                 &attributes,
             ).map_err(|err| {
-                warn!(target: "payload_builder", parent_hash=%parent_block.hash(), %err, "failed to apply beacon root contract call for empty payload");
+                warn!(target: "taiko_payload_builder", parent_hash=%parent_block.hash(), %err, "failed to apply beacon root contract call for empty payload");
                 err
             })?;
 
         let WithdrawalsOutcome { withdrawals_root, withdrawals } =
                 commit_withdrawals(&mut db, &chain_spec, attributes.payload_attributes.timestamp, attributes.payload_attributes.withdrawals.clone()).map_err(|err| {
-                    warn!(target: "payload_builder", parent_hash=%parent_block.hash(), %err, "failed to commit withdrawals for empty payload");
+                    warn!(target: "taiko_payload_builder", parent_hash=%parent_block.hash(), %err, "failed to commit withdrawals for empty payload");
                     err
                 })?;
 
@@ -125,7 +125,7 @@ where
         // calculate the state root
         let bundle_state = db.take_bundle();
         let state_root = db.database.state_root(&bundle_state).map_err(|err| {
-                warn!(target: "payload_builder", parent_hash=%parent_block.hash(), %err, "failed to calculate state root for empty payload");
+                warn!(target: "taiko_payload_builder", parent_hash=%parent_block.hash(), %err, "failed to calculate state root for empty payload");
                 err
             })?;
 
@@ -212,7 +212,7 @@ where
         ..
     } = config;
 
-    debug!(target: "payload_builder", id=%attributes.payload_attributes.payload_id(), parent_hash = ?parent_block.hash(), parent_number = parent_block.number, "building new payload");
+    debug!(target: "taiko_payload_builder", id=%attributes.payload_attributes.payload_id(), parent_hash = ?parent_block.hash(), parent_number = parent_block.number, "building new payload");
     let mut cumulative_gas_used = 0;
     let mut sum_blob_gas_used = 0;
     let block_gas_limit: u64 = initialized_block_env.gas_limit.try_into().unwrap_or(u64::MAX);
@@ -267,7 +267,7 @@ where
                 // invalid, which removes its dependent transactions from
                 // the iterator. This is similar to the gas limit condition
                 // for regular transactions above.
-                trace!(target: "payload_builder", tx=?tx.hash, ?sum_blob_gas_used, ?tx_blob_gas, "skipping blob transaction because it would exceed the max data gas per block");
+                trace!(target: "taiko_payload_builder", tx=?tx.hash, ?sum_blob_gas_used, ?tx_blob_gas, "skipping blob transaction because it would exceed the max data gas per block");
                 // anchor tx can't be a blob tx
                 continue;
             }
@@ -478,7 +478,7 @@ where
     // Write the head L1Origin.
     client.save_head_l1_origin(sealed_block.number)?;
 
-    debug!(target: "payload_builder", ?sealed_block, "sealed built block");
+    debug!(target: "taiko_payload_builder", ?sealed_block, "sealed built block");
 
     let mut payload =
         TaikoBuiltPayload::new(attributes.payload_attributes.id, sealed_block, total_fees);

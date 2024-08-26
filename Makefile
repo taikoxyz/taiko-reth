@@ -340,16 +340,17 @@ define taiko_docker_build_push
 	mkdir -p $(BIN_DIR)/amd64
 	cp $(BUILD_PATH)/x86_64-unknown-linux-gnu/$(PROFILE)/taiko-reth $(BIN_DIR)/amd64/taiko-reth
 
-	$(MAKE) taiko-build-aarch64-unknown-linux-gnu
-	mkdir -p $(BIN_DIR)/arm64
-	cp $(BUILD_PATH)/aarch64-unknown-linux-gnu/$(PROFILE)/taiko-reth $(BIN_DIR)/arm64/taiko-reth
+	# $(MAKE) taiko-build-aarch64-unknown-linux-gnu
+	# mkdir -p $(BIN_DIR)/arm64
+	# cp $(BUILD_PATH)/aarch64-unknown-linux-gnu/$(PROFILE)/taiko-reth $(BIN_DIR)/arm64/taiko-reth
 
 	docker buildx build --file ./DockerfileTaiko.cross . \
-		--platform linux/amd64,linux/arm64 \
+		#--platform linux/amd64,linux/arm64 \
+		--platform linux/amd64 \
 		--tag $(TAIKO_DOCKER_IMAGE_NAME):$(1) \
 		--tag $(TAIKO_DOCKER_IMAGE_NAME):$(2) \
 		--provenance=false \
-		--push
+		# --push
 endef
 
 ##@ Other

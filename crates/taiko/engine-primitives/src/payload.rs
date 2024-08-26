@@ -21,6 +21,8 @@ use reth_rpc_types_compat::engine::{
     payload::{block_to_payload_v2, block_to_payload_v3, block_to_payload_v4},
 };
 use serde::{Deserialize, Serialize};
+use serde_with::base64::Base64;
+use serde_with::serde_as;
 use std::convert::Infallible;
 use taiko_reth_primitives::L1Origin;
 
@@ -62,6 +64,7 @@ impl reth_payload_primitives::PayloadAttributes for TaikoPayloadAttributes {
 }
 
 /// This structure contains the information from l1 contract storage
+#[serde_as]
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BlockMetadata {
@@ -81,7 +84,8 @@ pub struct BlockMetadata {
     pub tx_list: Bytes,
     /// An arbitrary byte array containing data relevant to this block. This must be 32 bytes or
     /// fewer; formally Hx.
-    pub extra_data: Bytes,
+    #[serde_as(as = "Base64")]
+    pub extra_data: Vec<u8>,
 }
 
 /// Taiko Payload Builder Attributes
@@ -302,7 +306,7 @@ impl From<TaikoBuiltPayload> for ExecutionPayloadEnvelopeV4 {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TaikoExecutionPayloadV2 {
-    /// Inner V3 payload
+    /// Inner V2 payload
     #[serde(flatten)]
     pub payload_inner: ExecutionPayloadV2,
 

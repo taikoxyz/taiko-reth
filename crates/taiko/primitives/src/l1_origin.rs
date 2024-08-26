@@ -4,7 +4,7 @@ use reth_db_api::{
     table::{Compress, Decode, Decompress, Encode},
     DatabaseError,
 };
-use reth_primitives::{BlockNumber, B256};
+use reth_primitives::{B256, U256};
 use serde::{Deserialize, Serialize};
 reth_db_api::impl_compression_for_compact!(L1Origin);
 
@@ -36,11 +36,12 @@ impl Decode for HeadL1OriginKey {
 #[serde(rename_all = "camelCase")]
 pub struct L1Origin {
     /// The block number of the l2 block
-    pub block_id: BlockNumber,
+    #[serde(rename = "blockID")]
+    pub block_id: U256,
     /// The hash of the l2 block
     pub l2_block_hash: B256,
     /// The height of the l1 block
-    pub l1_block_height: BlockNumber,
+    pub l1_block_height: U256,
     /// The hash of the l1 block
     pub l1_block_hash: B256,
 }

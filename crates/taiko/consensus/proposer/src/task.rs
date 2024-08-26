@@ -85,7 +85,13 @@ where
                         tx.effective_tip_per_gas(trigger_args.base_fee)
                             .map_or(false, |tip| tip >= trigger_args.min_tip as u128)
                     })
-                    .partition(|tx| trigger_args.local_accounts.contains(&tx.sender()));
+                    .partition(|tx| {
+                        trigger_args
+                            .local_accounts
+                            .as_ref()
+                            .map(|local_accounts| local_accounts.contains(&tx.sender()))
+                            .unwrap_or_default()
+                    });
                 local_txs.extend(remote_txs);
                 // miner returned a set of transaction that we feed to the producer
                 this.queued.push_back((trigger_args, local_txs));

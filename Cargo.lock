@@ -6667,6 +6667,7 @@ dependencies = [
  "alloy-genesis",
  "alloy-primitives",
  "alloy-rlp",
+ "alloy-serde",
  "alloy-trie",
  "derive_more",
  "num_enum",
@@ -6815,6 +6816,7 @@ dependencies = [
  "serde_json",
  "strum",
  "sysinfo",
+ "taiko-reth-primitives",
  "tempfile",
  "test-fuzz",
  "thiserror",
@@ -9777,6 +9779,7 @@ dependencies = [
  "reth-rpc-types-compat",
  "serde",
  "serde_json",
+ "serde_with",
  "taiko-reth-primitives",
 ]
 
@@ -9859,7 +9862,6 @@ dependencies = [
  "bytes",
  "modular-bitfield",
  "reth-codecs",
- "reth-db",
  "reth-db-api",
  "reth-primitives",
  "serde",
@@ -9892,6 +9894,7 @@ name = "taiko-reth-provider"
 version = "1.0.0"
 dependencies = [
  "auto_impl",
+ "reth-db",
  "reth-db-api",
  "reth-primitives",
  "reth-provider",

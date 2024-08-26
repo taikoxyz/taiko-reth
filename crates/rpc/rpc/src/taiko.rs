@@ -63,7 +63,7 @@ where
 {
     /// HeadL1Origin returns the latest L2 block's corresponding L1 origin.
     // #[cfg(feature = "taiko")]
-    async fn head_l1_origin(&self) -> RpcResult<Option<u64>> {
+    async fn head_l1_origin(&self) -> RpcResult<L1Origin> {
         self.provider.get_head_l1_origin().to_rpc_result()
     }
 
@@ -89,7 +89,7 @@ where
         base_fee: u64,
         block_max_gas_limit: u64,
         max_bytes_per_tx_list: u64,
-        local_accounts: Vec<Address>,
+        local_accounts: Option<Vec<Address>>,
         max_transactions_lists: u64,
     ) -> RpcResult<Vec<PreBuiltTxList>> {
         self.tx_pool_content_with_min_tip(
@@ -111,7 +111,7 @@ where
         base_fee: u64,
         block_max_gas_limit: u64,
         max_bytes_per_tx_list: u64,
-        local_accounts: Vec<Address>,
+        local_accounts: Option<Vec<Address>>,
         max_transactions_lists: u64,
         min_tip: u64,
     ) -> RpcResult<Vec<PreBuiltTxList>> {
