@@ -1,4 +1,5 @@
 //! The module for L1 origin related data.
+use reth_db::tables::{HeadL1Origin, L1Origins};
 use reth_db_api::{
     database::Database,
     transaction::{DbTx, DbTxMut},
@@ -9,15 +10,15 @@ use reth_provider::{
     DatabaseProviderRwFactory, ProviderError,
 };
 use reth_storage_errors::provider::ProviderResult;
-use taiko_reth_primitives::{HeadL1Origin, HeadL1OriginKey, L1Origin, L1Origins};
+use taiko_reth_primitives::{HeadL1OriginKey, L1Origin};
 
 /// The trait for fetch L1 origin related data.
 #[auto_impl::auto_impl(&, Arc)]
 pub trait L1OriginReader: Send + Sync {
     /// Get the L1 origin for the given block hash.
-    fn get_l1_origin(&self, block_hash: BlockNumber) -> ProviderResult<L1Origin>;
+    fn get_l1_origin(&self, block_number: BlockNumber) -> ProviderResult<L1Origin>;
     /// Get the head L1 origin.
-    fn get_head_l1_origin(&self) -> ProviderResult<Option<BlockNumber>>;
+    fn get_head_l1_origin(&self) -> ProviderResult<L1Origin>;
 }
 
 /// The trait for updating L1 origin related data.
@@ -36,8 +37,12 @@ impl<TX: DbTx> L1OriginReader for DatabaseProvider<TX> {
             .ok_or_else(|| ProviderError::L1OriginNotFound(block_number))
     }
 
-    fn get_head_l1_origin(&self) -> ProviderResult<Option<BlockNumber>> {
-        Ok(self.tx_ref().get::<HeadL1Origin>(HeadL1OriginKey)?)
+    fn get_head_l1_origin(&self) -> ProviderResult<L1Origin> {
+        let block_number = self
+            .tx_ref()
+            .get::<HeadL1Origin>(HeadL1OriginKey)?
+            .ok_or_else(|| ProviderError::HeadL1OriginNotFound)?;
+        self.get_l1_origin(block_number)
     }
 }
 
@@ -59,7 +64,7 @@ where
         self.database_provider_ro()?.get_l1_origin(block_number)
     }
 
-    fn get_head_l1_origin(&self) -> ProviderResult<Option<BlockNumber>> {
+    fn get_head_l1_origin(&self) -> ProviderResult<L1Origin> {
         self.database_provider_ro()?.get_head_l1_origin()
     }
 }

@@ -10,7 +10,6 @@ description = "Taiko primitive types"
 
 
 [dependencies]
-reth-db.workspace = true
 reth-primitives.workspace = true
 serde.workspace = true
 reth-db-api.workspace = true

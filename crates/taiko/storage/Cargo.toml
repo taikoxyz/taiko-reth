@@ -17,6 +17,7 @@ reth-primitives.workspace = true
 reth-storage-errors.workspace = true
 reth-provider.workspace = true
 reth-db-api.workspace = true
+reth-db.workspace = true
 
 # taiko
 taiko-reth-primitives.workspace = true
