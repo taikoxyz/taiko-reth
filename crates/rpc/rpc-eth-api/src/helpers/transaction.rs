@@ -268,16 +268,13 @@ pub trait EthTransactions: LoadTransaction {
             match Self::get_chain_id(&recovered) {
                 Ok(maybe_chain_id) => {
                     if let Some(chain_id) = maybe_chain_id {
-                        println!("Transaction is on network with chain ID: {}", chain_id);
-                        // Perform your special logic here based on chain_id
+                        println!("Dani debug: txn chain ID: {}", chain_id);
                     } else {
-                        println!("Transaction is pre-EIP-155 (no chain ID)");
-                        // Handle pre-EIP-155 transactions (no chain ID)
+                        println!("Dani debug: pre-EIP-155 (no chain ID)");
                     }
                 },
                 Err(e) => {
                     eprintln!("Error decoding chain ID: {:?}", e);
-                    // Handle RLP decoding error
                 }
             }
             
