@@ -314,6 +314,8 @@ where
         // 1. prepare state on new block
         self.on_new_block(&block.header);
 
+        println!("Dani debug: Execution happens on chainid: {:?}", self.chain_spec().chain());
+
         // 2. configure the evm and execute
         let env = self.evm_env_for_block(&block.header, total_difficulty);
         let output = {

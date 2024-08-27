@@ -62,6 +62,9 @@ impl<E: EngineTypes> PayloadTestContext<E> {
     pub async fn expect_built_payload(&mut self) -> eyre::Result<E::BuiltPayload> {
         let second_event = self.payload_event_stream.next().await.unwrap()?;
         if let reth::payload::Events::BuiltPayload(payload) = second_event {
+            let payload_to_debug = payload.clone();
+            println!("Dani debug expect_built_payload: when is it called: {:?}", payload_to_debug.block().number);
+            println!("Dani debug expect_built_payload: block's txns: {:?}", payload_to_debug.block().body);
             Ok(payload)
         } else {
             panic!("Expect a built payload event.");

@@ -232,19 +232,6 @@ pub trait EthTransactions: LoadTransaction {
         }
     }
 
-    fn get_chain_id(tx: &PooledTransactionsElementEcRecovered) -> alloy_rlp::Result<Option<u64>> {
-        // Get the signature from the transaction
-        let signature = tx.signature();
-        
-        // Get the v value from the signature
-        let v = signature.v(None);  // We pass None as we don't know the chain_id yet
-        
-        // Use the public extract_chain_id function
-        let (_, chain_id) = extract_chain_id(v)?;
-        
-        Ok(chain_id)
-    }
-
     /// Decodes and recovers the transaction and submits it to the pool.
     ///
     /// Returns the hash of the transaction.
@@ -264,19 +251,6 @@ pub trait EthTransactions: LoadTransaction {
             }
 
             let recovered = recover_raw_transaction(tx)?;
-
-            match Self::get_chain_id(&recovered) {
-                Ok(maybe_chain_id) => {
-                    if let Some(chain_id) = maybe_chain_id {
-                        println!("Dani debug: txn chain ID: {}", chain_id);
-                    } else {
-                        println!("Dani debug: pre-EIP-155 (no chain ID)");
-                    }
-                },
-                Err(e) => {
-                    eprintln!("Error decoding chain ID: {:?}", e);
-                }
-            }
             
             let pool_transaction =
                 <Self::Pool as TransactionPool>::Transaction::from_recovered_pooled_transaction(
