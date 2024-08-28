@@ -315,7 +315,12 @@ pub static TAIKO_INTERNAL_L2_A: Lazy<Arc<ChainSpec>> = Lazy::new(|| {
             #[cfg(feature = "taiko")]
             (Hardfork::Hekla, ForkCondition::Block(0)),
             #[cfg(feature = "taiko")]
-            (Hardfork::Ontake, ForkCondition::Block(20)), //todo
+            (
+                Hardfork::Ontake,
+                ForkCondition::Block(
+                    std::env::var("ONTAKE_HEIGHT").map_or(2000, |h| h.parse().unwrap_or(2000)),
+                ),
+            ),
         ]),
         base_fee_params: BaseFeeParamsKind::Constant(BaseFeeParams {
             max_change_denominator: 8,
