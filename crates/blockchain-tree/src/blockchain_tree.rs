@@ -393,6 +393,7 @@ where
 
         let provider = self.externals.provider_factory.provider()?;
 
+        println!("Dani debug: appears before validate_and_execute, if so, chain_id: {:?}", provider.chain_spec().chain().id());
         // Validate that the block is post merge
         let parent_td = provider
             .header_td(&block.parent_hash)?
