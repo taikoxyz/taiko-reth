@@ -239,12 +239,12 @@ opt-level = 3
 lto = "thin"
 
 [profile.release]
-opt-level = 3
+opt-level = 1
 lto = "thin"
 debug = "line-tables-only"
 strip = true
 panic = "unwind"
-codegen-units = 16
+codegen-units = 8
 
 # Use the `--profile profiling` flag to show symbols in release mode.
 # e.g. `cargo build --profile profiling`
@@ -539,3 +539,8 @@ serial_test = "3"
 similar-asserts = "1.5.0"
 test-fuzz = "5"
 iai-callgrind = "0.11"
+
+
+#[patch.crates-io]
+#revm = { path = "../revm/crates/revm" }
+#revm-primitives = { path = "../revm/crates/primitives" }

@@ -19,6 +19,7 @@ use reth_evm::execute::{BlockExecutionOutput, BlockExecutorProvider, Executor};
 use reth_execution_types::ExecutionOutcome;
 use reth_fs_util as fs;
 use reth_node_api::PayloadBuilderAttributes;
+//use reth_node_api::PayloadBuilderAttributes;
 use reth_payload_builder::database::CachedReads;
 use reth_primitives::{
     constants::eip4844::LoadKzgSettingsError, revm_primitives::KzgSettings, Address,
@@ -113,6 +114,7 @@ impl Command {
 
     /// Execute `debug in-memory-merkle` command
     pub async fn execute(self, ctx: CliContext) -> eyre::Result<()> {
+        // Brecht: good end to end block building code
         let Environment { provider_factory, .. } = self.env.init(AccessRights::RW)?;
 
         let consensus: Arc<dyn Consensus> =
@@ -267,6 +269,8 @@ impl Command {
                 let senders = block.senders().expect("sender recovery failed");
                 let block_with_senders =
                     SealedBlockWithSenders::new(block.clone(), senders).unwrap();
+
+                println!("debug_cmd build");
 
                 let db = StateProviderDatabase::new(blockchain_db.latest()?);
                 let executor = block_executor!(provider_factory.chain_spec()).executor(db);

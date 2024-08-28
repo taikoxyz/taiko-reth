@@ -93,6 +93,7 @@ impl ProviderFactory<DatabaseEnv> {
         args: DatabaseArguments,
         static_file_provider: StaticFileProvider,
     ) -> RethResult<Self> {
+        println!("new_with_database_path");
         Ok(Self {
             db: Arc::new(init_db(path, args).map_err(RethError::msg)?),
             chain_spec,

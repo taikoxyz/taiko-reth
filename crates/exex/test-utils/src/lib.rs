@@ -128,6 +128,7 @@ where
     type AddOns = EthereumAddOns;
 
     fn components_builder(&self) -> Self::ComponentsBuilder {
+        println!("components_builder");
         ComponentsBuilder::default()
             .node_types::<N>()
             .pool(TestPoolBuilder::default())

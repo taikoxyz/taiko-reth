@@ -374,6 +374,7 @@ where
                     }
                 },
                 FromEngine::Request(request) => match request {
+                    // Brecht: fork choice update
                     BeaconEngineMessage::ForkchoiceUpdated { state, payload_attrs, tx } => {
                         let output = self.on_forkchoice_updated(state, payload_attrs);
 
@@ -682,6 +683,8 @@ where
         &mut self,
         block: SealedBlockWithSenders,
     ) -> Result<InsertPayloadOk, InsertBlockErrorKind> {
+        println!("insert_block_inner");
+
         if self.block_by_hash(block.hash())?.is_some() {
             let attachment = BlockAttachment::Canonical; // TODO: remove or revise attachment
             return Ok(InsertPayloadOk::AlreadySeen(BlockStatus::Valid(attachment)))

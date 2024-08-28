@@ -1,0 +1,63 @@
+{
+  "name": "@taiko/gwyneth_protocol",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "buildMerkle": "ts-node ./utils/airdrop/buildMerkleTree.ts ./utils/airdrop/airdrop_db/example_claimList.json",
+    "clean": "rm -rf abis cache && forge clean",
+    "compile": "forge build",
+    "compile:hardhat": "pnpm hardhat compile",
+    "deploy:foundry": "./script/download_solc.sh && ./script/test_deploy_on_l1.sh",
+    "eslint": "pnpm exec eslint --ignore-path .eslintignore --ext .js,.ts .",
+    "eslint:fix": "pnpm exec eslint --ignore-path .eslintignore --ext .js,.ts . --fix",
+    "export:abi": "pnpm hardhat clear-abi && pnpm hardhat export-abi",
+    "fmt:sol": "forge fmt",
+    "generate:genesis": "ts-node ./utils/generate_genesis/main.ts",
+    "lint:sol": "forge fmt && pnpm solhint 'contracts/**/*.sol' --fix",
+    "sizer": "pnpm hardhat size-contracts",
+    "snapshot": "forge snapshot --match-path 'test/**/*.t.sol'",
+    "test": "forge test -vvv --match-path test/*.t.sol",
+    "test:coverage": "mkdir -p coverage && forge coverage --report lcov && lcov --remove ./lcov.info -o ./coverage/lcov.info 'test/' 'script/' 'contracts/thirdparty/' && genhtml coverage/lcov.info --branch-coverage --output-dir coverage --ignore-errors category && open coverage/index.html",
+    "test:genesis": "pnpm compile && pnpm compile:hardhat && FOUNDRY_PROFILE=genesis ./genesis/generate_genesis.test.sh",
+    "export:simconf": "forge test --match-test 'test_simulation' -vv > simulation/out/simconf_$(date +%s).txt"
+  },
+  "keywords": [
+    "ZKP",
+    "Zero-Knowledge Proof",
+    "Decentralized",
+    "Permissionless",
+    "Type-1",
+    "ZK-EVM",
+    "zkRollup",
+    "Ethereum",
+    "Layer2"
+  ],
+  "author": "Taiko Labs",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^20.11.30",
+    "@typescript-eslint/eslint-plugin": "^7.4.0",
+    "@typescript-eslint/parser": "^7.7.0",
+    "eslint": "^8.51.0",
+    "eslint-config-prettier": "^9.1.0",
+    "eslint-config-standard": "^17.1.0",
+    "eslint-plugin-import": "^2.28.1",
+    "eslint-plugin-node": "^11.1.0",
+    "eslint-plugin-prettier": "^5.1.3",
+    "eslint-plugin-promise": "^6.1.1",
+    "ethers": "^5.7.2",
+    "solc": "0.8.24",
+    "solhint": "^5.0.1",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.2.2"
+  },
+  "dependencies": {
+    "@openzeppelin/contracts": "4.9.6",
+    "@openzeppelin/contracts-upgradeable": "4.9.6",
+    "ds-test": "github:dapphub/ds-test#e282159d5170298eb2455a6c05280ab5a73a4ef0",
+    "forge-std": "github:foundry-rs/forge-std#v1.7.5",
+    "merkletreejs": "^0.3.11",
+    "p256-verifier": "github:taikoxyz/p256-verifier#v0.1.0",
+    "solady": "github:Vectorized/solady#v0.0.167"
+  }
+}

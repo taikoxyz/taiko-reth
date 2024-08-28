@@ -261,6 +261,8 @@ where
     Client: StateProviderFactory,
     Pool: TransactionPool,
 {
+    // Brecht: ethereum payload builder
+
     let BuildArguments { client, pool, mut cached_reads, config, cancel, best_payload } = args;
 
     let state_provider = client.state_by_block_hash(config.parent_block.hash())?;
@@ -295,6 +297,8 @@ where
 
     let block_number = initialized_block_env.number.to::<u64>();
 
+    println!("brecht: payload builder: {:?}", attributes.transactions);
+
     // apply eip-4788 pre block contract call
     pre_block_beacon_root_contract_call(
         &mut db,
@@ -326,111 +330,172 @@ where
     .map_err(|err| PayloadBuilderError::Internal(err.into()))?;
 
     let mut receipts = Vec::new();
-    while let Some(pool_tx) = best_txs.next() {
-        // ensure we still have capacity for this transaction
-        if cumulative_gas_used + pool_tx.gas_limit() > block_gas_limit {
-            // we can't fit this transaction into the block, so we need to mark it as invalid
-            // which also removes all dependent transaction from the iterator before we can
-            // continue
-            best_txs.mark_invalid(&pool_tx);
-            continue
+    // Using fixed transaction list if it's set
+    if attributes.transactions.is_some() {
+        println!("Using fixed tx list");
+
+        let transactions = attributes.transactions.unwrap();
+
+        for sequencer_tx in &transactions {
+            // Check if the job was cancelled, if so we can exit early.
+            if cancel.is_cancelled() {
+                return Ok(BuildOutcome::Cancelled)
+            }
+
+            let sequencer_tx = sequencer_tx.clone().try_into_ecrecovered().unwrap();
+
+            let env = EnvWithHandlerCfg::new_with_cfg_env(
+                initialized_cfg.clone(),
+                initialized_block_env.clone(),
+                evm_config.tx_env(&sequencer_tx),
+            );
+
+            let mut evm = evm_config.evm_with_env(&mut db, env);
+
+            let ResultAndState { result, state } = match evm.transact() {
+                Ok(res) => res,
+                Err(err) => {
+                    match err {
+                        EVMError::Transaction(err) => {
+                            trace!(target: "payload_builder", %err, ?sequencer_tx, "Error in sequencer transaction, skipping.");
+                            continue
+                        }
+                        err => {
+                            // this is an error that we should treat as fatal for this attempt
+                            return Err(PayloadBuilderError::EvmExecutionError(err))
+                        }
+                    }
+                }
+            };
+
+            // to release the db reference drop evm.
+            drop(evm);
+            // commit changes
+            db.commit(state);
+
+            let gas_used = result.gas_used();
+
+            // add gas used by the transaction to cumulative gas used, before creating the receipt
+            cumulative_gas_used += gas_used;
+
+            // Push transaction changeset and calculate header bloom filter for receipt.
+            receipts.push(Some(Receipt {
+                tx_type: sequencer_tx.tx_type(),
+                success: result.is_success(),
+                cumulative_gas_used,
+                logs: result.into_logs().into_iter().map(Into::into).collect(),
+            }));
+
+            // append transaction to the list of executed transactions
+            executed_txs.push(sequencer_tx.into_signed());
         }
-
-        // check if the job was cancelled, if so we can exit early
-        if cancel.is_cancelled() {
-            return Ok(BuildOutcome::Cancelled)
-        }
-
-        // convert tx to a signed transaction
-        let tx = pool_tx.to_recovered_transaction();
-
-        // There's only limited amount of blob space available per block, so we need to check if
-        // the EIP-4844 can still fit in the block
-        if let Some(blob_tx) = tx.transaction.as_eip4844() {
-            let tx_blob_gas = blob_tx.blob_gas();
-            if sum_blob_gas_used + tx_blob_gas > MAX_DATA_GAS_PER_BLOCK {
-                // we can't fit this _blob_ transaction into the block, so we mark it as
-                // invalid, which removes its dependent transactions from
-                // the iterator. This is similar to the gas limit condition
-                // for regular transactions above.
-                trace!(target: "payload_builder", tx=?tx.hash, ?sum_blob_gas_used, ?tx_blob_gas, "skipping blob transaction because it would exceed the max data gas per block");
+    } else {
+        while let Some(pool_tx) = best_txs.next() {
+            // ensure we still have capacity for this transaction
+            if cumulative_gas_used + pool_tx.gas_limit() > block_gas_limit {
+                // we can't fit this transaction into the block, so we need to mark it as invalid
+                // which also removes all dependent transaction from the iterator before we can
+                // continue
                 best_txs.mark_invalid(&pool_tx);
                 continue
             }
-        }
 
-        let env = EnvWithHandlerCfg::new_with_cfg_env(
-            initialized_cfg.clone(),
-            initialized_block_env.clone(),
-            evm_config.tx_env(&tx),
-        );
+            // check if the job was cancelled, if so we can exit early
+            if cancel.is_cancelled() {
+                return Ok(BuildOutcome::Cancelled)
+            }
 
-        // Configure the environment for the block.
-        let mut evm = evm_config.evm_with_env(&mut db, env);
+            // convert tx to a signed transaction
+            let tx = pool_tx.to_recovered_transaction();
 
-        let ResultAndState { result, state } = match evm.transact() {
-            Ok(res) => res,
-            Err(err) => {
-                match err {
-                    EVMError::Transaction(err) => {
-                        if matches!(err, InvalidTransaction::NonceTooLow { .. }) {
-                            // if the nonce is too low, we can skip this transaction
-                            trace!(target: "payload_builder", %err, ?tx, "skipping nonce too low transaction");
-                        } else {
-                            // if the transaction is invalid, we can skip it and all of its
-                            // descendants
-                            trace!(target: "payload_builder", %err, ?tx, "skipping invalid transaction and its descendants");
-                            best_txs.mark_invalid(&pool_tx);
-                        }
-
-                        continue
-                    }
-                    err => {
-                        // this is an error that we should treat as fatal for this attempt
-                        return Err(PayloadBuilderError::EvmExecutionError(err))
-                    }
+            // There's only limited amount of blob space available per block, so we need to check if
+            // the EIP-4844 can still fit in the block
+            if let Some(blob_tx) = tx.transaction.as_eip4844() {
+                let tx_blob_gas = blob_tx.blob_gas();
+                if sum_blob_gas_used + tx_blob_gas > MAX_DATA_GAS_PER_BLOCK {
+                    // we can't fit this _blob_ transaction into the block, so we mark it as
+                    // invalid, which removes its dependent transactions from
+                    // the iterator. This is similar to the gas limit condition
+                    // for regular transactions above.
+                    trace!(target: "payload_builder", tx=?tx.hash, ?sum_blob_gas_used, ?tx_blob_gas, "skipping blob transaction because it would exceed the max data gas per block");
+                    best_txs.mark_invalid(&pool_tx);
+                    continue
                 }
             }
-        };
-        // drop evm so db is released.
-        drop(evm);
-        // commit changes
-        db.commit(state);
 
-        // add to the total blob gas used if the transaction successfully executed
-        if let Some(blob_tx) = tx.transaction.as_eip4844() {
-            let tx_blob_gas = blob_tx.blob_gas();
-            sum_blob_gas_used += tx_blob_gas;
+            let env = EnvWithHandlerCfg::new_with_cfg_env(
+                initialized_cfg.clone(),
+                initialized_block_env.clone(),
+                evm_config.tx_env(&tx),
+            );
 
-            // if we've reached the max data gas per block, we can skip blob txs entirely
-            if sum_blob_gas_used == MAX_DATA_GAS_PER_BLOCK {
-                best_txs.skip_blobs();
+            // Configure the environment for the block.
+            let mut evm = evm_config.evm_with_env(&mut db, env);
+
+            let ResultAndState { result, state } = match evm.transact() {
+                Ok(res) => res,
+                Err(err) => {
+                    match err {
+                        EVMError::Transaction(err) => {
+                            if matches!(err, InvalidTransaction::NonceTooLow { .. }) {
+                                // if the nonce is too low, we can skip this transaction
+                                trace!(target: "payload_builder", %err, ?tx, "skipping nonce too low transaction");
+                            } else {
+                                // if the transaction is invalid, we can skip it and all of its
+                                // descendants
+                                trace!(target: "payload_builder", %err, ?tx, "skipping invalid transaction and its descendants");
+                                best_txs.mark_invalid(&pool_tx);
+                            }
+
+                            continue
+                        }
+                        err => {
+                            // this is an error that we should treat as fatal for this attempt
+                            return Err(PayloadBuilderError::EvmExecutionError(err))
+                        }
+                    }
+                }
+            };
+            // drop evm so db is released.
+            drop(evm);
+            // commit changes
+            db.commit(state);
+
+            // add to the total blob gas used if the transaction successfully executed
+            if let Some(blob_tx) = tx.transaction.as_eip4844() {
+                let tx_blob_gas = blob_tx.blob_gas();
+                sum_blob_gas_used += tx_blob_gas;
+
+                // if we've reached the max data gas per block, we can skip blob txs entirely
+                if sum_blob_gas_used == MAX_DATA_GAS_PER_BLOCK {
+                    best_txs.skip_blobs();
+                }
             }
+
+            let gas_used = result.gas_used();
+
+            // add gas used by the transaction to cumulative gas used, before creating the receipt
+            cumulative_gas_used += gas_used;
+
+            // Push transaction changeset and calculate header bloom filter for receipt.
+            #[allow(clippy::needless_update)] // side-effect of optimism fields
+            receipts.push(Some(Receipt {
+                tx_type: tx.tx_type(),
+                success: result.is_success(),
+                cumulative_gas_used,
+                logs: result.into_logs().into_iter().map(Into::into).collect(),
+                ..Default::default()
+            }));
+
+            // update add to total fees
+            let miner_fee = tx
+                .effective_tip_per_gas(Some(base_fee))
+                .expect("fee is always valid; execution succeeded");
+            total_fees += U256::from(miner_fee) * U256::from(gas_used);
+
+            // append transaction to the list of executed transactions
+            executed_txs.push(tx.into_signed());
         }
-
-        let gas_used = result.gas_used();
-
-        // add gas used by the transaction to cumulative gas used, before creating the receipt
-        cumulative_gas_used += gas_used;
-
-        // Push transaction changeset and calculate header bloom filter for receipt.
-        #[allow(clippy::needless_update)] // side-effect of optimism fields
-        receipts.push(Some(Receipt {
-            tx_type: tx.tx_type(),
-            success: result.is_success(),
-            cumulative_gas_used,
-            logs: result.into_logs().into_iter().map(Into::into).collect(),
-            ..Default::default()
-        }));
-
-        // update add to total fees
-        let miner_fee = tx
-            .effective_tip_per_gas(Some(base_fee))
-            .expect("fee is always valid; execution succeeded");
-        total_fees += U256::from(miner_fee) * U256::from(gas_used);
-
-        // append transaction to the list of executed transactions
-        executed_txs.push(tx.into_signed());
     }
 
     // check if we have a better block

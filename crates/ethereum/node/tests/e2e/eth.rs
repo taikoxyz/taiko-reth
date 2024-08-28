@@ -45,6 +45,8 @@ async fn can_run_eth_node() -> eyre::Result<()> {
     // assert the block has been committed to the blockchain
     node.assert_new_block(tx_hash, block_hash, block_number).await?;
 
+    println!("Ran node");
+
     Ok(())
 }
 
@@ -80,7 +82,7 @@ async fn can_run_eth_node_with_auth_engine_api_over_ipc() -> eyre::Result<()> {
     // Configure wallet from test mnemonic and create dummy transfer tx
     let wallet = Wallet::default();
     let raw_tx = TransactionTestContext::transfer_tx_bytes(1, wallet.inner).await;
-
+    
     // make the node advance
     let tx_hash = node.rpc.inject_tx(raw_tx).await?;
 
