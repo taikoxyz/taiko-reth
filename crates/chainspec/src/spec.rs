@@ -315,7 +315,7 @@ pub static TAIKO_INTERNAL_L2_A: Lazy<Arc<ChainSpec>> = Lazy::new(|| {
             #[cfg(feature = "taiko")]
             (Hardfork::Hekla, ForkCondition::Block(0)),
             #[cfg(feature = "taiko")]
-            (Hardfork::Ontake, ForkCondition::Block(20)), //todo
+            (Hardfork::Ontake, ForkCondition::Block(2)), //todo
         ]),
         base_fee_params: BaseFeeParamsKind::Constant(BaseFeeParams {
             max_change_denominator: 8,
@@ -388,6 +388,8 @@ pub static TAIKO_HEKLA: Lazy<Arc<ChainSpec>> = Lazy::new(|| {
             (Hardfork::Shanghai, ForkCondition::Timestamp(0)),
             #[cfg(feature = "taiko")]
             (Hardfork::Hekla, ForkCondition::Block(0)),
+            #[cfg(feature = "taiko")]
+            (Hardfork::Ontake, ForkCondition::Block(720_000)), //todo
         ]),
         deposit_contract: None,
         ..Default::default()
@@ -425,6 +427,8 @@ pub static TAIKO_MAINNET: Lazy<Arc<ChainSpec>> = Lazy::new(|| {
             (Hardfork::Shanghai, ForkCondition::Timestamp(0)),
             #[cfg(feature = "taiko")]
             (Hardfork::Hekla, ForkCondition::Block(0)),
+            #[cfg(feature = "taiko")]
+            (Hardfork::Ontake, ForkCondition::Block(374_400)), //todo
         ]),
         deposit_contract: None,
         ..Default::default()

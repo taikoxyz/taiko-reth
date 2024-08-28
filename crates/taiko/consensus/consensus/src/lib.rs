@@ -16,7 +16,7 @@ use reth_consensus_common::validation::{
     validate_header_extradata, validate_header_gas,
 };
 use reth_primitives::{
-    constants::MAXIMUM_GAS_LIMIT, BlockWithSenders, Header, SealedBlock, SealedHeader,
+    constants::MAXIMUM_GAS_LIMIT, BlockWithSenders, GotExpected, Header, SealedBlock, SealedHeader,
     EMPTY_OMMER_ROOT_HASH, U256,
 };
 use std::{sync::Arc, time::SystemTime};
@@ -162,7 +162,48 @@ impl Consensus for TaikoBeaconConsensus {
     }
 
     fn validate_block_pre_execution(&self, block: &SealedBlock) -> Result<(), ConsensusError> {
-        validate_block_pre_execution(block, &self.chain_spec)
+        // Check ommers hash
+        let ommers_hash = reth_primitives::proofs::calculate_ommers_root(&block.ommers);
+        if block.header.ommers_hash != ommers_hash {
+            return Err(ConsensusError::BodyOmmersHashDiff(
+                GotExpected { got: ommers_hash, expected: block.header.ommers_hash }.into(),
+            ));
+        }
+
+        // Check transaction root
+        if let Err(error) = block.ensure_transaction_root_valid() {
+            return Err(ConsensusError::BodyTransactionRootDiff(error.into()));
+        }
+
+        // EIP-4844: Shard Blob Transactions
+        if self.chain_spec.is_cancun_active_at_timestamp(block.timestamp) {
+            // Check that the blob gas used in the header matches the sum of the blob gas used by each
+            // blob tx
+            let header_blob_gas_used =
+                block.blob_gas_used.ok_or(ConsensusError::BlobGasUsedMissing)?;
+            let total_blob_gas = block.blob_gas_used();
+            if total_blob_gas != header_blob_gas_used {
+                return Err(ConsensusError::BlobGasUsedDiff(GotExpected {
+                    got: header_blob_gas_used,
+                    expected: total_blob_gas,
+                }));
+            }
+        }
+
+        // EIP-7685: General purpose execution layer requests
+        if self.chain_spec.is_prague_active_at_timestamp(block.timestamp) {
+            let requests = block.requests.as_ref().ok_or(ConsensusError::BodyRequestsMissing)?;
+            let requests_root = reth_primitives::proofs::calculate_requests_root(&requests.0);
+            let header_requests_root =
+                block.requests_root.as_ref().ok_or(ConsensusError::RequestsRootMissing)?;
+            if requests_root != *header_requests_root {
+                return Err(ConsensusError::BodyRequestsRootDiff(
+                    GotExpected { got: requests_root, expected: *header_requests_root }.into(),
+                ));
+            }
+        }
+
+        Ok(())
     }
 
     fn validate_block_post_execution(

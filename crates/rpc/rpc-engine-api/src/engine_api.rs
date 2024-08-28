@@ -14,9 +14,8 @@ use reth_primitives::{BlockHash, BlockHashOrNumber, BlockNumber, Hardfork, B256,
 use reth_rpc_api::EngineApiServer;
 use reth_rpc_types::engine::{
     CancunPayloadFields, ClientVersionV1, ExecutionPayload, ExecutionPayloadBodiesV1,
-    ExecutionPayloadInputV2, ExecutionPayloadV1, ExecutionPayloadV3, ExecutionPayloadV4,
-    ForkchoiceState, ForkchoiceUpdated, PayloadId, PayloadStatus, TransitionConfiguration,
-    CAPABILITIES,
+    ExecutionPayloadV1, ExecutionPayloadV3, ExecutionPayloadV4, ForkchoiceState, ForkchoiceUpdated,
+    PayloadId, PayloadStatus, TaikoExecutionPayloadInputV2, TransitionConfiguration, CAPABILITIES,
 };
 use reth_rpc_types_compat::engine::payload::{
     convert_payload_input_v2_to_payload, convert_to_payload_body_v1,
@@ -128,9 +127,10 @@ where
     /// See also <https://github.com/ethereum/execution-apis/blob/584905270d8ad665718058060267061ecfd79ca5/src/engine/shanghai.md#engine_newpayloadv2>
     pub async fn new_payload_v2(
         &self,
-        payload: ExecutionPayloadInputV2,
+        payload: TaikoExecutionPayloadInputV2,
     ) -> EngineApiResult<PayloadStatus> {
-        let payload = convert_payload_input_v2_to_payload(payload);
+        let TaikoExecutionPayloadInputV2 { execution_payload, tx_hash, withdrawals_hash } = payload;
+        let payload = convert_payload_input_v2_to_payload(execution_payload);
         let payload_or_attrs =
             PayloadOrAttributes::<'_, EngineT::PayloadAttributes>::from_execution_payload(
                 &payload, None,
@@ -141,7 +141,7 @@ where
             payload_or_attrs,
         )?;
         #[cfg(feature = "taiko")]
-        let payload = TaikoExecutionPayload::from(payload);
+        let payload = TaikoExecutionPayload::from((payload, tx_hash, withdrawals_hash));
         Ok(self.inner.beacon_consensus.new_payload(payload, None).await?)
     }
 
@@ -583,10 +583,13 @@ where
 
     /// Handler for `engine_newPayloadV2`
     /// See also <https://github.com/ethereum/execution-apis/blob/584905270d8ad665718058060267061ecfd79ca5/src/engine/shanghai.md#engine_newpayloadv2>
-    async fn new_payload_v2(&self, payload: ExecutionPayloadInputV2) -> RpcResult<PayloadStatus> {
+    async fn new_payload_v2(
+        &self,
+        payload: TaikoExecutionPayloadInputV2,
+    ) -> RpcResult<PayloadStatus> {
         trace!(target: "rpc::engine", "Serving engine_newPayloadV2");
         let start = Instant::now();
-        let gas_used = payload.execution_payload.gas_used;
+        let gas_used = payload.execution_payload.execution_payload.gas_used;
         let res = Self::new_payload_v2(self, payload).await;
         let elapsed = start.elapsed();
         self.inner.metrics.latency.new_payload_v2.record(elapsed);
@@ -989,8 +992,8 @@ mod tests {
                 blocks
                     .iter()
                     .filter(|b| {
-                        !first_missing_range.contains(&b.number) &&
-                            !second_missing_range.contains(&b.number)
+                        !first_missing_range.contains(&b.number)
+                            && !second_missing_range.contains(&b.number)
                     })
                     .map(|b| (b.hash(), b.clone().unseal())),
             );
@@ -1019,8 +1022,8 @@ mod tests {
                 // ensure we still return trailing `None`s here because by-hash will not be aware
                 // of the missing block's number, and cannot compare it to the current best block
                 .map(|b| {
-                    if first_missing_range.contains(&b.number) ||
-                        second_missing_range.contains(&b.number)
+                    if first_missing_range.contains(&b.number)
+                        || second_missing_range.contains(&b.number)
                     {
                         None
                     } else {
@@ -1046,8 +1049,8 @@ mod tests {
             let (handle, api) = setup_engine_api();
 
             let transition_config = TransitionConfiguration {
-                terminal_total_difficulty: handle.chain_spec.fork(Hardfork::Paris).ttd().unwrap() +
-                    U256::from(1),
+                terminal_total_difficulty: handle.chain_spec.fork(Hardfork::Paris).ttd().unwrap()
+                    + U256::from(1),
                 ..Default::default()
             };
 

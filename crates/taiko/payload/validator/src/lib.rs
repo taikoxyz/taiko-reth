@@ -110,7 +110,7 @@ impl TaikoExecutionPayloadValidator {
         cancun_fields: MaybeCancunPayloadFields,
     ) -> Result<SealedBlock, PayloadError> {
         let expected_hash = payload.block_hash();
-
+        debug!(target: "taiko_payload_validator", "Payload {:?}", payload);
         // First parse the block
         let sealed_block = if payload.payload_inner.as_v1().transactions.is_empty()
             && (payload.payload_inner.withdrawals().is_none()

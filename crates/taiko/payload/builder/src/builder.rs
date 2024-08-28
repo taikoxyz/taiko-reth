@@ -202,7 +202,6 @@ where
     let state = StateProviderDatabase::new(state_provider);
     let mut db =
         State::builder().with_database_ref(cached_reads.as_db(state)).with_bundle_update().build();
-    let extra_data = config.extra_data();
     let PayloadConfig {
         initialized_block_env,
         initialized_cfg,
@@ -456,7 +455,7 @@ where
         gas_limit: block_gas_limit,
         difficulty: U256::ZERO,
         gas_used: cumulative_gas_used,
-        extra_data,
+        extra_data: attributes.block_metadata.extra_data.clone().into(),
         parent_beacon_block_root: attributes.payload_attributes.parent_beacon_block_root,
         blob_gas_used,
         excess_blob_gas,
