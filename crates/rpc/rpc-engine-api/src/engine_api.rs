@@ -5,7 +5,9 @@ use async_trait::async_trait;
 use jsonrpsee_core::RpcResult;
 use reth_beacon_consensus::BeaconConsensusEngineHandle;
 use reth_chainspec::ChainSpec;
-use reth_engine_primitives::EngineTypes;
+use reth_engine_primitives::{
+    EngineTypes, BuiltPayload,
+};
 use reth_evm::provider::EvmEnvProvider;
 use reth_payload_builder::PayloadStore;
 use reth_payload_primitives::{
@@ -319,13 +321,36 @@ where
         )?;
 
         // Now resolve the payload
-        self.inner
-            .payload_store
-            .resolve(payload_id)
-            .await
-            .ok_or(EngineApiError::UnknownPayload)?
-            .map_err(|_| EngineApiError::UnknownPayload)?
-            .try_into()
+        let built_payload = self.inner
+        .payload_store
+        .resolve(payload_id)
+        .await
+        .ok_or(EngineApiError::UnknownPayload)?
+        .map_err(|_| EngineApiError::UnknownPayload)?;
+
+          // Get the chain ID
+    let chain_id = self.inner.chain_spec.chain().id();
+
+    // Debug print only for a specific chain ID (e.g., 167010)
+    if chain_id == 167010 {
+        let block = built_payload.block();
+        println!("Dani debug : BuiltPayload for chain_id {} and payload_id {:?}:", chain_id, payload_id);
+        println!("  Block Number: {:?}", block.number);
+        println!("  Block Hash: {:?}", block.hash());
+        println!("  Parent Hash: {:?}", block.parent_hash);
+        println!("  State Root: {:?}", block.state_root);
+        println!("  Transactions Count: {}", block.body.len());
+        println!("  Ommers Count: {}", block.ommers.len());
+        println!("  Has Withdrawals: {}", block.withdrawals.is_some());
+        println!("  Has Requests: {}", block.requests.is_some());
+        println!("  Timestamp: {:?}", block.timestamp);
+        println!("  Gas Limit: {:?}", block.gas_limit);
+        println!("  Gas Used: {:?}", block.gas_used);
+        println!("  Base Fee Per Gas: {:?}", block.base_fee_per_gas);
+        println!("  Fees: {:?}", built_payload.fees());
+    }
+
+        built_payload.try_into()
             .map_err(|_| {
                 warn!("could not transform built payload into ExecutionPayloadV3");
                 EngineApiError::UnknownPayload

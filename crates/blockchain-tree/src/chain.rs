@@ -15,7 +15,7 @@ use reth_evm::execute::{BlockExecutionOutput, BlockExecutorProvider, Executor};
 use reth_execution_errors::BlockExecutionError;
 use reth_execution_types::{Chain, ExecutionOutcome};
 use reth_primitives::{
-    BlockHash, BlockNumber, ForkBlock, GotExpected, SealedBlockWithSenders, SealedHeader, U256,
+    BlockHash, BlockNumber, ForkBlock, GotExpected, SealedBlockWithSenders, SealedHeader, U256, BufMut,
 };
 use reth_provider::{
     providers::{BundleStateProvider, ConsistentDbView},
@@ -293,6 +293,10 @@ impl AppendableChain {
             canonical_fork,
         };
 
+
+        println!("Dani debug before: validate_and_execute");
+        println!("ID: {:?}", externals.provider_factory.chain_spec().chain().id());
+        
         let (block_state, _) = Self::validate_and_execute(
             block.clone(),
             parent_block,
@@ -303,6 +307,8 @@ impl AppendableChain {
         )?;
         // extend the state.
         self.chain.append_block(block, block_state);
+
+        println!("Dani debug after text: validate_and_execute");
 
         Ok(())
     }

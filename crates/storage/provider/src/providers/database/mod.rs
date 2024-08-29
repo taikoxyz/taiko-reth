@@ -77,6 +77,11 @@ impl<DB> ProviderFactory<DB> {
         &self.db
     }
 
+    /// Returns reference to the underlying chain_spec.
+    pub fn chain_spec(&self) -> Arc<ChainSpec> {
+        self.chain_spec.clone()
+    }
+
     #[cfg(any(test, feature = "test-utils"))]
     /// Consumes Self and returns DB
     pub fn into_db(self) -> Arc<DB> {
