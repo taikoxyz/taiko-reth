@@ -22,6 +22,12 @@ impl CanonicalChain {
         self.chain = chain;
     }
 
+    /// Rollback the chain to the given block number.
+    #[inline]
+    pub(crate) fn rollback(&mut self, number: &BlockNumber) {
+        self.chain.split_off(&(number + 1));
+    }
+
     /// Returns the block hash of the (non-finalized) canonical block with the given number.
     #[inline]
     pub(crate) fn canonical_hash(&self, number: &BlockNumber) -> Option<BlockHash> {

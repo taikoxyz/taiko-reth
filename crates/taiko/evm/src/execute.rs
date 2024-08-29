@@ -150,6 +150,7 @@ where
         &self,
         block: &mut BlockWithSenders,
         mut evm: Evm<'_, Ext, &mut State<DB>>,
+        disable_anchor: bool,
     ) -> Result<TaikoExecuteOutput, BlockExecutionError>
     where
         DB: Database<Error = ProviderError>,
@@ -185,7 +186,7 @@ where
         while idx < block.body.len() {
             let sender = block.senders[idx];
             let transaction = &block.body[idx];
-            let is_anchor = idx == 0 && self.evm_config.enable_anchor();
+            let is_anchor = idx == 0 && !disable_anchor;
 
             // verify the anchor tx
             if is_anchor {
@@ -366,6 +367,7 @@ where
         &mut self,
         block: &mut BlockWithSenders,
         total_difficulty: U256,
+        disable_anchor: bool,
     ) -> Result<TaikoExecuteOutput, BlockExecutionError> {
         // 1. prepare state on new block
         self.on_new_block(&block.header);
@@ -374,7 +376,7 @@ where
         let env = self.evm_env_for_block(&block.header, total_difficulty);
         let output = {
             let evm = self.executor.evm_config.evm_with_env(&mut self.state, env);
-            self.executor.execute_state_transitions(block, evm)
+            self.executor.execute_state_transitions(block, evm, disable_anchor)
         }?;
 
         // 3. apply post execution changes
@@ -447,9 +449,9 @@ where
     ///
     /// State changes are committed to the database.
     fn execute(mut self, input: Self::Input<'_>) -> Result<Self::Output, Self::Error> {
-        let BlockExecutionInput { block, total_difficulty } = input;
+        let BlockExecutionInput { block, total_difficulty, disable_anchor } = input;
         let TaikoExecuteOutput { receipts, requests, gas_used } =
-            self.execute_without_verification(block, total_difficulty)?;
+            self.execute_without_verification(block, total_difficulty, disable_anchor)?;
 
         // NOTE: we need to merge keep the reverts for the bundle retention
         self.state.merge_transitions(BundleRetention::Reverts);
@@ -490,9 +492,9 @@ where
     type Error = BlockExecutionError;
 
     fn execute_and_verify_one(&mut self, input: Self::Input<'_>) -> Result<(), Self::Error> {
-        let BlockExecutionInput { block, total_difficulty } = input;
+        let BlockExecutionInput { block, total_difficulty, disable_anchor } = input;
         let TaikoExecuteOutput { receipts, requests, gas_used: _ } =
-            self.executor.execute_without_verification(block, total_difficulty)?;
+            self.executor.execute_without_verification(block, total_difficulty, disable_anchor)?;
 
         validate_block_post_execution(block, self.executor.chain_spec(), &receipts, &requests)?;
 
@@ -659,6 +661,7 @@ mod tests {
                     senders: vec![],
                 },
                 U256::ZERO,
+                false,
             )
             .unwrap();
 

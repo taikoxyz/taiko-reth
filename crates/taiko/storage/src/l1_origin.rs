@@ -77,7 +77,7 @@ where
         self.database_provider_rw()?.save_l1_origin(block_number, l1_origin)
     }
 
-    fn save_head_l1_origin(&self, block_number: u64) -> ProviderResult<()> {
+    fn save_head_l1_origin(&self, block_number: BlockNumber) -> ProviderResult<()> {
         self.database_provider_rw()?.save_head_l1_origin(block_number)
     }
 }

@@ -2,6 +2,7 @@ use crate::result::ToRpcResult;
 use alloy_primitives::Address;
 use async_trait::async_trait;
 use jsonrpsee::core::RpcResult;
+use reth_errors::RethError;
 use reth_evm::execute::BlockExecutorProvider;
 use reth_primitives::IntoRecoveredTransaction;
 use reth_provider::{
@@ -10,6 +11,7 @@ use reth_provider::{
 use reth_rpc_api::{PreBuiltTxList, TaikoApiServer, TaikoAuthApiServer};
 use reth_tasks::TaskSpawner;
 use reth_transaction_pool::TransactionPool;
+use revm_primitives::U256;
 use taiko_reth_primitives::L1Origin;
 use taiko_reth_proposer_consensus::{ProposerBuilder, ProposerClient};
 use taiko_reth_provider::L1OriginReader;
@@ -62,15 +64,14 @@ where
     Provider: L1OriginReader + 'static,
 {
     /// HeadL1Origin returns the latest L2 block's corresponding L1 origin.
-    // #[cfg(feature = "taiko")]
     async fn head_l1_origin(&self) -> RpcResult<L1Origin> {
         self.provider.get_head_l1_origin().to_rpc_result()
     }
 
     /// L1OriginByID returns the L2 block's corresponding L1 origin.
-    // #[cfg(feature = "taiko")]
-    async fn l1_origin_by_id(&self, block_id: u64) -> RpcResult<L1Origin> {
-        self.provider.get_l1_origin(block_id).to_rpc_result()
+    async fn l1_origin_by_id(&self, block_id: U256) -> RpcResult<L1Origin> {
+        let block_number = block_id.try_into().map_err(RethError::other).to_rpc_result()?;
+        self.provider.get_l1_origin(block_number).to_rpc_result()
     }
 }
 

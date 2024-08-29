@@ -35,10 +35,7 @@ pub mod eip6110;
 /// Ethereum-related EVM configuration.
 #[derive(Debug, Clone, Copy, Default)]
 #[non_exhaustive]
-pub struct TaikoEvmConfig {
-    /// Enable anchor transaction.
-    pub enable_anchor: bool,
-}
+pub struct TaikoEvmConfig;
 
 impl ConfigureEvmEnv for TaikoEvmConfig {
     fn fill_tx_env(tx_env: &mut TxEnv, transaction: &TransactionSigned, sender: Address) {
@@ -67,10 +64,6 @@ impl ConfigureEvmEnv for TaikoEvmConfig {
 
         cfg_env.handler_cfg.spec_id = spec_id;
         cfg_env.handler_cfg.is_taiko = true;
-    }
-
-    fn enable_anchor(&self) -> bool {
-        self.enable_anchor
     }
 }
 

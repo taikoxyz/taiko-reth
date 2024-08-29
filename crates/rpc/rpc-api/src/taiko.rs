@@ -1,5 +1,5 @@
 use jsonrpsee::{core::RpcResult, proc_macros::rpc};
-use reth_primitives::Address;
+use reth_primitives::{Address, U256};
 use reth_rpc_types::Transaction;
 use serde::{Deserialize, Serialize};
 use taiko_reth_primitives::L1Origin;
@@ -13,7 +13,7 @@ pub trait TaikoApi {
 
     /// L1OriginByID returns the L2 block's corresponding L1 origin.
     #[method(name = "l1OriginByID")]
-    async fn l1_origin_by_id(&self, block_id: u64) -> RpcResult<L1Origin>;
+    async fn l1_origin_by_id(&self, block_id: U256) -> RpcResult<L1Origin>;
 
     /// GetSyncMode returns the node sync mode.
     #[method(name = "getSyncMode")]

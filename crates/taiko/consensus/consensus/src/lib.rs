@@ -12,8 +12,8 @@ use reth_chainspec::ChainSpec;
 use reth_consensus::{Consensus, ConsensusError, PostExecutionInput};
 use reth_consensus_common::validation::{
     validate_4844_header_standalone, validate_against_parent_4844,
-    validate_against_parent_hash_number, validate_block_pre_execution, validate_header_base_fee,
-    validate_header_extradata, validate_header_gas,
+    validate_against_parent_hash_number, validate_header_base_fee, validate_header_extradata,
+    validate_header_gas,
 };
 use reth_primitives::{
     constants::MAXIMUM_GAS_LIMIT, BlockWithSenders, GotExpected, Header, SealedBlock, SealedHeader,

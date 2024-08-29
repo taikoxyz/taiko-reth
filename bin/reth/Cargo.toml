@@ -169,6 +169,7 @@ taiko = [
     "reth-revm/taiko",
     "reth-node-builder/taiko",
     "dep:taiko-reth-node",
+    "reth-blockchain-tree/taiko",
 ]
 
 # no-op feature flag for switching between the `optimism` and default functionality in CI matrices
