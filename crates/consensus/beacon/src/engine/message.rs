@@ -1,6 +1,6 @@
 use crate::engine::{error::BeaconOnNewPayloadError, forkchoice::ForkchoiceStatus};
 use futures::{future::Either, FutureExt};
-use reth_engine_primitives::EngineTypes;
+use reth_engine_primitives::{EngineApiMessageVersion, EngineTypes};
 use reth_errors::RethResult;
 use reth_payload_builder::error::PayloadBuilderError;
 #[cfg(not(feature = "taiko"))]
@@ -162,6 +162,8 @@ pub enum BeaconEngineMessage<Engine: EngineTypes> {
         state: ForkchoiceState,
         /// The payload attributes for block building.
         payload_attrs: Option<Engine::PayloadAttributes>,
+        /// The api version.
+        version: EngineApiMessageVersion,
         /// The sender for returning forkchoice updated result.
         tx: oneshot::Sender<RethResult<OnForkChoiceUpdated>>,
     },

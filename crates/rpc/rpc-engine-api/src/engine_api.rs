@@ -7,7 +7,7 @@ use reth_engine_primitives::EngineTypes;
 use reth_evm::provider::EvmEnvProvider;
 use reth_payload_builder::PayloadStore;
 use reth_payload_primitives::{
-    validate_payload_timestamp, EngineApiMessageVersion, PayloadAttributes,
+    validate_payload_id, validate_payload_timestamp, EngineApiMessageVersion, PayloadAttributes,
     PayloadBuilderAttributes, PayloadOrAttributes,
 };
 use reth_primitives::{BlockHash, BlockHashOrNumber, BlockNumber, Hardfork, B256, U64};
@@ -251,6 +251,7 @@ where
         &self,
         payload_id: PayloadId,
     ) -> EngineApiResult<EngineT::ExecutionPayloadV1> {
+        validate_payload_id(payload_id, Some(EngineApiMessageVersion::V1))?;
         self.inner
             .payload_store
             .resolve(payload_id)
@@ -275,6 +276,10 @@ where
         &self,
         payload_id: PayloadId,
     ) -> EngineApiResult<EngineT::ExecutionPayloadV2> {
+        validate_payload_id(
+            payload_id,
+            [EngineApiMessageVersion::V1, EngineApiMessageVersion::V2],
+        )?;
         // First we fetch the payload attributes to check the timestamp
         let attributes = self.get_payload_attributes(payload_id).await?;
 
@@ -310,6 +315,7 @@ where
         &self,
         payload_id: PayloadId,
     ) -> EngineApiResult<EngineT::ExecutionPayloadV3> {
+        validate_payload_id(payload_id, Some(EngineApiMessageVersion::V3))?;
         // First we fetch the payload attributes to check the timestamp
         let attributes = self.get_payload_attributes(payload_id).await?;
 
@@ -547,7 +553,8 @@ where
             // To do this, we set the payload attrs to `None` if attribute validation failed, but
             // we still apply the forkchoice update.
             if let Err(err) = attr_validation_res {
-                let fcu_res = self.inner.beacon_consensus.fork_choice_updated(state, None).await?;
+                let fcu_res =
+                    self.inner.beacon_consensus.fork_choice_updated(state, None, version).await?;
                 // TODO: decide if we want this branch - the FCU INVALID response might be more
                 // useful than the payload attributes INVALID response
                 if fcu_res.is_invalid() {
@@ -557,7 +564,7 @@ where
             }
         }
 
-        Ok(self.inner.beacon_consensus.fork_choice_updated(state, payload_attrs).await?)
+        Ok(self.inner.beacon_consensus.fork_choice_updated(state, payload_attrs, version).await?)
     }
 }
 

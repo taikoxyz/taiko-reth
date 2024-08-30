@@ -231,6 +231,7 @@ impl Command {
             reth_payload_builder::EthPayloadBuilderAttributes::try_new(
                 best_block.hash(),
                 payload_attrs,
+                Default::default(),
             )?,
             provider_factory.chain_spec(),
         );

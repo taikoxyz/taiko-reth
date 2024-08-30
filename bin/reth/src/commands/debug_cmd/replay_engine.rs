@@ -179,8 +179,9 @@ impl Command {
             debug!(target: "reth::cli", filepath = %filepath.display(), ?message, "Forwarding Engine API message");
             match message {
                 StoredEngineApiMessage::ForkchoiceUpdated { state, payload_attrs } => {
-                    let response =
-                        beacon_engine_handle.fork_choice_updated(state, payload_attrs).await?;
+                    let response = beacon_engine_handle
+                        .fork_choice_updated(state, payload_attrs, Default::default())
+                        .await?;
                     debug!(target: "reth::cli", ?response, "Received for forkchoice updated");
                 }
                 StoredEngineApiMessage::NewPayload { payload, cancun_fields } => {

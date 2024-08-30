@@ -108,9 +108,13 @@ impl PayloadBuilderAttributes for TaikoPayloadBuilderAttributes {
     /// Creates a new payload builder for the given parent block and the attributes.
     ///
     /// Derives the unique [`PayloadId`] for the given parent and attributes
-    fn try_new(parent: B256, attributes: TaikoPayloadAttributes) -> Result<Self, Infallible> {
+    fn try_new(
+        parent: B256,
+        attributes: TaikoPayloadAttributes,
+        version: EngineApiMessageVersion,
+    ) -> Result<Self, Infallible> {
         let payload_attributes =
-            EthPayloadBuilderAttributes::new(parent, attributes.payload_attributes);
+            EthPayloadBuilderAttributes::new(parent, attributes.payload_attributes, version);
 
         Ok(Self {
             payload_attributes,

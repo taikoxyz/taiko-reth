@@ -5,7 +5,7 @@ use crate::{
     BeaconForkChoiceUpdateError, BeaconOnNewPayloadError,
 };
 use futures::TryFutureExt;
-use reth_engine_primitives::EngineTypes;
+use reth_engine_primitives::{EngineApiMessageVersion, EngineTypes};
 use reth_errors::RethResult;
 #[cfg(not(feature = "taiko"))]
 use reth_rpc_types::engine::ExecutionPayload;
@@ -66,9 +66,10 @@ where
         &self,
         state: ForkchoiceState,
         payload_attrs: Option<Engine::PayloadAttributes>,
+        version: EngineApiMessageVersion,
     ) -> Result<ForkchoiceUpdated, BeaconForkChoiceUpdateError> {
         Ok(self
-            .send_fork_choice_updated(state, payload_attrs)
+            .send_fork_choice_updated(state, payload_attrs, version)
             .map_err(|_| BeaconForkChoiceUpdateError::EngineUnavailable)
             .await??
             .await?)
@@ -80,11 +81,13 @@ where
         &self,
         state: ForkchoiceState,
         payload_attrs: Option<Engine::PayloadAttributes>,
+        version: EngineApiMessageVersion,
     ) -> oneshot::Receiver<RethResult<OnForkChoiceUpdated>> {
         let (tx, rx) = oneshot::channel();
         let _ = self.to_engine.send(BeaconEngineMessage::ForkchoiceUpdated {
             state,
             payload_attrs,
+            version,
             tx,
         });
         rx

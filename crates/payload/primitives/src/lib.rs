@@ -15,6 +15,7 @@ pub use error::{EngineObjectValidationError, PayloadBuilderError, VersionSpecifi
 /// Contains traits to abstract over payload attributes types and default implementations of the
 /// [`PayloadAttributes`] trait for ethereum mainnet and optimism types.
 mod traits;
+use reth_rpc_types::engine::PayloadId;
 pub use traits::{BuiltPayload, PayloadAttributes, PayloadBuilderAttributes};
 
 mod payload;
@@ -34,6 +35,17 @@ pub trait PayloadTypes: Send + Sync + Unpin + core::fmt::Debug + Clone {
     type PayloadBuilderAttributes: PayloadBuilderAttributes<RpcPayloadAttributes = Self::PayloadAttributes>
         + Clone
         + Unpin;
+}
+
+/// Validates the payload ID against the expected payload IDs.
+pub fn validate_payload_id<T: IntoIterator<Item = EngineApiMessageVersion>>(
+    id: PayloadId,
+    expected_vers: T,
+) -> Result<(), EngineObjectValidationError> {
+    if !expected_vers.into_iter().all(|expected_ver| id.0[0] == expected_ver as u8) {
+        return Err(EngineObjectValidationError::UnsupportedFork);
+    }
+    Ok(())
 }
 
 /// Validates the timestamp depending on the version called:
@@ -318,8 +330,9 @@ where
 }
 
 /// The version of Engine API message.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum EngineApiMessageVersion {
+    #[default]
     /// Version 1
     V1 = 1,
     /// Version 2
