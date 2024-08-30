@@ -14,7 +14,6 @@ use reth_rpc_types::{engine::MaybeCancunPayloadFields, PayloadError};
 use reth_rpc_types_compat::engine::payload::try_into_block;
 use std::sync::Arc;
 use taiko_reth_engine_primitives::TaikoExecutionPayload;
-use tracing::debug;
 
 /// Execution payload validator.;
 #[derive(Clone, Debug)]
@@ -110,7 +109,6 @@ impl TaikoExecutionPayloadValidator {
         cancun_fields: MaybeCancunPayloadFields,
     ) -> Result<SealedBlock, PayloadError> {
         let expected_hash = payload.block_hash();
-        debug!(target: "taiko_payload_validator", "Payload {:?}", payload);
         // First parse the block
         let sealed_block = if payload.payload_inner.as_v1().transactions.is_empty()
             && (payload.payload_inner.withdrawals().is_none()
@@ -121,7 +119,6 @@ impl TaikoExecutionPayloadValidator {
             try_into_block(payload.payload_inner, cancun_fields.parent_beacon_block_root())?
                 .seal_slow()
         };
-        debug!(target: "taiko_payload_validator", "Sealed block: {:?}", sealed_block);
         // Ensure the hash included in the payload matches the block hash
         if expected_hash != sealed_block.hash() {
             return Err(PayloadError::BlockHash {

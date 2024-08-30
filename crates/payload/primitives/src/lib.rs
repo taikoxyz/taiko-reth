@@ -42,7 +42,7 @@ pub fn validate_payload_id<T: IntoIterator<Item = EngineApiMessageVersion>>(
     id: PayloadId,
     expected_vers: T,
 ) -> Result<(), EngineObjectValidationError> {
-    if !expected_vers.into_iter().all(|expected_ver| id.0[0] == expected_ver as u8) {
+    if !expected_vers.into_iter().any(|expected_ver| id.0[0] == expected_ver as u8) {
         return Err(EngineObjectValidationError::UnsupportedFork);
     }
     Ok(())

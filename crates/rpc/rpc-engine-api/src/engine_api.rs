@@ -26,7 +26,7 @@ use std::{sync::Arc, time::Instant};
 #[cfg(feature = "taiko")]
 use taiko_reth_engine_primitives::TaikoExecutionPayload;
 use tokio::sync::oneshot;
-use tracing::{trace, warn};
+use tracing::{debug, trace, warn};
 
 /// The Engine API response sender.
 pub type EngineApiSender<Ok> = oneshot::Sender<EngineApiResult<Ok>>;
@@ -538,6 +538,8 @@ where
         if let Some(ref attrs) = payload_attrs {
             let attr_validation_res =
                 attrs.ensure_well_formed_attributes(&self.inner.chain_spec, version);
+
+            debug!(target: "rpc::engine", ?attr_validation_res, ?attrs, "Validating payload attributes");
 
             // From the engine API spec:
             //

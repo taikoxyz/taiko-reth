@@ -18,6 +18,7 @@ reth-primitives = { workspace = true, features = ["taiko"] }
 reth-revm = { workspace = true, features = ["taiko"] }
 reth-prune-types.workspace = true
 reth-execution-types.workspace = true
+reth-consensus.workspace = true
 
 # Taiko
 taiko-reth-beacon-consensus.workspace = true

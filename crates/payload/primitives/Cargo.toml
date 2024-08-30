@@ -25,6 +25,7 @@ tokio = { workspace = true, features = ["sync"] }
 # misc
 thiserror.workspace = true
 serde.workspace = true
+tracing.workspace = true
 
 [features]
 taiko = ["reth-transaction-pool/taiko"]

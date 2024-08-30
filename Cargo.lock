@@ -7870,6 +7870,7 @@ dependencies = [
  "serde",
  "thiserror",
  "tokio",
+ "tracing",
 ]
 
 [[package]]
@@ -9790,6 +9791,7 @@ dependencies = [
  "alloy-eips",
  "alloy-sol-types",
  "reth-chainspec",
+ "reth-consensus",
  "reth-evm",
  "reth-execution-types",
  "reth-primitives",

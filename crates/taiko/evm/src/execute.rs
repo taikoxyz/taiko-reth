@@ -5,6 +5,7 @@ use crate::{
     TaikoEvmConfig,
 };
 use reth_chainspec::{ChainSpec, TAIKO_HEKLA, TAIKO_MAINNET};
+use reth_consensus::ConsensusError;
 use reth_evm::{
     execute::{
         BatchExecutor, BlockExecutionError, BlockExecutionInput, BlockExecutionOutput,
@@ -181,7 +182,9 @@ where
             block.body.remove(idx);
             block.senders.remove(idx);
         };
-
+        if !disable_anchor && block.body.is_empty() {
+            return Err(ConsensusError::AnchorTxMissing.into());
+        }
         let mut idx = 0;
         while idx < block.body.len() {
             let sender = block.senders[idx];

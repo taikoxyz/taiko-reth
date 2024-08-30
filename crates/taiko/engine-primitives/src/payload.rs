@@ -318,18 +318,11 @@ pub struct TaikoExecutionPayloadV2 {
     pub tx_hash: B256,
     /// Allow passing withdrawals hash directly instead of withdrawals
     pub withdrawals_hash: B256,
-    /// Whether this is a Taiko L2 block, only used by `ExecutableDataToBlock`
-    pub _taiko_block: bool,
 }
 
 impl From<ExecutionPayloadV2> for TaikoExecutionPayloadV2 {
     fn from(value: ExecutionPayloadV2) -> Self {
-        Self {
-            payload_inner: value,
-            tx_hash: B256::default(),
-            withdrawals_hash: B256::default(),
-            _taiko_block: false,
-        }
+        Self { payload_inner: value, tx_hash: B256::default(), withdrawals_hash: B256::default() }
     }
 }
 
@@ -350,7 +343,6 @@ impl From<TaikoBuiltPayload> for TaikoExecutionPayloadV2 {
         Self {
             tx_hash: block.header.transactions_root,
             withdrawals_hash: block.header.withdrawals_root.unwrap_or_default(),
-            _taiko_block: true,
             payload_inner: block_to_payload_v2(block),
         }
     }
