@@ -1050,12 +1050,9 @@ where
                     hash: block_hash,
                 }));
             }
-            if cfg!(feature = "taiko") {
-                let _ = header;
-            } else {
-                let head = self.state.block_indices.canonical_tip();
-                return Ok(CanonicalOutcome::AlreadyCanonical { header, head });
-            }
+
+            let head = self.state.block_indices.canonical_tip();
+            return Ok(CanonicalOutcome::AlreadyCanonical { header, head });
         }
 
         let Some(chain_id) = self.block_indices().get_block_chain_id(&block_hash) else {
