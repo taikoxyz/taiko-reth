@@ -31,12 +31,13 @@ use reth_revm::database::StateProviderDatabase;
 use reth_rpc_types::Transaction;
 use reth_transaction_pool::TransactionPool;
 use std::{
+    f64::consts::E,
     io::{self, Write},
     sync::Arc,
     time::{SystemTime, UNIX_EPOCH},
 };
 use tokio::sync::oneshot;
-use tracing::trace;
+use tracing::debug;
 
 mod client;
 mod task;
@@ -296,7 +297,7 @@ impl Storage {
             .with_recovered_senders()
             .ok_or(BlockExecutionError::Validation(BlockValidationError::SenderRecoveryError))?;
 
-        trace!(target: "consensus::auto", transactions=?&block.body, "executing transactions");
+        debug!(target: "taiko::proposer", transactions=?&block.body, "before executing transactions");
 
         let mut db = StateProviderDatabase::new(
             provider.latest().map_err(BlockExecutionError::LatestBlock)?,
@@ -307,6 +308,8 @@ impl Storage {
             executor.executor(&mut db).execute((&mut block, U256::ZERO, true).into())?;
         let Block { body, .. } = block.block;
 
+        debug!(target: "taiko::proposer", transactions=?body, "after executing transactions");
+
         let mut tx_lists = vec![];
         let mut chunk_start = 0;
         let mut last_compressed_buf = None;
@@ -316,13 +319,12 @@ impl Storage {
                 let compressed_buf = encode_and_compress_tx_list(&body[chunk_start..=idx])
                     .map_err(BlockExecutionError::other)?;
 
-                if idx - chunk_start >= max_transactions_lists as usize
-                    || compressed_buf.len() > max_bytes_per_tx_list as usize
-                {
+                if compressed_buf.len() > max_bytes_per_tx_list as usize {
                     // the first transaction in chunk is too large, so we need to skip it
                     if idx == chunk_start {
                         gas_used_start = receipts[idx].cumulative_gas_used;
                         chunk_start += 1;
+                        // the first transaction in chunk is too large, so we need to skip it
                         None
                     } else {
                         // current chunk reaches the max_transactions_lists or max_bytes_per_tx_list
@@ -334,6 +336,14 @@ impl Storage {
                         chunk_start = idx;
                         Some((range, estimated_gas_used, last_compressed_buf.clone()))
                     }
+                }
+                // reach the limitation of max_transactions_lists or max_bytes_per_tx_list
+                else if idx - chunk_start + 1 == max_transactions_lists as usize {
+                    let estimated_gas_used = receipts[idx].cumulative_gas_used - gas_used_start;
+                    gas_used_start = receipts[idx].cumulative_gas_used;
+                    let range = chunk_start..idx + 1;
+                    chunk_start = idx + 1;
+                    Some((range, estimated_gas_used, Some(compressed_buf)))
                 } else {
                     last_compressed_buf = Some(compressed_buf);
                     None

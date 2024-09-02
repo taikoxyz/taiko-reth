@@ -1,4 +1,5 @@
 //! The `L1Origin` module provides the `L1Origin` struct and the `HeadL1Origin` table.
+use alloy_rlp::{RlpDecodable, RlpEncodable};
 use reth_codecs::{main_codec, Compact};
 use reth_db_api::{
     table::{Compress, Decode, Decompress, Encode},
@@ -32,7 +33,7 @@ impl Decode for HeadL1OriginKey {
 
 /// L1Origin represents a L1Origin of a L2 block.
 #[main_codec]
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, RlpDecodable, RlpEncodable)]
 #[serde(rename_all = "camelCase")]
 pub struct L1Origin {
     /// The block number of the l2 block

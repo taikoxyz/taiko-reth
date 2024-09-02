@@ -1,5 +1,7 @@
 //! Payload related types
 
+use alloy_rlp::{Encodable, RlpDecodable, RlpEncodable};
+
 use reth_chainspec::ChainSpec;
 use reth_ethereum_engine_primitives::{
     EthPayloadBuilderAttributes, ExecutionPayloadEnvelopeV3, ExecutionPayloadEnvelopeV4,
@@ -65,7 +67,7 @@ impl reth_payload_primitives::PayloadAttributes for TaikoPayloadAttributes {
 
 /// This structure contains the information from l1 contract storage
 #[serde_as]
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, RlpDecodable, RlpEncodable)]
 #[serde(rename_all = "camelCase")]
 pub struct BlockMetadata {
     /// The Keccak 256-bit hash of the parent
@@ -113,8 +115,17 @@ impl PayloadBuilderAttributes for TaikoPayloadBuilderAttributes {
         attributes: TaikoPayloadAttributes,
         version: EngineApiMessageVersion,
     ) -> Result<Self, Infallible> {
-        let payload_attributes =
-            EthPayloadBuilderAttributes::new(parent, attributes.payload_attributes, version);
+        let id = payload_id(&parent, &attributes, version);
+
+        let payload_attributes = EthPayloadBuilderAttributes {
+            id,
+            parent,
+            timestamp: attributes.payload_attributes.timestamp,
+            suggested_fee_recipient: attributes.payload_attributes.suggested_fee_recipient,
+            prev_randao: attributes.payload_attributes.prev_randao,
+            withdrawals: attributes.payload_attributes.withdrawals.unwrap_or_default().into(),
+            parent_beacon_block_root: attributes.payload_attributes.parent_beacon_block_root,
+        };
 
         Ok(Self {
             payload_attributes,
@@ -396,4 +407,44 @@ impl From<ExecutionPayload> for TaikoExecutionPayload {
     fn from(value: ExecutionPayload) -> Self {
         Self { payload_inner: value, tx_hash: B256::default(), withdrawals_hash: B256::default() }
     }
+}
+
+/// Generates the payload id for the configured payload from the [`PayloadAttributes`].
+///
+/// Returns an 8-byte identifier by hashing the payload components with sha256 hash.
+pub(crate) fn payload_id(
+    parent: &B256,
+    attributes: &TaikoPayloadAttributes,
+    version: EngineApiMessageVersion,
+) -> PayloadId {
+    use sha2::Digest;
+    let mut hasher = sha2::Sha256::new();
+    hasher.update(parent.as_slice());
+    hasher.update(&attributes.payload_attributes.timestamp.to_be_bytes()[..]);
+    hasher.update(attributes.payload_attributes.prev_randao.as_slice());
+    hasher.update(attributes.payload_attributes.suggested_fee_recipient.as_slice());
+    if let Some(withdrawals) = &attributes.payload_attributes.withdrawals {
+        let mut buf = Vec::new();
+        withdrawals.encode(&mut buf);
+        hasher.update(buf);
+    }
+
+    if let Some(parent_beacon_block) = attributes.payload_attributes.parent_beacon_block_root {
+        hasher.update(parent_beacon_block);
+    }
+
+    hasher.update(attributes.base_fee_per_gas.to_be_bytes_vec());
+
+    let mut buf = Vec::new();
+    attributes.block_metadata.encode(&mut buf);
+    hasher.update(buf);
+
+    let mut buf = Vec::new();
+    attributes.l1_origin.encode(&mut buf);
+    hasher.update(buf);
+
+    let out = hasher.finalize();
+    let mut out_bytes: [u8; 8] = out.as_slice()[..8].try_into().expect("sufficient length");
+    out_bytes[0] = version as u8;
+    PayloadId::new(out_bytes)
 }

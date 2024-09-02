@@ -13,6 +13,7 @@ use std::{
     task::{Context, Poll},
 };
 use tokio::sync::mpsc::UnboundedReceiver;
+use tracing::debug;
 
 /// A Future that listens for new ready transactions and puts new blocks into storage
 pub struct ProposerTask<Provider, Pool: TransactionPool, Executor> {
@@ -80,6 +81,7 @@ where
             } {
                 let mut best_txs = this.pool.best_transactions();
                 best_txs.skip_blobs();
+                debug!(target: "taiko::proposer", txs = ?best_txs.size_hint(), "Proposer get best transactions");
                 let (mut local_txs, remote_txs): (Vec<_>, Vec<_>) = best_txs
                     .filter(|tx| {
                         tx.effective_tip_per_gas(trigger_args.base_fee)
@@ -93,6 +95,7 @@ where
                             .unwrap_or_default()
                     });
                 local_txs.extend(remote_txs);
+                debug!(target: "taiko::proposer", txs = ?local_txs.len(), "Proposer filter best transactions");
                 // miner returned a set of transaction that we feed to the producer
                 this.queued.push_back((trigger_args, local_txs));
             };

@@ -37,6 +37,7 @@ use taiko_reth_beacon_consensus::{
 
 #[cfg(not(feature = "std"))]
 use alloc::{sync::Arc, vec, vec::Vec};
+use tracing::debug;
 
 #[cfg(feature = "std")]
 use std::sync::Arc;
@@ -207,6 +208,7 @@ where
                 // Signature can be invalid if not taiko or not the anchor tx
                 if !is_anchor {
                     // If the signature is not valid, skip the transaction
+                    debug!(target: "taiko::executor", hash = ?transaction.hash(), "Invalid sender for tx");
                     delete_tx(block, idx);
                     continue;
                 }
@@ -221,6 +223,7 @@ where
             let block_available_gas = block.header.gas_limit - cumulative_gas_used;
             if transaction.gas_limit() > block_available_gas {
                 if !is_anchor {
+                    debug!(target: "taiko::executor", hash = ?transaction.hash(), want = ?transaction.gas_limit(), got = block_available_gas, "Invalid gas limit for tx");
                     delete_tx(block, idx);
                     continue;
                 }
@@ -258,6 +261,7 @@ where
                             evm.context.evm.journaled_state.spec,
                             HashSet::new(),
                         );
+                        debug!(target: "taiko::executor", hash = ?transaction.hash(), error = ?err, "Invalid execute for tx");
                         delete_tx(block, idx);
                         continue;
                     }

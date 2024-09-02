@@ -9770,6 +9770,7 @@ dependencies = [
 name = "taiko-reth-engine-primitives"
 version = "1.0.0"
 dependencies = [
+ "alloy-rlp",
  "alloy-serde",
  "reth-chainspec",
  "reth-engine-primitives",
@@ -9781,6 +9782,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_with",
+ "sha2 0.10.8",
  "taiko-reth-primitives",
 ]
 
@@ -9802,6 +9804,7 @@ dependencies = [
  "secp256k1",
  "serde_json",
  "taiko-reth-beacon-consensus",
+ "tracing",
 ]
 
 [[package]]
@@ -9862,6 +9865,7 @@ dependencies = [
 name = "taiko-reth-primitives"
 version = "1.0.0"
 dependencies = [
+ "alloy-rlp",
  "bytes",
  "modular-bitfield",
  "reth-codecs",

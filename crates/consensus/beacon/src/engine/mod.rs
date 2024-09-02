@@ -486,7 +486,7 @@ where
                 current_head_num=?head.number,
                 "[Taiko] Allowing beacon reorg to old head"
             );
-            return true;
+            return head != &header.num_hash();
         }
 
         // 2. Client software MAY skip an update of the forkchoice state and MUST NOT begin a
@@ -1195,10 +1195,15 @@ where
         //    client software MUST respond with -38003: `Invalid payload attributes` and MUST NOT
         //    begin a payload build process. In such an event, the forkchoiceState update MUST NOT
         //    be rolled back.
+        #[cfg(not(feature = "taiko"))]
         if attrs.timestamp() <= head.timestamp {
             return OnForkChoiceUpdated::invalid_payload_attributes();
         }
 
+        #[cfg(feature = "taiko")]
+        if attrs.timestamp() < head.timestamp {
+            return OnForkChoiceUpdated::invalid_payload_attributes();
+        }
         // 8. Client software MUST begin a payload build process building on top of
         //    forkchoiceState.headBlockHash and identified via buildProcessId value if
         //    payloadAttributes is not null and the forkchoice state has been updated successfully.

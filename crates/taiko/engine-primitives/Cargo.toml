@@ -27,6 +27,8 @@ reth-ethereum-engine-primitives.workspace = true
 serde.workspace = true
 serde_with.workspace = true
 alloy-serde = "0.1.3"
+alloy-rlp.workspace = true
+sha2.workspace = true
 
 [dev-dependencies]
 serde_json.workspace = true
