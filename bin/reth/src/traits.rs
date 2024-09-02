@@ -20,3 +20,6 @@ impl PayloadEnvelopeExt for ExecutionPayloadEnvelopeV3 {
         self.execution_payload.clone()
     }
 }
+pub trait RpcServerArgsExEx {
+    fn with_static_l2_rpc_ip_and_port(self) -> Self;
+}

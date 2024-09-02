@@ -84,7 +84,7 @@ fi
 
 # Run the Kurtosis command and capture its output
 echo "Running Kurtosis command..."
-KURTOSIS_OUTPUT=$(kurtosis run github.com/ethpandaops/ethereum-package --args-file ./scripts/confs/network_params.yaml)
+KURTOSIS_OUTPUT=$(kurtosis run github.com/adaki2004/ethereum-package --args-file ./scripts/confs/network_params.yaml)
 
 # Print the entire Kurtosis output for debugging
 # echo "Kurtosis Output:"
@@ -124,8 +124,6 @@ fi
 
 # Run the forge foundry script using the extracted RPC port and PRIVATE_KEY
 FORGE_COMMAND="forge script --rpc-url http://127.0.0.1:$RPC_PORT scripts/DeployL1Locally.s.sol -vvvv --broadcast --private-key $PRIVATE_KEY --legacy"
-
 echo "Running forge foundry script..."
 eval $FORGE_COMMAND
-
 echo "Script execution completed."
