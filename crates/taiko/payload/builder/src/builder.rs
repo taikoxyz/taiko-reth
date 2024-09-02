@@ -167,12 +167,9 @@ where
     // execute the block
     let BlockExecutionOutput { state, receipts, requests, gas_used } =
         executor.executor(&mut db).execute((&mut block, U256::ZERO).into())?;
+    block.header.requests_root = Some(proofs::calculate_requests_root(&requests));
     let execution_outcome =
         ExecutionOutcome::new(state, receipts.into(), block.number, vec![requests.into()]);
-
-    // todo(onbjerg): we should not pass requests around as this is building a block, which
-    // means we need to extract the requests from the execution output and compute the requests
-    // root here
 
     // now we need to update certain header fields with the results of the execution
     block.header.transactions_root = proofs::calculate_transaction_root(&block.body);
