@@ -46,9 +46,6 @@ use reth_tasks::TaskManager;
 use reth_transaction_pool::{blobstore::DiskFileBlobStore, CoinbaseTipOrdering, EthPooledTransaction, EthTransactionValidator, Pool, TransactionValidationTaskExecutor};
 use std::{sync::Arc};
 use alloy_rlp::Decodable;
-
-use alloy_rlp::Decodable;
-
 use reth::rpc::types::engine::PayloadAttributes;
 use reth_payload_builder::{EthBuiltPayload, EthPayloadBuilderAttributes};
 
@@ -59,37 +56,12 @@ mod node;
 mod engine_api;
 mod traits;
 
-/// Helper function to create a new eth payload attributes
-// pub(crate) fn gwyneth_payload_attributes(timestamp: u64) -> GwynethPayloadBuilderAttributes {
-//     let attributes = GwynethPayloadAttributes {
-//         inner: PayloadAttributes {
-//             timestamp,
-//             prev_randao: B256::ZERO,
-//             suggested_fee_recipient: Address::ZERO,
-//             withdrawals: Some(vec![]),
-//             parent_beacon_block_root: Some(B256::ZERO),
-//         },
-//         transactions: None,
-//         gas_limit: None,
-//     }
-//     GwynethPayloadBuilderAttributes::try_new(B256::ZERO, attributes).unwrap()
-// }
-
 
 sol!(RollupContract, "TaikoL1.json");
 use RollupContract::{BlockProposed, RollupContractEvents};
 
 const ROLLUP_CONTRACT_ADDRESS: Address = address!("9fCF7D13d10dEdF17d0f24C62f0cf4ED462f65b7");
 const CHAIN_ID: u64 = 167010;
-
-pub fn decode_transactions(tx_list: &[u8]) -> Vec<TransactionSigned> {
-    #[allow(clippy::useless_asref)]
-    Vec::<TransactionSigned>::decode(&mut tx_list.as_ref()).unwrap_or_else(|e| {
-        // If decoding fails we need to make an empty block
-        println!("decode_transactions not successful: {e:?}, use empty tx_list");
-        vec![]
-    })
-}
 
 pub fn decode_transactions(tx_list: &[u8]) -> Vec<TransactionSigned> {
     #[allow(clippy::useless_asref)]
@@ -189,7 +161,6 @@ impl<Node: reth_node_api::FullNodeComponents> Rollup<Node> {
                         })
                     });
                     println!("assert_new_block done: {:?}", res);
-                }
                 }
                 _ => (),
             }

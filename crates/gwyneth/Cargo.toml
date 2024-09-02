@@ -25,6 +25,7 @@ reth-provider.workspace = true
 reth-transaction-pool.workspace = true
 reth-network.workspace = true
 reth-evm-ethereum.workspace = true
+reth-evm.workspace = true
 reth-consensus.workspace = true
 reth-auto-seal-consensus.workspace = true
 reth-beacon-consensus.workspace = true
@@ -38,6 +39,9 @@ reth-node-events.workspace = true
 reth-node-core.workspace = true
 reth-exex.workspace = true
 reth-chainspec.workspace = true
+reth-execution-types.workspace = true
+reth-primitives.workspace = true
+reth-revm.workspace = true
 
 # ethereum
 reth-node-ethereum.workspace = true
@@ -51,3 +55,6 @@ tokio-stream.workspace = true
 futures.workspace = true
 alloy-rlp.workspace = true
 thiserror.workspace = true
+tracing.workspace = true
+
+revm.workspace = true

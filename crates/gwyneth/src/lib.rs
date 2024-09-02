@@ -1,5 +1,7 @@
 //! Ethereum Node types config.
 
+use builder::default_gwyneth_payload_builder;
+use reth_evm_ethereum::EthEvmConfig;
 use reth_tasks::TaskManager;
 use thiserror::Error;
 
@@ -53,6 +55,8 @@ use reth_transaction_pool::{
     TransactionPool,
 };
 use serde::{Deserialize, Serialize};
+
+pub mod builder;
 
 /// Gwyneth error type used in payload attributes validation
 #[derive(Debug, Error)]
@@ -225,7 +229,7 @@ where
     type ComponentsBuilder = ComponentsBuilder<
         N,
         EthereumPoolBuilder,
-        GwynethPayloadServiceBuilder,
+        GwynethPayloadBuilder,
         EthereumNetworkBuilder,
         EthereumExecutorBuilder,
         EthereumConsensusBuilder,
@@ -236,19 +240,59 @@ where
         ComponentsBuilder::default()
             .node_types::<N>()
             .pool(EthereumPoolBuilder::default())
-            .payload(GwynethPayloadServiceBuilder::default())
+            .payload(GwynethPayloadBuilder::default())
             .network(EthereumNetworkBuilder::default())
             .executor(EthereumExecutorBuilder::default())
             .consensus(EthereumConsensusBuilder::default())
     }
 }
 
-/// A Gwyneth payload service builder that supports the Gwyneth engine types
+/// The type responsible for building Gwyneth payloads
 #[derive(Debug, Default, Clone)]
 #[non_exhaustive]
-pub struct GwynethPayloadServiceBuilder;
+pub struct GwynethPayloadBuilder;
 
-impl<Node, Pool> PayloadServiceBuilder<Node, Pool> for GwynethPayloadServiceBuilder
+impl<Pool, Client> PayloadBuilder<Pool, Client> for GwynethPayloadBuilder
+where
+    Client: StateProviderFactory,
+    Pool: TransactionPool,
+{
+    type Attributes = GwynethPayloadBuilderAttributes;
+    type BuiltPayload = EthBuiltPayload;
+
+    fn try_build(
+        &self,
+        args: BuildArguments<Pool, Client, Self::Attributes, Self::BuiltPayload>,
+    ) -> Result<BuildOutcome<Self::BuiltPayload>, PayloadBuilderError> {
+        default_gwyneth_payload_builder(EthEvmConfig::default(), args)
+    }
+
+    fn build_empty_payload(
+        &self,
+        client: &Client,
+        config: PayloadConfig<Self::Attributes>,
+    ) -> Result<Self::BuiltPayload, PayloadBuilderError> {
+        let PayloadConfig {
+            initialized_block_env,
+            initialized_cfg,
+            parent_block,
+            extra_data,
+            attributes,
+            chain_spec,
+        } = config;
+        let eth_payload_config = PayloadConfig {
+            initialized_block_env,
+            initialized_cfg,
+            parent_block,
+            extra_data,
+            attributes: attributes.inner,
+            chain_spec,
+        };
+        <reth_ethereum_payload_builder::EthereumPayloadBuilder as PayloadBuilder<Pool, Client>>::build_empty_payload(&reth_ethereum_payload_builder::EthereumPayloadBuilder::default(),client, eth_payload_config)
+    }
+}
+
+impl<Node, Pool> PayloadServiceBuilder<Node, Pool> for GwynethPayloadBuilder
 where
     Node: FullNodeTypes<Engine = GwynethEngineTypes>,
     Pool: TransactionPool + Unpin + 'static,
@@ -284,76 +328,6 @@ where
     }
 }
 
-/// The type responsible for building Gwyneth payloads
-#[derive(Debug, Default, Clone)]
-#[non_exhaustive]
-pub struct GwynethPayloadBuilder;
-
-impl<Pool, Client> PayloadBuilder<Pool, Client> for GwynethPayloadBuilder
-where
-    Client: StateProviderFactory,
-    Pool: TransactionPool,
-{
-    type Attributes = GwynethPayloadBuilderAttributes;
-    type BuiltPayload = EthBuiltPayload;
-
-    fn try_build(
-        &self,
-        args: BuildArguments<Pool, Client, Self::Attributes, Self::BuiltPayload>,
-    ) -> Result<BuildOutcome<Self::BuiltPayload>, PayloadBuilderError> {
-        let BuildArguments { client, pool, cached_reads, config, cancel, best_payload } = args;
-        let PayloadConfig {
-            initialized_block_env,
-            initialized_cfg,
-            parent_block,
-            extra_data,
-            attributes,
-            chain_spec,
-        } = config;
-
-        // This reuses the default EthereumPayloadBuilder to build the payload
-        // but any Gwyneth logic can be implemented here
-        reth_ethereum_payload_builder::EthereumPayloadBuilder::default().try_build(BuildArguments {
-            client,
-            pool,
-            cached_reads,
-            config: PayloadConfig {
-                initialized_block_env,
-                initialized_cfg,
-                parent_block,
-                extra_data,
-                attributes: attributes.inner,
-                chain_spec,
-            },
-            cancel,
-            best_payload,
-        })
-    }
-
-    fn build_empty_payload(
-        &self,
-        client: &Client,
-        config: PayloadConfig<Self::Attributes>,
-    ) -> Result<Self::BuiltPayload, PayloadBuilderError> {
-        let PayloadConfig {
-            initialized_block_env,
-            initialized_cfg,
-            parent_block,
-            extra_data,
-            attributes,
-            chain_spec,
-        } = config;
-        let eth_payload_config = PayloadConfig {
-            initialized_block_env,
-            initialized_cfg,
-            parent_block,
-            extra_data,
-            attributes: attributes.inner,
-            chain_spec,
-        };
-        <reth_ethereum_payload_builder::EthereumPayloadBuilder as PayloadBuilder<Pool, Client>>::build_empty_payload(&reth_ethereum_payload_builder::EthereumPayloadBuilder::default(),client, eth_payload_config)
-    }
-}
 
 #[tokio::main]
 async fn main() -> eyre::Result<()> {
