@@ -376,10 +376,8 @@ where
         ..attributes.l1_origin.clone()
     };
     let block_id = l1_origin.block_id.try_into().unwrap();
-    // Write L1Origin.
+    // Write L1Origin and head L1Origin.
     client.save_l1_origin(block_id, l1_origin)?;
-    // Write the head L1Origin.
-    client.save_head_l1_origin(block_id)?;
 
     debug!(target: "taiko_payload_builder", ?sealed_block, "sealed built block");
 

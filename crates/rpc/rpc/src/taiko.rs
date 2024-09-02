@@ -15,6 +15,7 @@ use revm_primitives::U256;
 use taiko_reth_primitives::L1Origin;
 use taiko_reth_proposer_consensus::{ProposerBuilder, ProposerClient};
 use taiko_reth_provider::L1OriginReader;
+use tracing::debug;
 
 /// Taiko API.
 #[derive(Debug)]
@@ -65,13 +66,17 @@ where
 {
     /// HeadL1Origin returns the latest L2 block's corresponding L1 origin.
     async fn head_l1_origin(&self) -> RpcResult<L1Origin> {
-        self.provider.get_head_l1_origin().to_rpc_result()
+        let res = self.provider.get_head_l1_origin().to_rpc_result();
+        debug!(target: "rpc::taiko", ?res, "Read head l1 origin");
+        res
     }
 
     /// L1OriginByID returns the L2 block's corresponding L1 origin.
     async fn l1_origin_by_id(&self, block_id: U256) -> RpcResult<L1Origin> {
         let block_number = block_id.try_into().map_err(RethError::other).to_rpc_result()?;
-        self.provider.get_l1_origin(block_number).to_rpc_result()
+        let res = self.provider.get_l1_origin(block_number).to_rpc_result();
+        debug!(target: "rpc::taiko", ?block_number, ?res, "Read l1 origin by id");
+        res
     }
 }
 
@@ -116,7 +121,19 @@ where
         max_transactions_lists: u64,
         min_tip: u64,
     ) -> RpcResult<Vec<PreBuiltTxList>> {
-        self.proposer_client
+        debug!(
+            target: "rpc::taiko",
+            ?beneficiary,
+            ?base_fee,
+            ?block_max_gas_limit,
+            ?max_bytes_per_tx_list,
+            ?local_accounts,
+            ?max_transactions_lists,
+            ?min_tip,
+            "Read tx pool context"
+        );
+        let res = self
+            .proposer_client
             .tx_pool_content_with_min_tip(
                 beneficiary,
                 base_fee,
@@ -137,6 +154,8 @@ where
                     })
                     .collect()
             })
-            .to_rpc_result()
+            .to_rpc_result();
+        debug!(target: "rpc::taiko", ?res, "Read tx pool context");
+        res
     }
 }

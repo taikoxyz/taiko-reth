@@ -26,8 +26,6 @@ pub trait L1OriginReader: Send + Sync {
 pub trait L1OriginWriter: Send + Sync {
     /// Save the L1 origin for the given block hash.
     fn save_l1_origin(&self, block_number: BlockNumber, l1_origin: L1Origin) -> ProviderResult<()>;
-    /// Save the head L1 origin.
-    fn save_head_l1_origin(&self, block_number: BlockNumber) -> ProviderResult<()>;
 }
 
 impl<TX: DbTx> L1OriginReader for DatabaseProvider<TX> {
@@ -46,13 +44,11 @@ impl<TX: DbTx> L1OriginReader for DatabaseProvider<TX> {
     }
 }
 
-impl<TX: DbTxMut> L1OriginWriter for DatabaseProvider<TX> {
+impl<TX: DbTxMut + DbTx> L1OriginWriter for DatabaseProvider<TX> {
     fn save_l1_origin(&self, block_number: BlockNumber, l1_origin: L1Origin) -> ProviderResult<()> {
-        Ok(self.tx_ref().put::<L1Origins>(block_number, l1_origin)?)
-    }
-
-    fn save_head_l1_origin(&self, block_number: BlockNumber) -> ProviderResult<()> {
-        Ok(self.tx_ref().put::<HeadL1Origin>(HeadL1OriginKey, block_number)?)
+        self.tx_ref().put::<L1Origins>(block_number, l1_origin)?;
+        self.tx_ref().put::<HeadL1Origin>(HeadL1OriginKey, block_number)?;
+        Ok(())
     }
 }
 
@@ -74,10 +70,9 @@ where
     DB: Database,
 {
     fn save_l1_origin(&self, block_number: BlockNumber, l1_origin: L1Origin) -> ProviderResult<()> {
-        self.database_provider_rw()?.save_l1_origin(block_number, l1_origin)
-    }
-
-    fn save_head_l1_origin(&self, block_number: BlockNumber) -> ProviderResult<()> {
-        self.database_provider_rw()?.save_head_l1_origin(block_number)
+        let provider_rw = self.database_provider_rw()?;
+        provider_rw.save_l1_origin(block_number, l1_origin)?;
+        provider_rw.commit()?;
+        Ok(())
     }
 }
