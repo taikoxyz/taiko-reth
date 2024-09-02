@@ -141,11 +141,11 @@ impl PayloadBuilderAttributes for TaikoPayloadBuilderAttributes {
     }
 
     fn suggested_fee_recipient(&self) -> Address {
-        self.payload_attributes.suggested_fee_recipient
+        self.block_metadata.beneficiary
     }
 
     fn prev_randao(&self) -> B256 {
-        self.payload_attributes.prev_randao
+        self.block_metadata.mix_hash
     }
 
     fn withdrawals(&self) -> &Withdrawals {

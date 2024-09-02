@@ -64,18 +64,8 @@ where
         &self,
         args: BuildArguments<Pool, Client, TaikoPayloadBuilderAttributes, TaikoBuiltPayload>,
     ) -> Result<BuildOutcome<TaikoBuiltPayload>, PayloadBuilderError> {
-        let BuildArguments { client, mut cached_reads, config, cancel, .. } = args;
-        match taiko_payload_builder(
-            self.evm_config.clone(),
-            &client,
-            &mut cached_reads,
-            config,
-            Some(&cancel),
-        ) {
-            Ok(Some(payload)) => Ok(BuildOutcome::Better { payload, cached_reads }),
-            Ok(None) => Ok(BuildOutcome::Cancelled),
-            Err(err) => Err(err),
-        }
+        let BuildArguments { cached_reads, .. } = args;
+        Ok(BuildOutcome::Aborted { fees: U256::ZERO, cached_reads })
     }
 
     fn build_empty_payload(
@@ -84,8 +74,7 @@ where
         config: PayloadConfig<Self::Attributes>,
     ) -> Result<TaikoBuiltPayload, PayloadBuilderError> {
         let mut cached_reads = Default::default();
-        taiko_payload_builder(self.evm_config.clone(), client, &mut cached_reads, config, None)
-            .map(|res| res.unwrap())
+        taiko_payload_builder(self.evm_config.clone(), client, &mut cached_reads, config)
     }
 }
 
@@ -100,8 +89,7 @@ fn taiko_payload_builder<EvmConfig, Client>(
     client: &Client,
     cached_reads: &mut CachedReads,
     config: PayloadConfig<TaikoPayloadBuilderAttributes>,
-    cancel: Option<&Cancelled>,
-) -> Result<Option<TaikoBuiltPayload>, PayloadBuilderError>
+) -> Result<TaikoBuiltPayload, PayloadBuilderError>
 where
     EvmConfig: ConfigureEvm,
     Client: StateProviderFactory + L1OriginWriter,
@@ -156,26 +144,8 @@ where
                     TaikoPayloadBuilderError::FailedToExecuteAnchor,
                 ));
             }
+            debug!(target: "taiko_payload_builder", want = %block_gas_limit, got = %(cumulative_gas_used + tx.gas_limit()), "skipping transaction because it would exceed the block gas limit");
             continue;
-        }
-
-        // check if the job was cancelled, if so we can exit early
-        if cancel.map_or(false, |cancel| cancel.is_cancelled()) {
-            return Ok(None);
-        }
-
-        // the EIP-4844 can still fit in the block
-        if let Some(blob_tx) = tx.transaction.as_eip4844() {
-            let tx_blob_gas = blob_tx.blob_gas();
-            if sum_blob_gas_used + tx_blob_gas > MAX_DATA_GAS_PER_BLOCK {
-                // we can't fit this _blob_ transaction into the block, so we mark it as
-                // invalid, which removes its dependent transactions from
-                // the iterator. This is similar to the gas limit condition
-                // for regular transactions above.
-                trace!(target: "taiko_payload_builder", tx=?tx.hash, ?sum_blob_gas_used, ?tx_blob_gas, "skipping blob transaction because it would exceed the max data gas per block");
-                // anchor tx can't be a blob tx
-                continue;
-            }
         }
 
         let tx = match tx.try_into_ecrecovered().map_err(|_| {
@@ -186,6 +156,7 @@ where
                 if is_anchor {
                     return Err(err);
                 } else {
+                    debug!(target: "taiko_payload_builder", error = ?err, "skipping transaction because it failed to recover");
                     continue;
                 }
             }
@@ -201,6 +172,20 @@ where
             .map_err(|_| {
                 PayloadBuilderError::other(TaikoPayloadBuilderError::InvalidAnchorTransaction)
             })?;
+        }
+
+        // the EIP-4844 can still fit in the block
+        if let Some(blob_tx) = tx.transaction.as_eip4844() {
+            let tx_blob_gas = blob_tx.blob_gas();
+            if sum_blob_gas_used + tx_blob_gas > MAX_DATA_GAS_PER_BLOCK {
+                // we can't fit this _blob_ transaction into the block, so we mark it as
+                // invalid, which removes its dependent transactions from
+                // the iterator. This is similar to the gas limit condition
+                // for regular transactions above.
+                trace!(target: "taiko_payload_builder", tx=?tx.hash, ?sum_blob_gas_used, ?tx_blob_gas, "skipping blob transaction because it would exceed the max data gas per block");
+                // anchor tx can't be a blob tx
+                continue;
+            }
         }
 
         let taiko_tx_env_with_recovered = |tx: &TransactionSignedEcRecovered| -> TxEnv {
@@ -231,6 +216,7 @@ where
                         evm.context.evm.journaled_state.spec,
                         Default::default(),
                     );
+                    debug!(target: "taiko_payload_builder", error = ?err, "skipping transaction because it failed to execute");
                     continue;
                 }
                 return Err(PayloadBuilderError::EvmExecutionError(err));
@@ -350,12 +336,12 @@ where
         withdrawals_root,
         logs_bloom,
         timestamp: attributes.payload_attributes.timestamp,
-        mix_hash: attributes.payload_attributes.prev_randao,
+        mix_hash: initialized_block_env.prevrandao.unwrap(),
         nonce: BEACON_NONCE,
         base_fee_per_gas: Some(base_fee),
-        number: parent_block.number + 1,
+        number: block_number,
         gas_limit: block_gas_limit,
-        difficulty: U256::ZERO,
+        difficulty: initialized_block_env.difficulty,
         gas_used: cumulative_gas_used,
         extra_data: attributes.block_metadata.extra_data.clone().into(),
         parent_beacon_block_root: attributes.payload_attributes.parent_beacon_block_root,
@@ -375,6 +361,7 @@ where
         l2_block_hash: sealed_block.hash(),
         ..attributes.l1_origin.clone()
     };
+    debug!(target: "taiko_payload_builder", ?l1_origin, "save l1 origin");
     let block_id = l1_origin.block_id.try_into().unwrap();
     // Write L1Origin and head L1Origin.
     client.save_l1_origin(block_id, l1_origin)?;
@@ -383,5 +370,5 @@ where
 
     let payload =
         TaikoBuiltPayload::new(attributes.payload_attributes.id, sealed_block, total_fees);
-    Ok(Some(payload))
+    Ok(payload)
 }
