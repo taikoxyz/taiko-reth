@@ -1,6 +1,6 @@
 //! Error types emitted by types or implementations of this crate.
 
-use reth_errors::{ProviderError, RethError};
+use reth_errors::{BlockExecutionError, ProviderError, RethError};
 use reth_primitives::{revm_primitives::EVMError, B256};
 use reth_transaction_pool::BlobStoreError;
 use tokio::sync::oneshot;
@@ -32,6 +32,9 @@ pub enum PayloadBuilderError {
     /// Any other payload building errors.
     #[error(transparent)]
     Other(Box<dyn std::error::Error + Send + Sync>),
+    /// Error during block execution.
+    #[error(transparent)]
+    BlockExecutionError(#[from] BlockExecutionError),
 }
 
 impl PayloadBuilderError {

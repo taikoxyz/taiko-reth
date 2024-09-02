@@ -199,6 +199,9 @@ where
         ctx: &BuilderContext<Node>,
         pool: Pool,
     ) -> eyre::Result<PayloadBuilderHandle<Node::Engine>> {
+        let chain_spec = ctx.chain_spec();
+        let evm_config = TaikoEvmConfig::default();
+        let executor = TaikoExecutorProvider::new(chain_spec, evm_config);
         let payload_builder = taiko_reth_payload_builder::TaikoPayloadBuilder::default();
         let conf = ctx.payload_builder_config();
 

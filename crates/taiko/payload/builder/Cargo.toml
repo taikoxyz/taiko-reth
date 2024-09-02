@@ -21,6 +21,7 @@ reth-payload-builder.workspace = true
 reth-basic-payload-builder.workspace = true
 reth-evm = { workspace = true, features = ["taiko"] }
 reth-errors.workspace = true
+reth-chainspec = { workspace = true, features = ["taiko"] }
 
 # taiko
 taiko-reth-evm.workspace = true

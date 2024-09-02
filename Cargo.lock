@@ -9833,6 +9833,7 @@ version = "1.0.0"
 dependencies = [
  "alloy-rlp",
  "reth-basic-payload-builder",
+ "reth-chainspec",
  "reth-errors",
  "reth-evm",
  "reth-payload-builder",
