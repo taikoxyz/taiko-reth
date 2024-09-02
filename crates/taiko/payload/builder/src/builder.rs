@@ -96,48 +96,20 @@ where
         alloy_rlp::Decodable::decode(&mut attributes.block_metadata.tx_list.as_ref())
             .map_err(|_| PayloadBuilderError::other(TaikoPayloadBuilderError::FailedToDecodeTx))?;
 
-    // initialize empty blob sidecars at first. If cancun is active then this will
-    let mut excess_blob_gas = None;
-    let mut blob_gas_used = None;
-
-    // only determine cancun fields when active
-    if chain_spec.is_cancun_active_at_timestamp(attributes.payload_attributes.timestamp) {
-        excess_blob_gas = if chain_spec.is_cancun_active_at_timestamp(parent_block.timestamp) {
-            let parent_excess_blob_gas = parent_block.excess_blob_gas.unwrap_or_default();
-            let parent_blob_gas_used = parent_block.blob_gas_used.unwrap_or_default();
-            Some(calculate_excess_blob_gas(parent_excess_blob_gas, parent_blob_gas_used))
+    let blob_gas_used =
+        if chain_spec.is_cancun_active_at_timestamp(attributes.payload_attributes.timestamp) {
+            let mut sum_blob_gas_used = 0;
+            for tx in &transactions {
+                if let Some(blob_tx) = tx.transaction.as_eip4844() {
+                    sum_blob_gas_used += blob_tx.blob_gas();
+                }
+            }
+            Some(sum_blob_gas_used)
         } else {
-            // for the first post-fork block, both parent.blob_gas_used and
-            // parent.excess_blob_gas are evaluated as 0
-            Some(calculate_excess_blob_gas(0, 0))
+            None
         };
 
-        blob_gas_used = Some(0);
-    }
-    // let mut header = Header {
-    //     parent_hash: self.best_hash,
-    //     ommers_hash: proofs::calculate_ommers_root(ommers),
-    //     beneficiary: Default::default(),
-    //     state_root: Default::default(),
-    //     transactions_root: proofs::calculate_transaction_root(transactions),
-    //     receipts_root: Default::default(),
-    //     withdrawals_root: withdrawals.map(|w| proofs::calculate_withdrawals_root(w)),
-    //     logs_bloom: Default::default(),
-    //     difficulty: U256::from(2),
-    //     number: self.best_block + 1,
-    //     gas_limit: ETHEREUM_BLOCK_GAS_LIMIT,
-    //     gas_used: 0,
-    //     timestamp,
-    //     mix_hash: Default::default(),
-    //     nonce: 0,
-    //     base_fee_per_gas,
-    //     blob_gas_used,
-    //     excess_blob_gas: None,
-    //     extra_data: Default::default(),
-    //     parent_beacon_block_root: None,
-    //     requests_root: requests.map(|r| proofs::calculate_requests_root(&r.0)),
-    // };
-    let header = Header {
+    let mut header = Header {
         parent_hash: parent_block.hash(),
         ommers_hash: EMPTY_OMMER_ROOT_HASH,
         beneficiary: initialized_block_env.coinbase,
@@ -159,9 +131,27 @@ where
         extra_data: attributes.block_metadata.extra_data.clone().into(),
         parent_beacon_block_root: attributes.payload_attributes.parent_beacon_block_root,
         blob_gas_used,
-        excess_blob_gas,
+        excess_blob_gas: None,
         requests_root: Default::default(),
     };
+
+    if chain_spec.is_cancun_active_at_timestamp(attributes.payload_attributes.timestamp) {
+        header.parent_beacon_block_root = parent_block.parent_beacon_block_root;
+        header.blob_gas_used = Some(0);
+
+        let (parent_excess_blob_gas, parent_blob_gas_used) =
+            if chain_spec.is_cancun_active_at_timestamp(parent_block.timestamp) {
+                (
+                    parent_block.excess_blob_gas.unwrap_or_default(),
+                    parent_block.blob_gas_used.unwrap_or_default(),
+                )
+            } else {
+                (0, 0)
+            };
+
+        header.excess_blob_gas =
+            Some(calculate_excess_blob_gas(parent_excess_blob_gas, parent_blob_gas_used))
+    }
 
     // seal the block
     let mut block = Block {
