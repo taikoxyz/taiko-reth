@@ -111,6 +111,7 @@ where
 
                 let client = this.provider.clone();
                 let chain_spec = Arc::clone(&this.chain_spec);
+                let pool = this.pool.clone();
                 let executor = this.block_executor.clone();
 
                 // Create the mining future that creates a block, notifies the engine that drives
@@ -131,8 +132,8 @@ where
                         base_fee,
                         ..
                     } = trigger_args;
-                    let _ = tx.send(Storage::build_and_execute(
-                        txs,
+                    let res = Storage::build_and_execute(
+                        txs.clone(),
                         ommers,
                         &client,
                         chain_spec,
@@ -142,7 +143,12 @@ where
                         max_bytes_per_tx_list,
                         max_transactions_lists,
                         base_fee,
-                    ));
+                    );
+                    if res.is_ok() {
+                        // clear all transactions from pool
+                        pool.remove_transactions(txs.iter().map(|tx| tx.hash()).collect());
+                    }
+                    let _ = tx.send(res);
                 }));
             }
 
