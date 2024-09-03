@@ -33,8 +33,8 @@ RUN cargo chef cook --profile $BUILD_PROFILE --features "$FEATURES" --recipe-pat
 COPY . .
 RUN cargo build --profile $BUILD_PROFILE --features "$FEATURES" --locked --bin reth
 
-# Clone and build rbuilder
-RUN git clone https://github.com/taikoxyz/rbuilder.git /app/rbuilder
+# Clone and build rbuilder (gwyneth branch)
+RUN git clone -b gwyneth https://github.com/taikoxyz/rbuilder.git /app/rbuilder
 WORKDIR /app/rbuilder
 RUN cargo build --release
 
@@ -55,6 +55,9 @@ COPY --from=builder /app/rbuilder /usr/local/bin
 
 # Copy the entire rbuilder repository
 COPY --from=builder /app/rbuilder /app/rbuilder
+
+# Create exe_datadir
+RUN mkdir -p /app/exex_datadir/static_files
 
 # Copy licenses
 COPY LICENSE-* ./

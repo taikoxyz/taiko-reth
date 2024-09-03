@@ -23,3 +23,7 @@ impl PayloadEnvelopeExt for ExecutionPayloadEnvelopeV3 {
 pub trait RpcServerArgsExEx {
     fn with_static_l2_rpc_ip_and_port(self) -> Self;
 }
+
+pub trait StaticDatadirExex {
+    fn with_static_datadir(self) -> Self;
+}

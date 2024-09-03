@@ -47,6 +47,7 @@ use reth_rpc_api::{eth::{helpers::AddDevSigners, FullEthApiServer}, EngineApiCli
 use reth_tasks::TaskManager;
 use reth_transaction_pool::{blobstore::DiskFileBlobStore, CoinbaseTipOrdering, EthPooledTransaction, EthTransactionValidator, Pool, TransactionValidationTaskExecutor};
 use traits::RpcServerArgsExEx;
+use traits::StaticDatadirExex;
 use std::{future::Future, marker::PhantomData, pin::Pin, sync::Arc};
 
 use alloy_rlp::Decodable;
@@ -280,7 +281,11 @@ fn main() -> eyre::Result<()> {
             .with_network(network_config.clone())
             .with_unused_ports()
             .with_rpc(RpcServerArgs::default().with_unused_ports().with_static_l2_rpc_ip_and_port())
-            .set_dev(true);
+            .set_dev(true)
+            .with_static_datadir();
+
+        println!("Dani debug: data_dir for exex:");
+        println!("{:?}", node_config.datadir());
 
         let NodeHandle { node, node_exit_future: _ } = NodeBuilder::new(node_config.clone())
             .testing_node(exec.clone())
