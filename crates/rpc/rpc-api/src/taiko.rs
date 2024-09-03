@@ -54,6 +54,7 @@ pub trait TaikoAuthApi {
 /// `PreBuiltTxList` is a pre-built transaction list based on the latest chain state,
 /// with estimated gas used / bytes.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "PascalCase")]
 pub struct PreBuiltTxList {
     /// The list of transactions.
     pub tx_list: Vec<Transaction>,
