@@ -486,7 +486,7 @@ where
                 current_head_num=?head.number,
                 "[Taiko] Allowing beacon reorg to old head"
             );
-            return head != &header.num_hash();
+            return true;
         }
 
         // 2. Client software MAY skip an update of the forkchoice state and MUST NOT begin a

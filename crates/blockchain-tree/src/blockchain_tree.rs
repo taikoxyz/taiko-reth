@@ -1301,7 +1301,6 @@ where
         // with non-finalized data. The only scenario where canonical reverts go past the highest
         // static file is when an optimistic sync occurred and non-finalized data was written to
         // static files.
-        #[cfg(not(feature = "taiko"))]
         if self
             .externals
             .provider_factory
