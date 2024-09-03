@@ -109,6 +109,11 @@ where
             None
         };
 
+    // if shanghai is active, include empty withdrawals
+    let withdrawals = chain_spec
+        .is_shanghai_active_at_timestamp(attributes.payload_attributes.timestamp)
+        .then_some(attributes.payload_attributes.withdrawals);
+
     let mut header = Header {
         parent_hash: parent_block.hash(),
         ommers_hash: EMPTY_OMMER_ROOT_HASH,
@@ -116,9 +121,7 @@ where
         state_root: Default::default(),
         transactions_root: Default::default(),
         receipts_root: Default::default(),
-        withdrawals_root: Some(proofs::calculate_withdrawals_root(
-            &attributes.payload_attributes.withdrawals,
-        )),
+        withdrawals_root: withdrawals.as_ref().map(|w| proofs::calculate_withdrawals_root(w)),
         logs_bloom: Default::default(),
         timestamp: attributes.payload_attributes.timestamp,
         mix_hash: initialized_block_env.prevrandao.unwrap(),
@@ -158,7 +161,7 @@ where
         header,
         body: transactions,
         ommers: vec![],
-        withdrawals: Some(attributes.payload_attributes.withdrawals),
+        withdrawals,
         requests: Default::default(),
     }
     .with_recovered_senders()
@@ -167,10 +170,15 @@ where
     // execute the block
     let BlockExecutionOutput { state, receipts, requests, gas_used } =
         executor.executor(&mut db).execute((&mut block, U256::ZERO).into())?;
-    block.header.requests_root = Some(proofs::calculate_requests_root(&requests));
-    let execution_outcome =
-        ExecutionOutcome::new(state, receipts.into(), block.number, vec![requests.into()]);
 
+    let execution_outcome =
+        ExecutionOutcome::new(state, receipts.into(), block.number, vec![requests.clone().into()]);
+
+    // if prague is active, include empty requests
+    let requests = chain_spec
+        .is_prague_active_at_timestamp(attributes.payload_attributes.timestamp)
+        .then_some(requests);
+    block.header.requests_root = requests.map(|r| proofs::calculate_requests_root(&r));
     // now we need to update certain header fields with the results of the execution
     block.header.transactions_root = proofs::calculate_transaction_root(&block.body);
     block.header.state_root = db.state_root(execution_outcome.state())?;
