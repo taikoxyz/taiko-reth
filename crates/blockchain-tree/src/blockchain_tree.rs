@@ -193,10 +193,13 @@ where
                 return Ok(Some(BlockStatus::Valid(BlockAttachment::Canonical)));
             }
 
+            #[cfg(not(feature = "taiko"))]
             return Err(BlockchainTreeError::PendingBlockIsFinalized {
                 last_finalized: last_finalized_block,
             }
             .into());
+            #[cfg(feature = "taiko")]
+            return Ok(None);
         }
 
         // is block inside chain
