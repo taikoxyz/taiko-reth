@@ -36,6 +36,7 @@ const MAX_PAYLOAD_BODIES_LIMIT: u64 = 1024;
 
 /// The Engine API implementation that grants the Consensus layer access to data and
 /// functions in the Execution layer that are crucial for the consensus process.
+#[derive(Clone)]
 pub struct EngineApi<Provider, EngineT: EngineTypes> {
     inner: Arc<EngineApiInner<Provider, EngineT>>,
 }

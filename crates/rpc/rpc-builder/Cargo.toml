@@ -25,6 +25,7 @@ reth-tasks = { workspace = true, features = ["rayon"] }
 reth-transaction-pool.workspace = true
 reth-evm.workspace = true
 reth-engine-primitives.workspace = true
+reth-beacon-consensus.workspace = true
 
 # taiko
 taiko-reth-provider = { workspace = true, optional = true }

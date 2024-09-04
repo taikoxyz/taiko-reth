@@ -925,6 +925,28 @@ where
         Ok(())
     }
 
+    /// Sets the head of the canon chain without any additional checks.
+    fn taiko_reorg(&self, max_block: BlockNumber) -> RethResult<()> {
+        let max_header = self.blockchain.sealed_header(max_block)
+        .inspect_err(|error| {
+            error!(target: "consensus::engine", %error, "Error getting canonical header for continuous sync");
+        })?
+        .ok_or_else(|| ProviderError::HeaderNotFound(max_block.into()))?;
+        let max_hash = max_header.hash();
+        self.update_canon_chain(
+            max_header,
+            &ForkchoiceState {
+                head_block_hash: max_hash,
+                finalized_block_hash: max_hash,
+                safe_block_hash: max_hash,
+            },
+        )?;
+        self.blockchain.update_block_hashes_and_clear_buffered()?;
+        self.blockchain.connect_buffered_blocks_to_canonical_hashes()?;
+        // We are on an optimistic syncing process, better to wait for the next FCU to handle
+        Ok(())
+    }
+
     /// Updates the state of the canon chain tracker based on the given head.
     ///
     /// This expects the given head to be the new canonical head.
@@ -1495,22 +1517,18 @@ where
             }
         };
 
-        let optimistic_mode = |this: &mut Self| {
-            this.set_canonical_head(ctrl.block_number().unwrap_or_default())?;
-            this.blockchain.update_block_hashes_and_clear_buffered()?;
-            this.blockchain.connect_buffered_blocks_to_canonical_hashes()?;
-            // We are on an optimistic syncing process, better to wait for the next FCU to handle
-            Ok(())
-        };
-
         trace!(target: "consensus::engine", ?sync_target_state, "Check sync target state");
         if cfg!(feature = "taiko") {
             // ignore the finalized block hash if we are in taiko mode
-            return optimistic_mode(self);
+            return self.taiko_reorg(ctrl.block_number().unwrap_or_default());
         }
 
         if sync_target_state.finalized_block_hash.is_zero() {
-            return optimistic_mode(self);
+            self.set_canonical_head(ctrl.block_number().unwrap_or_default())?;
+            self.blockchain.update_block_hashes_and_clear_buffered()?;
+            self.blockchain.connect_buffered_blocks_to_canonical_hashes()?;
+            // We are on an optimistic syncing process, better to wait for the next FCU to handle
+            return Ok(());
         }
 
         // Next, we check if we need to schedule another pipeline run or transition

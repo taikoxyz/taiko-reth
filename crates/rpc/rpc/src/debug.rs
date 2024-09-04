@@ -10,6 +10,8 @@ use crate::{
 use alloy_rlp::{Decodable, Encodable};
 use async_trait::async_trait;
 use jsonrpsee::core::RpcResult;
+use reth_beacon_consensus::BeaconConsensusEngineHandle;
+use reth_engine_primitives::{EngineApiMessageVersion, EngineTypes};
 use reth_primitives::{
     revm::env::tx_env_with_recovered, Address, Block, BlockId, BlockNumberOrTag, Bytes,
     TransactionSignedEcRecovered, Withdrawals, B256, U256,
@@ -20,6 +22,7 @@ use reth_provider::{
 use reth_revm::database::StateProviderDatabase;
 use reth_rpc_api::DebugApiServer;
 use reth_rpc_types::{
+    engine::ForkchoiceState,
     state::EvmOverrides,
     trace::geth::{
         BlockTraceResult, FourByteFrame, GethDebugBuiltInTracerType, GethDebugTracerType,
@@ -42,16 +45,32 @@ use tokio::sync::{AcquireError, OwnedSemaphorePermit};
 /// `debug` API implementation.
 ///
 /// This type provides the functionality for handling `debug` related requests.
-pub struct DebugApi<Provider, Eth> {
-    inner: Arc<DebugApiInner<Provider, Eth>>,
+pub struct DebugApi<Provider, Eth, EngineT>
+where
+    EngineT: EngineTypes,
+{
+    inner: Arc<DebugApiInner<Provider, Eth, EngineT>>,
 }
 
 // === impl DebugApi ===
 
-impl<Provider, Eth> DebugApi<Provider, Eth> {
+impl<Provider, Eth, EngineT> DebugApi<Provider, Eth, EngineT>
+where
+    EngineT: EngineTypes,
+{
     /// Create a new instance of the [`DebugApi`]
-    pub fn new(provider: Provider, eth: Eth, blocking_task_guard: BlockingTaskGuard) -> Self {
-        let inner = Arc::new(DebugApiInner { provider, eth_api: eth, blocking_task_guard });
+    pub fn new(
+        provider: Provider,
+        eth: Eth,
+        blocking_task_guard: BlockingTaskGuard,
+        beacon_consensus: BeaconConsensusEngineHandle<EngineT>,
+    ) -> Self {
+        let inner = Arc::new(DebugApiInner {
+            provider,
+            eth_api: eth,
+            blocking_task_guard,
+            beacon_consensus,
+        });
         Self { inner }
     }
 
@@ -63,10 +82,11 @@ impl<Provider, Eth> DebugApi<Provider, Eth> {
 
 // === impl DebugApi ===
 
-impl<Provider, Eth> DebugApi<Provider, Eth>
+impl<Provider, Eth, EngineT> DebugApi<Provider, Eth, EngineT>
 where
     Provider: BlockReaderIdExt + HeaderProvider + ChainSpecProvider + 'static,
     Eth: EthTransactions + 'static,
+    EngineT: EngineTypes + 'static,
 {
     /// Acquires a permit to execute a tracing call.
     async fn acquire_trace_permit(&self) -> Result<OwnedSemaphorePermit, AcquireError> {
@@ -609,13 +629,39 @@ where
 
         Ok((frame.into(), res.state))
     }
+
+    // set the head to the given block and trace the block
+    async fn debug_set_head(&self, number: BlockNumberOrTag) -> EthResult<()> {
+        let block_hash = self
+            .inner
+            .provider
+            .block_hash_for_id(BlockId::Number(number))?
+            .ok_or_else(|| EthApiError::UnknownBlockNumber)?;
+
+        self.inner
+            .beacon_consensus
+            .fork_choice_updated(
+                ForkchoiceState {
+                    head_block_hash: block_hash,
+                    safe_block_hash: block_hash,
+                    finalized_block_hash: block_hash,
+                },
+                None,
+                EngineApiMessageVersion::V2,
+            )
+            .await
+            .map_err(|op| internal_rpc_err(op.to_string()))
+            .map_err(EthApiError::other)?;
+        Ok(())
+    }
 }
 
 #[async_trait]
-impl<Provider, Eth> DebugApiServer for DebugApi<Provider, Eth>
+impl<Provider, Eth, EngineT> DebugApiServer for DebugApi<Provider, Eth, EngineT>
 where
     Provider: BlockReaderIdExt + HeaderProvider + ChainSpecProvider + 'static,
     Eth: EthApiSpec + 'static,
+    EngineT: EngineTypes + 'static,
 {
     /// Handler for `debug_getRawHeader`
     async fn raw_header(&self, block_id: BlockId) -> RpcResult<Bytes> {
@@ -889,8 +935,8 @@ where
         Ok(())
     }
 
-    async fn debug_set_head(&self, _number: BlockNumberOrTag) -> RpcResult<()> {
-        Ok(())
+    async fn debug_set_head(&self, number: BlockNumberOrTag) -> RpcResult<()> {
+        Ok(Self::debug_set_head(self, number).await?)
     }
 
     async fn debug_set_mutex_profile_fraction(&self, _rate: i32) -> RpcResult<()> {
@@ -977,23 +1023,34 @@ where
     }
 }
 
-impl<Provider, Eth> std::fmt::Debug for DebugApi<Provider, Eth> {
+impl<Provider, Eth, EngineT> std::fmt::Debug for DebugApi<Provider, Eth, EngineT>
+where
+    EngineT: EngineTypes,
+{
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("DebugApi").finish_non_exhaustive()
     }
 }
 
-impl<Provider, Eth> Clone for DebugApi<Provider, Eth> {
+impl<Provider, Eth, EngineT> Clone for DebugApi<Provider, Eth, EngineT>
+where
+    EngineT: EngineTypes,
+{
     fn clone(&self) -> Self {
         Self { inner: Arc::clone(&self.inner) }
     }
 }
 
-struct DebugApiInner<Provider, Eth> {
+struct DebugApiInner<Provider, Eth, EngineT>
+where
+    EngineT: EngineTypes,
+{
     /// The provider that can interact with the chain.
     provider: Provider,
     /// The implementation of `eth` API
     eth_api: Eth,
     // restrict the number of concurrent calls to blocking calls
     blocking_task_guard: BlockingTaskGuard,
+
+    beacon_consensus: BeaconConsensusEngineHandle<EngineT>,
 }

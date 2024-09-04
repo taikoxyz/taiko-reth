@@ -31,6 +31,8 @@ revm-inspectors = { workspace = true, features = ["js-tracer"] }
 reth-evm.workspace = true
 reth-network-peers.workspace = true
 reth-execution-types.workspace = true
+reth-beacon-consensus.workspace = true
+reth-engine-primitives.workspace = true
 
 reth-evm-optimism = { workspace = true, optional = true }
 

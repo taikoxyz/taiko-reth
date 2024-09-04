@@ -1,6 +1,7 @@
 //! Builder support for rpc components.
 
 use futures::TryFutureExt;
+use reth_beacon_consensus::BeaconConsensusEngineHandle;
 use reth_network::NetworkHandle;
 use reth_node_api::FullNodeComponents;
 use reth_node_core::{node_config::NodeConfig, rpc::api::EngineApiServer};
@@ -157,6 +158,7 @@ pub struct RpcRegistry<Node: FullNodeComponents> {
         Node::Provider,
         Node::Evm,
         Node::Executor,
+        Node::Engine,
     >,
 }
 
@@ -169,6 +171,7 @@ impl<Node: FullNodeComponents> Deref for RpcRegistry<Node> {
         Node::Provider,
         Node::Evm,
         Node::Executor,
+        Node::Engine,
     >;
 
     fn deref(&self) -> &Self::Target {
@@ -253,6 +256,7 @@ impl<'a, Node: FullNodeComponents> RpcContext<'a, Node> {
 pub(crate) async fn launch_rpc_servers<Node, Engine>(
     node: Node,
     engine_api: Engine,
+    beacon_consensus: BeaconConsensusEngineHandle<Node::Engine>,
     config: &NodeConfig,
     jwt_secret: JwtSecret,
     hooks: RpcHooks<Node>,
@@ -267,15 +271,17 @@ where
     let module_config = config.rpc.transport_rpc_module_config();
     debug!(target: "reth::cli", http=?module_config.http(), ws=?module_config.ws(), "Using RPC module config");
 
-    let (mut modules, mut auth_module, registry) = RpcModuleBuilder::default()
-        .with_provider(node.provider().clone())
-        .with_pool(node.pool().clone())
-        .with_network(node.network().clone())
-        .with_events(node.provider().clone())
-        .with_executor(node.task_executor().clone())
-        .with_evm_config(node.evm_config().clone())
-        .with_block_executor(node.block_executor().clone())
-        .build_with_auth_server(module_config, engine_api);
+    let (mut modules, mut auth_module, registry) =
+        RpcModuleBuilder::<_, _, _, _, _, _, _, Node::Engine>::default()
+            .with_provider(node.provider().clone())
+            .with_pool(node.pool().clone())
+            .with_network(node.network().clone())
+            .with_events(node.provider().clone())
+            .with_executor(node.task_executor().clone())
+            .with_evm_config(node.evm_config().clone())
+            .with_block_executor(node.block_executor().clone())
+            .with_beacon_consensus(beacon_consensus)
+            .build_with_auth_server(module_config, engine_api);
 
     let mut registry = RpcRegistry { registry };
     let ctx = RpcContext {
