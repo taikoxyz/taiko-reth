@@ -1495,12 +1495,22 @@ where
             }
         };
 
-        if sync_target_state.finalized_block_hash.is_zero() {
-            self.set_canonical_head(ctrl.block_number().unwrap_or_default())?;
-            self.blockchain.update_block_hashes_and_clear_buffered()?;
-            self.blockchain.connect_buffered_blocks_to_canonical_hashes()?;
+        let optimistic_mode = |this: &mut Self| {
+            this.set_canonical_head(ctrl.block_number().unwrap_or_default())?;
+            this.blockchain.update_block_hashes_and_clear_buffered()?;
+            this.blockchain.connect_buffered_blocks_to_canonical_hashes()?;
             // We are on an optimistic syncing process, better to wait for the next FCU to handle
-            return Ok(());
+            Ok(())
+        };
+
+        trace!(target: "consensus::engine", ?sync_target_state, "Check sync target state");
+        if cfg!(feature = "taiko") {
+            // ignore the finalized block hash if we are in taiko mode
+            return optimistic_mode(self);
+        }
+
+        if sync_target_state.finalized_block_hash.is_zero() {
+            return optimistic_mode(self);
         }
 
         // Next, we check if we need to schedule another pipeline run or transition

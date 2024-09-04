@@ -31,7 +31,6 @@ use reth_revm::database::StateProviderDatabase;
 use reth_rpc_types::Transaction;
 use reth_transaction_pool::TransactionPool;
 use std::{
-    f64::consts::E,
     io::{self, Write},
     sync::Arc,
     time::{SystemTime, UNIX_EPOCH},
