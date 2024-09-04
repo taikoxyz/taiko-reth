@@ -162,6 +162,7 @@ where
                                     payload_attrs: None,
                                     version: Default::default(),
                                     tx,
+                                    debug: false,
                                 });
                                 debug!(target: "consensus::auto", ?state, "Sent fork choice update");
 

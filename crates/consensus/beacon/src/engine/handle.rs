@@ -69,7 +69,24 @@ where
         version: EngineApiMessageVersion,
     ) -> Result<ForkchoiceUpdated, BeaconForkChoiceUpdateError> {
         Ok(self
-            .send_fork_choice_updated(state, payload_attrs, version)
+            .send_fork_choice_updated(state, payload_attrs, version, false)
+            .map_err(|_| BeaconForkChoiceUpdateError::EngineUnavailable)
+            .await??
+            .await?)
+    }
+
+    /// Sends a forkchoice update message to the beacon consensus engine and waits for a response.
+    ///
+    /// See also <https://github.com/ethereum/execution-apis/blob/3d627c95a4d3510a8187dd02e0250ecb4331d27e/src/engine/shanghai.md#engine_forkchoiceupdatedv2>
+    /// For debug purposes.
+    pub async fn debug_fork_choice_updated(
+        &self,
+        state: ForkchoiceState,
+        payload_attrs: Option<Engine::PayloadAttributes>,
+        version: EngineApiMessageVersion,
+    ) -> Result<ForkchoiceUpdated, BeaconForkChoiceUpdateError> {
+        Ok(self
+            .send_fork_choice_updated(state, payload_attrs, version, true)
             .map_err(|_| BeaconForkChoiceUpdateError::EngineUnavailable)
             .await??
             .await?)
@@ -82,6 +99,7 @@ where
         state: ForkchoiceState,
         payload_attrs: Option<Engine::PayloadAttributes>,
         version: EngineApiMessageVersion,
+        debug: bool,
     ) -> oneshot::Receiver<RethResult<OnForkChoiceUpdated>> {
         let (tx, rx) = oneshot::channel();
         let _ = self.to_engine.send(BeaconEngineMessage::ForkchoiceUpdated {
@@ -89,6 +107,7 @@ where
             payload_attrs,
             version,
             tx,
+            debug,
         });
         rx
     }

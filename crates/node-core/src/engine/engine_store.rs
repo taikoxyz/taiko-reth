@@ -76,6 +76,7 @@ impl EngineMessageStore {
                 payload_attrs,
                 version: _version,
                 tx: _tx,
+                debug: _debug,
             } => {
                 let filename = format!("{}-fcu-{}.json", timestamp, state.head_block_hash);
                 fs::write(

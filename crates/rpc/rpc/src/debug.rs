@@ -39,8 +39,11 @@ use revm_inspectors::tracing::{
     js::{JsInspector, TransactionContext},
     FourByteInspector, MuxInspector, TracingInspector, TracingInspectorConfig,
 };
-use std::sync::Arc;
-use tokio::sync::{AcquireError, OwnedSemaphorePermit};
+use std::{sync::Arc, time::Duration};
+use tokio::{
+    sync::{AcquireError, OwnedSemaphorePermit},
+    time::sleep,
+};
 
 /// `debug` API implementation.
 ///
@@ -640,7 +643,7 @@ where
 
         self.inner
             .beacon_consensus
-            .fork_choice_updated(
+            .debug_fork_choice_updated(
                 ForkchoiceState {
                     head_block_hash: block_hash,
                     safe_block_hash: block_hash,
@@ -652,6 +655,7 @@ where
             .await
             .map_err(|op| internal_rpc_err(op.to_string()))
             .map_err(EthApiError::other)?;
+        sleep(Duration::from_secs(1)).await;
         Ok(())
     }
 }

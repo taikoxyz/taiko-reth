@@ -50,6 +50,7 @@ where
                     payload_attrs,
                     version,
                     tx,
+                    debug,
                 }) => {
                     if this.skipped < this.threshold {
                         *this.skipped += 1;
@@ -63,6 +64,7 @@ where
                             payload_attrs,
                             version,
                             tx,
+                            debug,
                         })
                     }
                 }

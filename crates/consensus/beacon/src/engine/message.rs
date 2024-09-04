@@ -164,6 +164,8 @@ pub enum BeaconEngineMessage<Engine: EngineTypes> {
         payload_attrs: Option<Engine::PayloadAttributes>,
         /// The api version.
         version: EngineApiMessageVersion,
+        /// Send from the debug api server.
+        debug: bool,
         /// The sender for returning forkchoice updated result.
         tx: oneshot::Sender<RethResult<OnForkChoiceUpdated>>,
     },
