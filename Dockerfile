@@ -33,31 +33,24 @@ RUN cargo chef cook --profile $BUILD_PROFILE --features "$FEATURES" --recipe-pat
 COPY . .
 RUN cargo build --profile $BUILD_PROFILE --features "$FEATURES" --locked --bin reth
 
-# Clone and build rbuilder (gwyneth branch)
+# Clone rbuilder repository (gwyneth branch) without building
 RUN git clone -b gwyneth https://github.com/taikoxyz/rbuilder.git /app/rbuilder
-WORKDIR /app/rbuilder
-RUN cargo build --release
 
-# Copy binaries to a temporary location
+# Copy reth binary to a temporary location
 RUN cp /app/target/$BUILD_PROFILE/reth /app/reth
-RUN cp /app/rbuilder/target/release/rbuilder /app/rbuilder
 
 # Use Ubuntu as the release image
 FROM ubuntu AS runtime
 WORKDIR /app
 
 # Install necessary runtime dependencies
-RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y ca-certificates git && rm -rf /var/lib/apt/lists/*
 
-# Copy reth and rbuilder over from the build stage
+# Copy reth over from the build stage
 COPY --from=builder /app/reth /usr/local/bin
-COPY --from=builder /app/rbuilder /usr/local/bin
 
 # Copy the entire rbuilder repository
 COPY --from=builder /app/rbuilder /app/rbuilder
-
-# Create exe_datadir
-RUN mkdir -p /app/exex_datadir/static_files
 
 # Copy licenses
 COPY LICENSE-* ./
