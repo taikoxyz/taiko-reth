@@ -33,7 +33,7 @@ use reth::{
     blockchain_tree::noop::NoopBlockchainTree, providers::test_utils::TestCanonStateSubscriptions,
     tasks::TokioTaskExecutor,
 };
-use reth_node_ethereum::{EthEvmConfig, EthExecutorProvider};
+use reth_node_ethereum::{EthEngineTypes, EthEvmConfig, EthExecutorProvider};
 use std::{path::Path, sync::Arc};
 
 // Custom rpc extension
@@ -60,7 +60,7 @@ async fn main() -> eyre::Result<()> {
     //    disk and don't handle new blocks/live sync etc, which is done by the blockchain tree.
     let provider = BlockchainProvider::new(factory, Arc::new(NoopBlockchainTree::default()))?;
 
-    let rpc_builder = RpcModuleBuilder::default()
+    let rpc_builder = RpcModuleBuilder::<_, _, _, _, _, _, _, EthEngineTypes>::default()
         .with_provider(provider.clone())
         // Rest is just noops that do nothing
         .with_noop_pool()
