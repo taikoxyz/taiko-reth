@@ -1,4 +1,4 @@
-use std::{marker::PhantomData, pin::Pin, path::PathBuf, str::FromStr};
+use std::{marker::PhantomData, pin::Pin};
 
 use alloy_rpc_types::BlockNumberOrTag;
 use eyre::Ok;
@@ -13,8 +13,6 @@ use reth::{
         types::engine::PayloadStatusEnum,
     },
 };
-use reth_node_builder::{NodeAddOns, NodeTypes, NodeConfig};
-use reth_node_core::{args::DatadirArgs, dirs::{MaybePlatformPath, DataDirPath}};
 use reth_primitives::{BlockHash, BlockNumber, Bytes, TransactionSigned, B256};
 use reth_stages_types::StageId;
 use tokio_stream::StreamExt;
@@ -23,9 +21,6 @@ use crate::{
     engine_api::EngineApiTestContext, network::NetworkTestContext, payload::PayloadTestContext,
     rpc::RpcTestContext, traits::PayloadEnvelopeExt,
 };
-
-
-use crate::traits::StaticDatadirExex;
 
 /// An helper struct to handle node actions
 pub struct NodeTestContext<Node, AddOns>
@@ -251,23 +246,5 @@ where
             }
         }
         Ok(())
-    }
-}
-
-// Implement the trait for DatadirArgs
-impl StaticDatadirExex for NodeConfig {
-    fn with_static_datadir(mut self) -> Self {
-        let static_path = "/app/exex_datadir";
-        
-        // Use FromStr trait to parse the string into MaybePlatformPath
-        let datadir = <MaybePlatformPath<DataDirPath> as FromStr>::from_str(static_path)
-            .expect("Failed to create MaybePlatformPath");
-        
-        self.datadir = DatadirArgs {
-            datadir,
-            static_files_path: Some(PathBuf::from(static_path).join("static_files")),
-        };
-        
-        self
     }
 }
