@@ -13,6 +13,7 @@ use reth::{
         types::engine::PayloadStatusEnum,
     },
 };
+use reth_node_builder::{NodeAddOns, NodeTypes};
 use reth_primitives::{BlockHash, BlockNumber, Bytes, TransactionSigned, B256};
 use reth_stages_types::StageId;
 use tokio_stream::StreamExt;
