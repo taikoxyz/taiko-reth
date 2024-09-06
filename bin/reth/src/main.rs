@@ -147,7 +147,7 @@ impl<Node: reth_node_api::FullNodeComponents> Rollup<Node> {
                             })
                         })
                     }).unwrap();
-
+                    println!("payload end");
                     let block_hash = payload.block().hash();
                     let block_number = payload.block().number;
                     println!("block_hash: {:?}", block_hash);

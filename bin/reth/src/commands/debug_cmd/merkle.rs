@@ -175,7 +175,7 @@ impl Command {
 
             if incremental_result.is_ok() {
                 debug!(target: "reth::cli", block_number, "Successfully computed incremental root");
-                continue;
+                continue
             }
 
             warn!(target: "reth::cli", block_number, "Incremental calculation failed, retrying from scratch");
@@ -195,7 +195,7 @@ impl Command {
                 let clean_result = merkle_stage.execute(&provider_rw, clean_input);
                 assert!(clean_result.is_ok(), "Clean state root calculation failed");
                 if clean_result.unwrap().done {
-                    break;
+                    break
                 }
             }
 
