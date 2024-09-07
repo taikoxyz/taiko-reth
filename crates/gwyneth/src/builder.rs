@@ -8,6 +8,7 @@ use reth_basic_payload_builder::{
     commit_withdrawals, is_better_payload, BuildArguments, BuildOutcome, PayloadBuilder,
     PayloadConfig, WithdrawalsOutcome,
 };
+use reth_errors::RethError;
 use reth_evm::{
     system_calls::{
         post_block_withdrawal_requests_contract_call, pre_block_beacon_root_contract_call,
@@ -72,12 +73,12 @@ where
 
     debug!(target: "payload_builder", id=%attributes.inner.id, parent_hash = ?parent_block.hash(), parent_number = parent_block.number, "building new payload");
     let mut cumulative_gas_used = 0;
+    let mut sum_blob_gas_used = 0;
     let block_gas_limit: u64 =
         initialized_block_env.gas_limit.try_into().unwrap_or(chain_spec.max_gas_limit);
     let base_fee = initialized_block_env.basefee.to::<u64>();
 
-    // The transaction obtained from Gwyneth L1 proposal
-    let mut executed_txs = Vec::with_capacity(attributes.transactions.len());
+    let mut executed_txs = Vec::new();
 
     let mut best_txs = pool.best_transactions_with_attributes(BestTransactionsAttributes::new(
         base_fee,
@@ -110,6 +111,7 @@ where
         PayloadBuilderError::Internal(err.into())
     })?;
 
+
     // apply eip-2935 blockhashes update
     apply_blockhashes_update(
         &mut db,
@@ -120,15 +122,15 @@ where
     )
     .map_err(|err| PayloadBuilderError::Internal(err.into()))?;
 
-    let mut receipts = Vec::new();
 
-    for sequencer_tx in attributes.transactions {
+    let mut receipts = Vec::new();
+    for sequencer_tx in &attributes.transactions {
         // Check if the job was cancelled, if so we can exit early.
         if cancel.is_cancelled() {
             return Ok(BuildOutcome::Cancelled)
         }
 
-        let sequencer_tx = sequencer_tx.value().clone().try_into_ecrecovered().unwrap();
+        let sequencer_tx = sequencer_tx.clone().1.try_into_ecrecovered().unwrap();
 
         let env = EnvWithHandlerCfg::new_with_cfg_env(
             initialized_cfg.clone(),
@@ -175,10 +177,35 @@ where
         // append transaction to the list of executed transactions
         executed_txs.push(sequencer_tx.into_signed());
     }
+    // check if we have a better block
+    if !is_better_payload(best_payload.as_ref(), total_fees) {
+        // can skip building the block
+        return Ok(BuildOutcome::Aborted { fees: total_fees, cached_reads })
+    }
 
-    // Use empty withdrawals for Gwyneth
+    // calculate the requests and the requests root
+    let (requests, requests_root) = if chain_spec
+        .is_prague_active_at_timestamp(attributes.inner.timestamp)
+    {
+        let deposit_requests = parse_deposits_from_receipts(&chain_spec, receipts.iter().flatten())
+            .map_err(|err| PayloadBuilderError::Internal(RethError::Execution(err.into())))?;
+        let withdrawal_requests = post_block_withdrawal_requests_contract_call(
+            &evm_config,
+            &mut db,
+            &initialized_cfg,
+            &initialized_block_env,
+        )
+        .map_err(|err| PayloadBuilderError::Internal(err.into()))?;
+
+        let requests = [deposit_requests, withdrawal_requests].concat();
+        let requests_root = calculate_requests_root(&requests);
+        (Some(requests.into()), Some(requests_root))
+    } else {
+        (None, None)
+    };
+
     let WithdrawalsOutcome { withdrawals_root, withdrawals } =
-        commit_withdrawals(&mut db, &chain_spec, attributes.inner.timestamp, Withdrawals::default())?;
+        commit_withdrawals(&mut db, &chain_spec, attributes.inner.timestamp, attributes.inner.withdrawals)?;
 
     // merge all transitions into bundle state, this would apply the withdrawal balance changes
     // and 4788 contract call
@@ -188,7 +215,7 @@ where
         db.take_bundle(),
         vec![receipts].into(),
         block_number,
-        Vec::new(),
+        vec![requests.clone().unwrap_or_default()],
     );
     let receipts_root =
         execution_outcome.receipts_root_slow(block_number).expect("Number is in range");
@@ -202,6 +229,31 @@ where
 
     // create the block header
     let transactions_root = proofs::calculate_transaction_root(&executed_txs);
+
+    // initialize empty blob sidecars at first. If cancun is active then this will
+    let mut blob_sidecars = Vec::new();
+    let mut excess_blob_gas = None;
+    let mut blob_gas_used = None;
+
+    // only determine cancun fields when active
+    if chain_spec.is_cancun_active_at_timestamp(attributes.inner.timestamp) {
+        // grab the blob sidecars from the executed txs
+        blob_sidecars = pool.get_all_blobs_exact(
+            executed_txs.iter().filter(|tx| tx.is_eip4844()).map(|tx| tx.hash).collect(),
+        )?;
+
+        excess_blob_gas = if chain_spec.is_cancun_active_at_timestamp(parent_block.timestamp) {
+            let parent_excess_blob_gas = parent_block.excess_blob_gas.unwrap_or_default();
+            let parent_blob_gas_used = parent_block.blob_gas_used.unwrap_or_default();
+            Some(calculate_excess_blob_gas(parent_excess_blob_gas, parent_blob_gas_used))
+        } else {
+            // for the first post-fork block, both parent.blob_gas_used and
+            // parent.excess_blob_gas are evaluated as 0
+            Some(calculate_excess_blob_gas(0, 0))
+        };
+
+        blob_gas_used = Some(sum_blob_gas_used);
+    }
 
     let header = Header {
         parent_hash: parent_block.hash(),
@@ -222,18 +274,21 @@ where
         gas_used: cumulative_gas_used,
         extra_data,
         parent_beacon_block_root: attributes.inner.parent_beacon_block_root,
-        blob_gas_used: None,
-        excess_blob_gas: None,
-        requests_root: None,
+        blob_gas_used,
+        excess_blob_gas,
+        requests_root,
     };
 
     // seal the block
-    let block = Block { header, body: executed_txs, ommers: vec![], withdrawals, requests: None };
+    let block = Block { header, body: executed_txs, ommers: vec![], withdrawals, requests };
 
     let sealed_block = block.seal_slow();
     debug!(target: "payload_builder", ?sealed_block, "sealed built block");
 
     let mut payload = EthBuiltPayload::new(attributes.inner.id, sealed_block, total_fees);
+
+    // extend the payload with the blob sidecars from the executed txs
+    payload.extend_sidecars(blob_sidecars);
 
     Ok(BuildOutcome::Better { payload, cached_reads })
 }
