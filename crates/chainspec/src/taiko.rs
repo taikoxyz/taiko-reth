@@ -1,3 +1,4 @@
+//! Taiko Chain Specification
 use core::str::FromStr;
 use std::collections::BTreeMap;
 
@@ -7,6 +8,13 @@ use alloy_genesis::{ChainConfig, Genesis, GenesisAccount};
 use once_cell::sync::Lazy;
 use revm_primitives::{Address, Bytes, FixedBytes, B256, U256};
 use serde::{Deserialize, Serialize};
+
+/// The internal devnet ontake height.
+pub const INTERNAL_DEVNET_ONTAKE_BLOCK: u64 = 2;
+/// The hekla ontake height.
+pub const HEKLA_ONTAKE_BLOCK: u64 = 840_512;
+/// The mainnet ontake height.
+pub const MAINNET_ONTAKE_BLOCK: u64 = 9_000_000;
 
 impl ChainSpec {
     /// Returns the treasury address for the chain.
@@ -24,7 +32,7 @@ impl ChainSpec {
 
 // Taiko Chain Configuration, sets the chain_id to the internal devnet L2A by default.
 static TAIKO_CHAIN_CONFIG: Lazy<ChainConfig> = Lazy::new(|| ChainConfig {
-    chain_id: TaikoNamedChain::TaikoInternalL2A as u64,
+    chain_id: TaikoNamedChain::TaikoInternalL2a as u64,
     homestead_block: Some(0),
     dao_fork_block: None,
     dao_fork_support: false,
@@ -54,6 +62,7 @@ static TAIKO_CHAIN_CONFIG: Lazy<ChainConfig> = Lazy::new(|| ChainConfig {
     deposit_contract_address: None,
 });
 
+/// The named chains for Taiko.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, strum::IntoStaticStr)] // Into<&'static str>, AsRef<str>, fmt::Display and serde::Serialize
 #[derive(strum::VariantNames)] // NamedChain::VARIANTS
 #[derive(strum::VariantArray)] // NamedChain::VARIANTS
@@ -64,27 +73,36 @@ static TAIKO_CHAIN_CONFIG: Lazy<ChainConfig> = Lazy::new(|| ChainConfig {
 #[cfg_attr(feature = "serde", derive(serde::Deserialize))]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[strum(serialize_all = "kebab-case")]
-#[cfg_attr(feature = "serde", serde(rename_all = "snake_case"))]
 #[repr(u64)]
 pub enum TaikoNamedChain {
+    /// The mainnet chain.
     #[cfg_attr(feature = "serde", serde(alias = "mainnet"))]
     Mainnet = 167000,
+    /// The internal devnet L2A chain.
     #[cfg_attr(feature = "serde", serde(alias = "taiko-internal-l2a"))]
-    TaikoInternalL2A = 167001,
+    TaikoInternalL2a = 167001,
+    /// The internal devnet L2B chain.
     #[cfg_attr(feature = "serde", serde(alias = "taiko-internal-l2b"))]
-    TaikoInternalL2B = 167002,
+    TaikoInternalL2b = 167002,
+    /// The Snaefellsjokull chain.
     #[cfg_attr(feature = "serde", serde(alias = "snaefellsjokull"))]
     Snaefellsjokull = 167003,
+    /// The Askja chain.
     #[cfg_attr(feature = "serde", serde(alias = "askja"))]
     Askja = 167004,
+    /// The Grimsvotn chain.
     #[cfg_attr(feature = "serde", serde(alias = "grimsvotn"))]
     Grimsvotn = 167005,
+    /// The Eldfell chain.
     #[cfg_attr(feature = "serde", serde(alias = "eldfell"))]
     Eldfell = 167006,
+    /// The Jolnir chain.
     #[cfg_attr(feature = "serde", serde(alias = "jolnir"))]
     Jolnir = 167007,
+    /// The Katla chain.
     #[cfg_attr(feature = "serde", serde(alias = "katla"))]
     Katla = 167008,
+    /// The Hekla chain.
     #[cfg_attr(feature = "serde", serde(alias = "hekla"))]
     Hekla = 167009,
 }
@@ -95,15 +113,16 @@ impl From<TaikoNamedChain> for Chain {
     }
 }
 
-pub(crate) fn get_taiko_genesis(chain: TaikoNamedChain) -> Genesis {
+/// Returns the genesis block for the given chain.
+pub fn get_taiko_genesis(chain: TaikoNamedChain) -> Genesis {
     let alloc_str = match chain {
         TaikoNamedChain::Mainnet => {
             include_str!("../res/genesis/taiko/mainnet.json")
         }
-        TaikoNamedChain::TaikoInternalL2A => {
+        TaikoNamedChain::TaikoInternalL2a => {
             include_str!("../res/genesis/taiko/internal_l2a.json")
         }
-        TaikoNamedChain::TaikoInternalL2B => {
+        TaikoNamedChain::TaikoInternalL2b => {
             include_str!("../res/genesis/taiko/internal_l2b.json")
         }
         TaikoNamedChain::Snaefellsjokull => {
@@ -171,5 +190,16 @@ impl From<TaikoGenesisAccount> for GenesisAccount {
             storage: account.storage,
             private_key: account.private_key,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn named() {
+        let name: &str = TaikoNamedChain::TaikoInternalL2a.into();
+        assert_eq!(name, "taiko-internal-l2a");
     }
 }

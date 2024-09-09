@@ -1,6 +1,9 @@
 #[cfg(feature = "taiko")]
 use super::taiko::{get_taiko_genesis, TaikoNamedChain};
-use crate::constants::MAINNET_DEPOSIT_CONTRACT;
+use crate::{
+    constants::MAINNET_DEPOSIT_CONTRACT,
+    taiko::{HEKLA_ONTAKE_BLOCK, INTERNAL_DEVNET_ONTAKE_BLOCK, MAINNET_ONTAKE_BLOCK},
+};
 #[cfg(not(feature = "std"))]
 use alloc::{
     collections::BTreeMap,
@@ -293,8 +296,8 @@ pub static BASE_MAINNET: Lazy<Arc<ChainSpec>> = Lazy::new(|| {
 #[cfg(feature = "taiko")]
 pub static TAIKO_INTERNAL_L2_A: Lazy<Arc<ChainSpec>> = Lazy::new(|| {
     ChainSpec {
-        chain: TaikoNamedChain::TaikoInternalL2A.into(),
-        genesis: get_taiko_genesis(TaikoNamedChain::TaikoInternalL2A),
+        chain: TaikoNamedChain::TaikoInternalL2a.into(),
+        genesis: get_taiko_genesis(TaikoNamedChain::TaikoInternalL2a),
         hardforks: BTreeMap::from([
             (Hardfork::Frontier, ForkCondition::Block(0)),
             (Hardfork::Homestead, ForkCondition::Block(0)),
@@ -993,6 +996,14 @@ impl From<Genesis> for ChainSpec {
         #[cfg(feature = "optimism")]
         let optimism_genesis_info = OptimismGenesisInfo::extract_from(&genesis);
 
+        #[cfg(feature = "taiko")]
+        let ontake_block = match TaikoNamedChain::try_from(genesis.config.chain_id) {
+            Ok(TaikoNamedChain::TaikoInternalL2a) => Some(INTERNAL_DEVNET_ONTAKE_BLOCK),
+            Ok(TaikoNamedChain::Hekla) => Some(HEKLA_ONTAKE_BLOCK),
+            Ok(TaikoNamedChain::Mainnet) => Some(MAINNET_ONTAKE_BLOCK),
+            _ => None,
+        };
+
         // Block-based hardforks
         let hardfork_opts = [
             (Hardfork::Homestead, genesis.config.homestead_block),
@@ -1010,6 +1021,8 @@ impl From<Genesis> for ChainSpec {
             (Hardfork::GrayGlacier, genesis.config.gray_glacier_block),
             #[cfg(feature = "optimism")]
             (Hardfork::Bedrock, optimism_genesis_info.bedrock_block),
+            #[cfg(feature = "taiko")]
+            (Hardfork::Ontake, ontake_block),
         ];
         let mut hardforks = hardfork_opts
             .iter()

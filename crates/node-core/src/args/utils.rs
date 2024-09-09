@@ -1,6 +1,7 @@
 //! Clap parser utilities
 
 use alloy_genesis::Genesis;
+use eyre::bail;
 use reth_chainspec::ChainSpec;
 use reth_fs_util as fs;
 use reth_primitives::{BlockHashOrNumber, B256};
@@ -21,7 +22,7 @@ use reth_chainspec::{BASE_MAINNET, BASE_SEPOLIA, OP_MAINNET, OP_SEPOLIA};
 use reth_chainspec::{GOERLI, HOLESKY, MAINNET, SEPOLIA};
 
 #[cfg(feature = "taiko")]
-use reth_chainspec::{TAIKO_HEKLA, TAIKO_INTERNAL_L2_A, TAIKO_MAINNET, TAIKO_TESTNET};
+use reth_chainspec::taiko::{get_taiko_genesis, TaikoNamedChain};
 
 #[cfg(feature = "optimism")]
 /// Chains supported by op-reth. First value should be used as the default.
@@ -31,7 +32,8 @@ pub const SUPPORTED_CHAINS: &[&str] = &["optimism", "optimism-sepolia", "base", 
 pub const SUPPORTED_CHAINS: &[&str] = &["mainnet", "sepolia", "goerli", "holesky", "dev"];
 #[cfg(feature = "taiko")]
 /// Chains supported by taiko-reth. First value should be used as default.
-pub const SUPPORTED_CHAINS: &[&str] = &["testnet", "internal_devnet_a", "mainnet", "hekla"];
+pub const SUPPORTED_CHAINS: &[&str] =
+    &["taiko-internal-l2a", "taiko-internal-l2b", "mainnet", "hekla"];
 
 /// Helper to parse a [Duration] from seconds
 pub fn parse_duration_from_secs(arg: &str) -> eyre::Result<Duration, std::num::ParseIntError> {
@@ -67,32 +69,34 @@ pub fn chain_value_parser(s: &str) -> eyre::Result<Arc<ChainSpec>, eyre::Error> 
         "base" => BASE_MAINNET.clone(),
         #[cfg(feature = "optimism")]
         "base_sepolia" | "base-sepolia" => BASE_SEPOLIA.clone(),
-        #[cfg(feature = "taiko")]
-        "testnet" => TAIKO_TESTNET.clone(),
-        #[cfg(feature = "taiko")]
-        "internal_devnet_a" => TAIKO_INTERNAL_L2_A.clone(),
-        #[cfg(feature = "taiko")]
-        "hekla" => TAIKO_HEKLA.clone(),
-        #[cfg(feature = "taiko")]
-        "mainnet" => TAIKO_MAINNET.clone(),
         _ => {
-            // try to read json from path first
-            let raw = match fs::read_to_string(PathBuf::from(shellexpand::full(s)?.into_owned())) {
-                Ok(raw) => raw,
-                Err(io_err) => {
-                    // valid json may start with "\n", but must contain "{"
-                    if s.contains('{') {
-                        s.to_string()
-                    } else {
-                        return Err(io_err.into()); // assume invalid path
-                    }
+            if let Ok(chain_id) = s.parse::<u64>() {
+                if let Ok(chain) = TaikoNamedChain::try_from(chain_id) {
+                    let genesis = get_taiko_genesis(chain);
+                    Arc::new(genesis.into())
+                } else {
+                    bail!("Invalid taiko chain id")
                 }
-            };
+            } else {
+                // try to read json from path first
+                let raw =
+                    match fs::read_to_string(PathBuf::from(shellexpand::full(s)?.into_owned())) {
+                        Ok(raw) => raw,
+                        Err(io_err) => {
+                            // valid json may start with "\n", but must contain "{"
+                            if s.contains('{') {
+                                s.to_string()
+                            } else {
+                                return Err(io_err.into()); // assume invalid path
+                            }
+                        }
+                    };
 
-            // both serialized Genesis and ChainSpec structs supported
-            let genesis: Genesis = serde_json::from_str(&raw)?;
+                // both serialized Genesis and ChainSpec structs supported
+                let genesis: Genesis = serde_json::from_str(&raw)?;
 
-            Arc::new(genesis.into())
+                Arc::new(genesis.into())
+            }
         }
     })
 }

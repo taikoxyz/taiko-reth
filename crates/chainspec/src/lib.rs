@@ -25,7 +25,7 @@ pub use spec::{TAIKO_HEKLA, TAIKO_INTERNAL_L2_A, TAIKO_MAINNET, TAIKO_TESTNET};
 extern crate alloc;
 
 #[cfg(feature = "taiko")]
-mod taiko;
+pub mod taiko;
 
 mod info;
 
