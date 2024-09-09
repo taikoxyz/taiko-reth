@@ -32,10 +32,10 @@ use crate::{
 };
 
 const ROLLUP_CONTRACT_ADDRESS: Address = address!("9fCF7D13d10dEdF17d0f24C62f0cf4ED462f65b7");
-pub const CHAIN_ID: u64 = 167010;
+const CHAIN_ID: u64 = 167010;
 const INITIAL_TIMESTAMP: u64 = 1710338135;
 
-pub type GwynethFullNode = FullNode<
+type GwynethFullNode = FullNode<
     NodeAdapter<
         FullNodeTypesAdapter<
             GwynethNode,
@@ -66,7 +66,7 @@ pub type GwynethFullNode = FullNode<
     EthereumAddOns,
 >;
 
-pub struct Rollup<Node: reth_node_api::FullNodeComponents> {
+struct Rollup<Node: reth_node_api::FullNodeComponents> {
     ctx: ExExContext<Node>,
     node: GwynethFullNode,
     // payload_event_stream: BroadcastStream<Events<GwynethEngineTypes>>,
@@ -74,7 +74,7 @@ pub struct Rollup<Node: reth_node_api::FullNodeComponents> {
 }
 
 impl<Node: reth_node_api::FullNodeComponents> Rollup<Node> {
-    pub async fn new(ctx: ExExContext<Node>, node: GwynethFullNode) -> eyre::Result<Self> {
+    async fn new(ctx: ExExContext<Node>, node: GwynethFullNode) -> eyre::Result<Self> {
         // let payload_events = node.payload_builder.subscribe().await?;
         // let payload_event_stream = payload_events.into_stream();
         let engine_api = EngineApiContext {
@@ -85,7 +85,7 @@ impl<Node: reth_node_api::FullNodeComponents> Rollup<Node> {
         Ok(Self { ctx, node, /* payload_event_stream, */ engine_api })
     }
 
-    pub async fn start(mut self) -> eyre::Result<()> {
+    async fn start(mut self) -> eyre::Result<()> {
         // Process all new chain state notifications
         while let Some(notification) = self.ctx.notifications.recv().await {
             if let Some(reverted_chain) = notification.reverted_chain() {
@@ -105,7 +105,7 @@ impl<Node: reth_node_api::FullNodeComponents> Rollup<Node> {
     ///
     /// This function decodes all transactions to the rollup contract into events, executes the
     /// corresponding actions and inserts the results into the database.
-    pub async fn commit(&mut self, chain: &Chain) -> eyre::Result<()> {
+    async fn commit(&mut self, chain: &Chain) -> eyre::Result<()> {
         let events = decode_chain_into_rollup_events(chain);
         println!("Found {:?} events", events.len());
         for (_, tx, event) in events {
@@ -179,7 +179,7 @@ impl<Node: reth_node_api::FullNodeComponents> Rollup<Node> {
         Ok(())
     }
 
-    pub fn revert(&mut self, chain: &Chain) -> eyre::Result<()> {
+    fn revert(&mut self, chain: &Chain) -> eyre::Result<()> {
         unimplemented!()
     }
 }
