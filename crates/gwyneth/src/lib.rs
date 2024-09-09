@@ -18,45 +18,36 @@ use reth_node_api::{
     payload::{EngineApiMessageVersion, EngineObjectValidationError, PayloadOrAttributes},
     validate_version_specific_fields, EngineTypes,
 };
-use reth_node_api::{
-    FullNodeComponents, PayloadAttributes, PayloadBuilderAttributes,
-};
+use reth_node_api::{FullNodeComponents, PayloadAttributes, PayloadBuilderAttributes};
 use reth_node_builder::{
-    components::{
-        ComponentsBuilder,
-        PayloadServiceBuilder,
-    },
+    components::{ComponentsBuilder, PayloadServiceBuilder},
     node::{FullNodeTypes, NodeTypes},
-    BuilderContext, Node, NodeBuilder, NodeConfig, PayloadBuilderConfig,
-    PayloadTypes,
+    BuilderContext, Node, NodeBuilder, NodeConfig, PayloadBuilderConfig, PayloadTypes,
 };
 use reth_node_core::{
     args::RpcServerArgs,
     primitives::{
         revm_primitives::{BlockEnv, CfgEnvWithHandlerCfg},
         transaction::WithEncoded,
-        Address, Bytes, Genesis, Header, TransactionSigned, Withdrawals, B256,
+        Address, Genesis, Header, TransactionSigned, Withdrawals, B256,
     },
 };
-use reth_node_ethereum::{
-    node::{
-        EthereumAddOns, EthereumConsensusBuilder, EthereumExecutorBuilder, EthereumNetworkBuilder, EthereumPoolBuilder,
-    },
+use reth_node_ethereum::node::{
+    EthereumAddOns, EthereumConsensusBuilder, EthereumExecutorBuilder, EthereumNetworkBuilder,
+    EthereumPoolBuilder,
 };
 use reth_payload_builder::{
     error::PayloadBuilderError, PayloadBuilderHandle, PayloadBuilderService, PayloadId,
 };
 use reth_provider::{CanonStateSubscriptions, StateProviderFactory};
 use reth_rpc_types::{ExecutionPayloadV1, Withdrawal};
-use reth_tracing::{
-    RethTracer, Tracer,
-};
-use reth_transaction_pool::{
-    TransactionPool,
-};
+use reth_tracing::{RethTracer, Tracer};
+use reth_transaction_pool::TransactionPool;
 use serde::{Deserialize, Serialize};
 
 pub mod builder;
+pub mod engine_api;
+pub mod exex;
 
 /// Gwyneth error type used in payload attributes validation
 #[derive(Debug, Error)]
@@ -111,8 +102,8 @@ impl PayloadAttributes for GwynethPayloadAttributes {
 }
 
 /// Gwyneth Payload Builder Attributes
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct GwynethPayloadBuilderAttributes {
+#[derive(Debug, Clone)]
+pub struct GwynethPayloadBuilderAttributes /* <DB> */ {
     /// Inner ethereum payload builder attributes
     pub inner: EthPayloadBuilderAttributes,
     /// Decoded transactions and the original EIP-2718 encoded bytes as received in the payload
@@ -120,6 +111,8 @@ pub struct GwynethPayloadBuilderAttributes {
     pub transactions: Vec<WithEncoded<TransactionSigned>>,
     /// The gas limit for the generated payload
     pub gas_limit: Option<u64>,
+    // /// The database of L1
+    // pub provider_factory: ProviderFactory<DB>,
 }
 
 impl PayloadBuilderAttributes for GwynethPayloadBuilderAttributes {
@@ -302,7 +295,7 @@ where
         ctx: &BuilderContext<Node>,
         pool: Pool,
     ) -> eyre::Result<PayloadBuilderHandle<Node::Engine>> {
-        let payload_builder = GwynethPayloadBuilder::default();
+        let payload_builder = Self::default();
         let conf = ctx.payload_builder_config();
 
         let payload_job_config = BasicPayloadJobGeneratorConfig::default()
@@ -327,7 +320,6 @@ where
         Ok(payload_builder)
     }
 }
-
 
 #[tokio::main]
 async fn main() -> eyre::Result<()> {

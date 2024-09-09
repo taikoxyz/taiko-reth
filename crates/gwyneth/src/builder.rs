@@ -5,8 +5,8 @@
 #![allow(clippy::useless_let_if_seq)]
 
 use reth_basic_payload_builder::{
-    commit_withdrawals, is_better_payload, BuildArguments, BuildOutcome, PayloadBuilder,
-    PayloadConfig, WithdrawalsOutcome,
+    commit_withdrawals, is_better_payload, BuildArguments, BuildOutcome, PayloadConfig,
+    WithdrawalsOutcome,
 };
 use reth_errors::RethError;
 use reth_evm::{
@@ -15,23 +15,21 @@ use reth_evm::{
     },
     ConfigureEvm,
 };
-use reth_evm_ethereum::{eip6110::parse_deposits_from_receipts, EthEvmConfig};
+use reth_evm_ethereum::eip6110::parse_deposits_from_receipts;
 use reth_execution_types::ExecutionOutcome;
-use reth_node_core::primitives::Withdrawals;
-use reth_payload_builder::{
-    error::PayloadBuilderError, EthBuiltPayload,
-};
+use reth_payload_builder::{error::PayloadBuilderError, EthBuiltPayload};
 use reth_primitives::{
-    constants::{
-        eip4844::MAX_DATA_GAS_PER_BLOCK, BEACON_NONCE, EMPTY_RECEIPTS, EMPTY_TRANSACTIONS,
-    }, eip4844::calculate_excess_blob_gas, proofs::{self, calculate_requests_root}, Block, EthereumHardforks, Header, IntoRecoveredTransaction, Receipt, TransactionSigned, EMPTY_OMMER_ROOT_HASH, U256
+    constants::BEACON_NONCE,
+    eip4844::calculate_excess_blob_gas,
+    proofs::{self, calculate_requests_root},
+    Block, EthereumHardforks, Header, Receipt, EMPTY_OMMER_ROOT_HASH, U256,
 };
 use reth_provider::StateProviderFactory;
 use reth_revm::{database::StateProviderDatabase, state_change::apply_blockhashes_update};
 use reth_transaction_pool::{BestTransactionsAttributes, TransactionPool};
 use revm::{
     db::states::bundle_state::BundleRetention,
-    primitives::{EVMError, EnvWithHandlerCfg, InvalidTransaction, ResultAndState},
+    primitives::{EVMError, EnvWithHandlerCfg, ResultAndState},
     DatabaseCommit, State,
 };
 use tracing::{debug, trace, warn};
@@ -111,7 +109,6 @@ where
         PayloadBuilderError::Internal(err.into())
     })?;
 
-
     // apply eip-2935 blockhashes update
     apply_blockhashes_update(
         &mut db,
@@ -121,7 +118,6 @@ where
         parent_block.hash(),
     )
     .map_err(|err| PayloadBuilderError::Internal(err.into()))?;
-
 
     let mut receipts = Vec::new();
     for sequencer_tx in &attributes.transactions {
