@@ -6,25 +6,12 @@
 static ALLOC: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 
 
-use alloy_sol_types::{sol, SolEventInterface};
 use gwyneth::GwynethNode;
 use reth::args::{DiscoveryArgs, NetworkArgs, RpcServerArgs};
-use reth_chainspec::{ChainSpecBuilder, MAINNET};
-use reth_consensus::Consensus;
-use reth_db::{test_utils::TempDatabase, DatabaseEnv};
-use reth_execution_types::Chain;
-use reth_exex::{ExExContext, ExExEvent};
-use reth_node_api::{FullNodeTypesAdapter, PayloadBuilderAttributes};
-use reth_node_builder::{components::Components, Node, NodeAdapter, NodeBuilder, NodeComponentsBuilder, NodeConfig, NodeHandle, RethFullAdapter};
-use reth_node_ethereum::{node::EthereumAddOns, EthEvmConfig, EthExecutorProvider, EthereumNode};
-use reth_primitives::{address, Address, SealedBlockWithSenders, TransactionSigned, B256};
-use reth_provider::{providers::BlockchainProvider};
+use reth_chainspec::ChainSpecBuilder;
+use reth_node_builder::{NodeBuilder, NodeConfig, NodeHandle};
+use reth_node_ethereum::EthereumNode;
 use reth_tasks::TaskManager;
-use reth_transaction_pool::{blobstore::DiskFileBlobStore, CoinbaseTipOrdering, EthPooledTransaction, EthTransactionValidator, Pool, TransactionValidationTaskExecutor};
-use std::{sync::Arc};
-use alloy_rlp::Decodable;
-use reth::rpc::types::engine::PayloadAttributes;
-use reth_payload_builder::{EthBuiltPayload, EthPayloadBuilderAttributes};
 
 
 fn main() -> eyre::Result<()> {
