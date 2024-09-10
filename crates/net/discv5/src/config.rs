@@ -299,6 +299,27 @@ impl Config {
         }
     }
 
+    /// Inserts a new boot node to the list of boot nodes.
+    pub fn insert_boot_node(&mut self, boot_node: BootNode) {
+        self.bootstrap_nodes.insert(boot_node);
+    }
+
+    /// Inserts a new unsigned enode boot node to the list of boot nodes if it can be parsed, see
+    /// also [`BootNode::from_unsigned`].
+    pub fn insert_unsigned_boot_node(&mut self, node_record: NodeRecord) {
+        let _ = BootNode::from_unsigned(node_record).map(|node| self.insert_boot_node(node));
+    }
+
+    /// Extends the list of boot nodes with a list of enode boot nodes if they can be parsed.
+    pub fn extend_unsigned_boot_nodes(
+        &mut self,
+        node_records: impl IntoIterator<Item = NodeRecord>,
+    ) {
+        for node_record in node_records {
+            self.insert_unsigned_boot_node(node_record);
+        }
+    }
+
     /// Returns the discovery (UDP) socket contained in the [`discv5::Config`]. Returns the IPv6
     /// socket, if both IPv4 and v6 are configured. This socket will be advertised to peers in the
     /// local [`Enr`](discv5::enr::Enr).
@@ -320,8 +341,8 @@ impl Config {
 /// Returns the IPv4 discovery socket if one is configured.
 pub const fn ipv4(listen_config: &ListenConfig) -> Option<SocketAddrV4> {
     match listen_config {
-        ListenConfig::Ipv4 { ip, port } |
-        ListenConfig::DualStack { ipv4: ip, ipv4_port: port, .. } => {
+        ListenConfig::Ipv4 { ip, port }
+        | ListenConfig::DualStack { ipv4: ip, ipv4_port: port, .. } => {
             Some(SocketAddrV4::new(*ip, *port))
         }
         ListenConfig::Ipv6 { .. } => None,
@@ -332,8 +353,8 @@ pub const fn ipv4(listen_config: &ListenConfig) -> Option<SocketAddrV4> {
 pub const fn ipv6(listen_config: &ListenConfig) -> Option<SocketAddrV6> {
     match listen_config {
         ListenConfig::Ipv4 { .. } => None,
-        ListenConfig::Ipv6 { ip, port } |
-        ListenConfig::DualStack { ipv6: ip, ipv6_port: port, .. } => {
+        ListenConfig::Ipv6 { ip, port }
+        | ListenConfig::DualStack { ipv6: ip, ipv6_port: port, .. } => {
             Some(SocketAddrV6::new(*ip, *port, 0, 0))
         }
     }
@@ -479,9 +500,9 @@ mod test {
         for node in config.bootstrap_nodes {
             let BootNode::Enr(node) = node else { panic!() };
             assert!(
-                socket_1 == node.udp4_socket().unwrap() && socket_1 == node.tcp4_socket().unwrap() ||
-                    socket_2 == node.udp4_socket().unwrap() &&
-                        socket_2 == node.tcp4_socket().unwrap()
+                socket_1 == node.udp4_socket().unwrap() && socket_1 == node.tcp4_socket().unwrap()
+                    || socket_2 == node.udp4_socket().unwrap()
+                        && socket_2 == node.tcp4_socket().unwrap()
             );
             assert_eq!("84b4940500", hex::encode(node.get_raw_rlp("opstack").unwrap()));
         }
