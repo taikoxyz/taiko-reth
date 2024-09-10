@@ -28,7 +28,6 @@ ENV FEATURES $FEATURES
 
 # Builds dependencies
 RUN cargo chef cook --profile $BUILD_PROFILE --features "$FEATURES" --recipe-path recipe.json
-
 # Build application
 COPY . .
 RUN cargo build --profile $BUILD_PROFILE --features "$FEATURES" --locked --bin reth
@@ -36,6 +35,7 @@ RUN cargo build --profile $BUILD_PROFILE --features "$FEATURES" --locked --bin r
 # Clone and build rbuilder (gwyneth branch)
 RUN git clone -b gwyneth https://github.com/taikoxyz/rbuilder.git /app/rbuilder
 WORKDIR /app/rbuilder
+RUN git pull
 RUN cargo build --release
 
 # Copy binaries to a temporary location
@@ -43,11 +43,22 @@ RUN cp /app/target/$BUILD_PROFILE/reth /app/reth
 RUN cp /app/rbuilder/target/release/rbuilder /app/rbuilder
 
 # Use Ubuntu as the release image
-FROM ubuntu AS runtime
+FROM ubuntu:22.04 AS runtime
 WORKDIR /app
 
-# Install necessary runtime dependencies
-RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/lists/*
+# Install necessary runtime dependencies and Rust/Cargo
+RUN apt-get update && apt-get install -y \
+    ca-certificates \
+    curl \
+    build-essential \
+    libclang-dev \
+    pkg-config \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Rust and Cargo
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+ENV PATH="/root/.cargo/bin:${PATH}"
 
 # Copy reth and rbuilder over from the build stage
 COPY --from=builder /app/reth /usr/local/bin
@@ -60,5 +71,4 @@ COPY --from=builder /app/rbuilder /app/rbuilder
 COPY LICENSE-* ./
 
 EXPOSE 30303 30303/udp 9001 8545 8546
-
 ENTRYPOINT ["/usr/local/bin/reth"]
