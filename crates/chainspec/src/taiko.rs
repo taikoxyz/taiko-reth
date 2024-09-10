@@ -148,13 +148,13 @@ pub fn get_taiko_genesis(chain: TaikoNamedChain) -> Genesis {
         timestamp: 0,
         extra_data: Bytes::new(),
         gas_limit: 15_000_000,
-        difficulty: U256::from(0),
+        difficulty: U256::ZERO,
         mix_hash: FixedBytes::ZERO,
         coinbase: Address::ZERO,
         base_fee_per_gas: Some(10_000_000),
         excess_blob_gas: None,
-        blob_gas_used: Some(0),
-        number: Some(0),
+        blob_gas_used: None,
+        number: None,
     }
 }
 

@@ -2,7 +2,7 @@
 
 use alloy_genesis::Genesis;
 use eyre::bail;
-use reth_chainspec::ChainSpec;
+use reth_chainspec::{ChainSpec, TAIKO_INTERNAL_L2_A};
 use reth_fs_util as fs;
 use reth_primitives::{BlockHashOrNumber, B256};
 use std::{
@@ -69,6 +69,8 @@ pub fn chain_value_parser(s: &str) -> eyre::Result<Arc<ChainSpec>, eyre::Error> 
         "base" => BASE_MAINNET.clone(),
         #[cfg(feature = "optimism")]
         "base_sepolia" | "base-sepolia" => BASE_SEPOLIA.clone(),
+        #[cfg(feature = "taiko")]
+        "taiko-internal-l2a" => TAIKO_INTERNAL_L2_A.clone(),
         _ => {
             if let Ok(chain_id) = s.parse::<u64>() {
                 if let Ok(chain) = TaikoNamedChain::try_from(chain_id) {
