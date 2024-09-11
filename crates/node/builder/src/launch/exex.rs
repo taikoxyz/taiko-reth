@@ -48,6 +48,7 @@ impl<Node: FullNodeComponents + Clone> ExExLauncher<Node> {
             let (handle, events, notifications) = ExExHandle::new(id.clone());
             exex_handles.push(handle);
 
+            // Brecht: exex creation
             // create the launch context for the exex
             let context = ExExContext {
                 head,

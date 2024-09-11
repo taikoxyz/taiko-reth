@@ -7,6 +7,7 @@ use reth_payload_primitives::{BuiltPayload, PayloadBuilderAttributes};
 use reth_primitives::{
     constants::EIP1559_INITIAL_BASE_FEE, Address, BlobTransactionSidecar, EthereumHardfork, Header, SealedBlock, TransactionSigned, Withdrawals, B256, U256
 };
+use reth_provider::{providers, ProviderFactory};
 use reth_rpc_types::engine::{
     ExecutionPayloadEnvelopeV2, ExecutionPayloadEnvelopeV3, ExecutionPayloadEnvelopeV4,
     ExecutionPayloadV1, PayloadAttributes, PayloadId,
@@ -15,8 +16,11 @@ use reth_rpc_types_compat::engine::payload::{
     block_to_payload_v1, block_to_payload_v3, block_to_payload_v4,
     convert_block_to_payload_field_v2,
 };
+use reth_storage_api::StateProvider;
+use revm_primitives::db::Database;
 use revm_primitives::{BlobExcessGasAndPrice, BlockEnv, CfgEnv, CfgEnvWithHandlerCfg, SpecId};
 use std::convert::Infallible;
+//use reth_node_api::FullNodeComponents; 
 
 /// Contains the built payload.
 ///
@@ -148,6 +152,14 @@ impl From<EthBuiltPayload> for ExecutionPayloadEnvelopeV4 {
     }
 }
 
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
+pub struct StateAttributes {
+    pub reth_datadir: PathBuf,
+    pub reth_db_path: PathBuf,
+    pub reth_static_files_path: PathBuf,
+    pub chain_spec: ChainSpec,
+}
+
 /// Container type for all components required to build a payload.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EthPayloadBuilderAttributes {
@@ -169,6 +181,8 @@ pub struct EthPayloadBuilderAttributes {
     pub parent_beacon_block_root: Option<B256>,
     /// Fixed transaction list
     pub transactions: Option<Vec<TransactionSigned>>,
+    /// Fixed transaction list
+    pub l1_state: Option<StateAttributes>,
 }
 
 // === impl EthPayloadBuilderAttributes ===
@@ -182,7 +196,7 @@ impl EthPayloadBuilderAttributes {
     /// Creates a new payload builder for the given parent block and the attributes.
     ///
     /// Derives the unique [`PayloadId`] for the given parent and attributes
-    pub fn new(parent: B256, attributes: PayloadAttributes, transactions: Option<Vec<TransactionSigned>>) -> Self {
+    pub fn new(parent: B256, attributes: PayloadAttributes, transactions: Option<Vec<TransactionSigned>>, l1_state: Option<StateAttributes>) -> Self {
         let id = payload_id(&parent, &attributes);
 
         Self {
@@ -194,10 +208,13 @@ impl EthPayloadBuilderAttributes {
             withdrawals: attributes.withdrawals.unwrap_or_default().into(),
             parent_beacon_block_root: attributes.parent_beacon_block_root,
             transactions,
+            l1_state,
         }
     }
 }
 
+use std::fmt::{Debug, Error};
+use std::path::{Path, PathBuf};
 impl PayloadBuilderAttributes for EthPayloadBuilderAttributes {
     type RpcPayloadAttributes = PayloadAttributes;
     type Error = Infallible;
@@ -206,7 +223,7 @@ impl PayloadBuilderAttributes for EthPayloadBuilderAttributes {
     ///
     /// Derives the unique [`PayloadId`] for the given parent and attributes
     fn try_new(parent: B256, attributes: PayloadAttributes) -> Result<Self, Infallible> {
-        Ok(Self::new(parent, attributes, None))
+        Ok(Self::new(parent, attributes, None, None))
     }
 
     fn payload_id(&self) -> PayloadId {
@@ -399,7 +416,7 @@ mod tests {
         let genesis: Genesis = serde_json::from_str(hive_london).unwrap();
         let chainspec = ChainSpec::from(genesis);
         let payload_builder_attributes =
-            EthPayloadBuilderAttributes::new(chainspec.genesis_hash(), attributes);
+            EthPayloadBuilderAttributes::new(chainspec.genesis_hash(), attributes, None, None);
 
         // use cfg_and_block_env
         let cfg_and_block_env =

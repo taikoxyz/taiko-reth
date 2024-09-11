@@ -44,6 +44,8 @@ use revm::{
 };
 use tracing::{debug, trace, warn};
 
+mod provider_factory_reloader;
+
 /// Ethereum payload builder
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct EthereumPayloadBuilder<EvmConfig = EthEvmConfig> {
@@ -278,6 +280,10 @@ where
         chain_spec,
         ..
     } = config;
+
+    println!("brecht: l1 state: {:?}", attributes.l1_state);
+
+    //create_provider_factory()
 
     debug!(target: "payload_builder", id=%attributes.id, parent_hash = ?parent_block.hash(), parent_number = parent_block.number, "building new payload");
     let mut cumulative_gas_used = 0;

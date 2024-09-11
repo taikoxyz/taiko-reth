@@ -9,7 +9,7 @@
 #![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
 
 mod payload;
-pub use payload::{EthBuiltPayload, EthPayloadBuilderAttributes};
+pub use payload::{EthBuiltPayload, EthPayloadBuilderAttributes, StateAttributes};
 use reth_chainspec::ChainSpec;
 use reth_engine_primitives::EngineTypes;
 use reth_payload_primitives::{

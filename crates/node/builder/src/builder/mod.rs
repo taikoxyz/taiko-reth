@@ -190,10 +190,16 @@ impl<DB> NodeBuilder<DB> {
             ..Default::default()
         });
 
+        println!("L2 datadir: {:?}", path);
+
         let data_dir =
             path.unwrap_or_chain_default(self.config.chain.chain, self.config.datadir.clone());
 
+        println!("L2 db: {:?}", data_dir);
+
         let db = reth_db::test_utils::create_test_rw_db_with_path(data_dir.db());
+
+        println!("L2 db 2: {:?}", db.path());
 
         WithLaunchContext { builder: self.with_database(db), task_executor }
     }

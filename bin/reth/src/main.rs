@@ -42,16 +42,16 @@ use reth_node_api::{FullNodeTypesAdapter, NodeAddOns};
 use reth_node_builder::{components::Components, rpc::EthApiBuilderProvider, AddOns, FullNode, Node, NodeAdapter, NodeBuilder, NodeComponentsBuilder, NodeConfig, NodeHandle, RethFullAdapter};
 use reth_node_ethereum::{node::EthereumAddOns, EthEvmConfig, EthExecutorProvider, EthereumNode};
 use reth_primitives::{address, alloy_primitives, Address, Genesis, SealedBlockWithSenders, TransactionSigned, B256};
-use reth_provider::providers::BlockchainProvider;
+use reth_provider::{providers::BlockchainProvider, DatabaseProviderFactory, HistoricalStateProviderRef};
 use reth_rpc_api::{eth::{helpers::AddDevSigners, FullEthApiServer}, EngineApiClient};
 use reth_tasks::TaskManager;
 use reth_transaction_pool::{blobstore::DiskFileBlobStore, CoinbaseTipOrdering, EthPooledTransaction, EthTransactionValidator, Pool, TransactionValidationTaskExecutor};
-use std::{future::Future, marker::PhantomData, pin::Pin, sync::Arc};
+use std::{future::Future, marker::PhantomData, path::PathBuf, pin::Pin, sync::Arc};
 
 use alloy_rlp::Decodable;
 
 use reth::rpc::types::engine::PayloadAttributes;
-use reth_payload_builder::{EthBuiltPayload, EthPayloadBuilderAttributes};
+use reth_payload_builder::{EthBuiltPayload, EthPayloadBuilderAttributes, StateAttributes};
 
 mod network;
 mod payload;
@@ -59,9 +59,10 @@ mod rpc;
 mod node;
 mod engine_api;
 mod traits;
+mod db;
 
 /// Helper function to create a new eth payload attributes
-pub(crate) fn eth_payload_attributes(timestamp: u64, transactions: Vec<TransactionSigned>) -> EthPayloadBuilderAttributes {
+pub(crate) fn eth_payload_attributes(timestamp: u64, transactions: Vec<TransactionSigned>, state: StateAttributes) -> EthPayloadBuilderAttributes {
     let attributes = PayloadAttributes {
         timestamp,
         prev_randao: B256::ZERO,
@@ -69,7 +70,7 @@ pub(crate) fn eth_payload_attributes(timestamp: u64, transactions: Vec<Transacti
         withdrawals: Some(vec![]),
         parent_beacon_block_root: Some(B256::ZERO),
     };
-    EthPayloadBuilderAttributes::new(B256::ZERO, attributes, Some(transactions))
+    EthPayloadBuilderAttributes::new(B256::ZERO, attributes, Some(transactions), Some(state))
 }
 
 
@@ -136,8 +137,27 @@ impl<Node: reth_node_api::FullNodeComponents> Rollup<Node> {
                     println!("tx_list: {:?}", tx_list);
                     let _call = RollupContractCalls::abi_decode(tx.input(), true)?;
 
+                    // Create a read-only database provider that we can use to get historical state
+                    // at the start of the notification chain. i.e. the state at the first block in
+                    // the notification, pre-execution.
+                    let database_provider = self.ctx.provider().database_provider_ro()?;
+                    let provider = HistoricalStateProviderRef::new(
+                        database_provider.tx_ref(),
+                        chain.first().number,
+                        database_provider.static_file_provider().clone(),
+                    );
+
+                    //let db = ShadowDatabase::new(provider, self.contracts.clone());
+
                     let transactions: Vec<TransactionSigned> = decode_transactions(&tx_list);
                     self.node.payload.transactions = transactions.clone();
+                    self.node.payload.l1_state = StateAttributes {
+                        reth_datadir: PathBuf::default(),
+                        reth_db_path: PathBuf::default(),
+                        reth_static_files_path: database_provider.static_file_provider().path().to_path_buf(),
+                        chain_spec: database_provider.chain_spec().clone(),
+                    };
+                    println!("l1_state: {:?}", self.node.payload.l1_state);
                     println!("transactions: {:?}", transactions);
             
                     // submit the block
@@ -269,17 +289,18 @@ fn main() -> eyre::Result<()> {
         };
 
         let chain_spec = ChainSpecBuilder::default()
-                .chain(CHAIN_ID.into())
-                .genesis(serde_json::from_str(include_str!("../../../crates/ethereum/node/tests/assets/genesis.json")).unwrap())
-                .cancun_activated()
-                .build();
+            .chain(CHAIN_ID.into())
+            .genesis(serde_json::from_str(include_str!("../../../crates/ethereum/node/tests/assets/genesis.json")).unwrap())
+            .cancun_activated()
+            .build();
 
         let node_config = NodeConfig::test()
             .with_chain(chain_spec.clone())
             .with_network(network_config.clone())
             .with_unused_ports()
-            .with_rpc(RpcServerArgs::default().with_unused_ports().with_http())
-            .set_dev(true);
+            .with_rpc(RpcServerArgs::default().with_unused_ports().with_http());
+
+        println!("node config: {:?}", node_config.rpc);
 
         let NodeHandle { node, node_exit_future: _ } = NodeBuilder::new(node_config.clone())
             .testing_node(exec.clone())
