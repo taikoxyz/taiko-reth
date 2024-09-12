@@ -304,7 +304,7 @@ impl Storage {
 
         // execute the block
         let BlockExecutionOutput { receipts, .. } =
-            executor.executor(&mut db).execute((&mut block, U256::ZERO, true).into())?;
+            executor.executor(&mut db).execute((&mut block, U256::ZERO, false).into())?;
         let Block { body, .. } = block.block;
 
         debug!(target: "taiko::proposer", transactions=?body, "after executing transactions");

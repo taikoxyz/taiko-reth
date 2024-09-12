@@ -68,7 +68,7 @@ impl TaikoExecutorProvider {
 
 impl<EvmConfig> TaikoExecutorProvider<EvmConfig> {
     /// Creates a new executor provider.
-    pub fn new(chain_spec: Arc<ChainSpec>, evm_config: EvmConfig) -> Self {
+    pub const fn new(chain_spec: Arc<ChainSpec>, evm_config: EvmConfig) -> Self {
         Self { chain_spec, evm_config }
     }
 }
@@ -152,7 +152,8 @@ where
         &self,
         block: &mut BlockWithSenders,
         mut evm: Evm<'_, Ext, &mut State<DB>>,
-        disable_anchor: bool,
+        enable_anchor: bool,
+        enable_skip: bool,
     ) -> Result<TaikoExecuteOutput, BlockExecutionError>
     where
         DB: Database<Error = ProviderError>,
@@ -183,14 +184,14 @@ where
             block.body.remove(idx);
             block.senders.remove(idx);
         };
-        if !disable_anchor && block.body.is_empty() {
+        if enable_anchor && block.body.is_empty() {
             return Err(ConsensusError::AnchorTxMissing.into());
         }
         let mut idx = 0;
         while idx < block.body.len() {
             let sender = block.senders[idx];
             let transaction = &block.body[idx];
-            let is_anchor = idx == 0 && !disable_anchor;
+            let is_anchor = idx == 0 && enable_anchor;
 
             // verify the anchor tx
             if is_anchor {
@@ -206,7 +207,7 @@ where
             // If the signature was not valid, the sender address will have been set to zero
             if sender == Address::ZERO {
                 // Signature can be invalid if not taiko or not the anchor tx
-                if !is_anchor {
+                if !is_anchor && enable_skip {
                     // If the signature is not valid, skip the transaction
                     debug!(target: "taiko::executor", hash = ?transaction.hash(), "Invalid sender for tx");
                     delete_tx(block, idx);
@@ -222,7 +223,7 @@ where
             // must be no greater than the block's gasLimit.
             let block_available_gas = block.header.gas_limit - cumulative_gas_used;
             if transaction.gas_limit() > block_available_gas {
-                if !is_anchor {
+                if !is_anchor && enable_skip {
                     debug!(target: "taiko::executor", hash = ?transaction.hash(), want = ?transaction.gas_limit(), got = block_available_gas, "Invalid gas limit for tx");
                     delete_tx(block, idx);
                     continue;
@@ -255,7 +256,7 @@ where
             }) {
                 Ok(res) => res,
                 Err(err) => {
-                    if !is_anchor {
+                    if !is_anchor && enable_skip {
                         // Clear the state for the next tx
                         evm.context.evm.journaled_state = JournaledState::new(
                             evm.context.evm.journaled_state.spec,
@@ -374,7 +375,8 @@ where
         &mut self,
         block: &mut BlockWithSenders,
         total_difficulty: U256,
-        disable_anchor: bool,
+        enable_anchor: bool,
+        enable_skip: bool,
     ) -> Result<TaikoExecuteOutput, BlockExecutionError> {
         // 1. prepare state on new block
         self.on_new_block(&block.header);
@@ -383,7 +385,7 @@ where
         let env = self.evm_env_for_block(&block.header, total_difficulty);
         let output = {
             let evm = self.executor.evm_config.evm_with_env(&mut self.state, env);
-            self.executor.execute_state_transitions(block, evm, disable_anchor)
+            self.executor.execute_state_transitions(block, evm, enable_anchor, enable_skip)
         }?;
 
         // 3. apply post execution changes
@@ -456,9 +458,9 @@ where
     ///
     /// State changes are committed to the database.
     fn execute(mut self, input: Self::Input<'_>) -> Result<Self::Output, Self::Error> {
-        let BlockExecutionInput { block, total_difficulty, disable_anchor } = input;
+        let BlockExecutionInput { block, total_difficulty, enable_anchor, enable_skip } = input;
         let TaikoExecuteOutput { receipts, requests, gas_used } =
-            self.execute_without_verification(block, total_difficulty, disable_anchor)?;
+            self.execute_without_verification(block, total_difficulty, enable_anchor, enable_skip)?;
 
         // NOTE: we need to merge keep the reverts for the bundle retention
         self.state.merge_transitions(BundleRetention::Reverts);
@@ -499,9 +501,10 @@ where
     type Error = BlockExecutionError;
 
     fn execute_and_verify_one(&mut self, input: Self::Input<'_>) -> Result<(), Self::Error> {
-        let BlockExecutionInput { block, total_difficulty, disable_anchor } = input;
-        let TaikoExecuteOutput { receipts, requests, gas_used: _ } =
-            self.executor.execute_without_verification(block, total_difficulty, disable_anchor)?;
+        let BlockExecutionInput { block, total_difficulty, enable_anchor, enable_skip } = input;
+        let TaikoExecuteOutput { receipts, requests, gas_used: _ } = self
+            .executor
+            .execute_without_verification(block, total_difficulty, enable_anchor, enable_skip)?;
 
         validate_block_post_execution(block, self.executor.chain_spec(), &receipts, &requests)?;
 
@@ -668,7 +671,8 @@ mod tests {
                     senders: vec![],
                 },
                 U256::ZERO,
-                false,
+                true,
+                true,
             )
             .unwrap();
 

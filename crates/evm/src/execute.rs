@@ -114,14 +114,16 @@ pub struct BlockExecutionInput<'a, Block> {
     pub block: &'a mut Block,
     /// The total difficulty of the block.
     pub total_difficulty: U256,
-    /// Disable anchor transaction.
-    pub disable_anchor: bool,
+    /// Enable anchor transaction.
+    pub enable_anchor: bool,
+    /// Enable skip invalid transaction.
+    pub enable_skip: bool,
 }
 
 impl<'a, Block> BlockExecutionInput<'a, Block> {
     /// Creates a new input.
     pub fn new(block: &'a mut Block, total_difficulty: U256) -> Self {
-        Self { block, total_difficulty, disable_anchor: false }
+        Self { block, total_difficulty, enable_anchor: true, enable_skip: true }
     }
 }
 
@@ -132,8 +134,16 @@ impl<'a, Block> From<(&'a mut Block, U256)> for BlockExecutionInput<'a, Block> {
 }
 
 impl<'a, Block> From<(&'a mut Block, U256, bool)> for BlockExecutionInput<'a, Block> {
-    fn from((block, total_difficulty, disable_anchor): (&'a mut Block, U256, bool)) -> Self {
-        Self { block, total_difficulty, disable_anchor }
+    fn from((block, total_difficulty, enable_anchor): (&'a mut Block, U256, bool)) -> Self {
+        Self { block, total_difficulty, enable_anchor, enable_skip: true }
+    }
+}
+
+impl<'a, Block> From<(&'a mut Block, U256, bool, bool)> for BlockExecutionInput<'a, Block> {
+    fn from(
+        (block, total_difficulty, enable_anchor, enable_skip): (&'a mut Block, U256, bool, bool),
+    ) -> Self {
+        Self { block, total_difficulty, enable_anchor, enable_skip }
     }
 }
 
