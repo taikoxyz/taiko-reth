@@ -32,10 +32,18 @@ RUN cargo chef cook --profile $BUILD_PROFILE --features "$FEATURES" --recipe-pat
 COPY . .
 RUN cargo build --profile $BUILD_PROFILE --features "$FEATURES" --locked --bin reth
 
+# Hack: Add a cache busting step (above steps are the more
+# time consuming ones but we need to make sure the rbuilder is 
+# always freshly cloned and not cached !)
+# Since the content of this file will change 
+# with each build, Docker will consider this 
+# layer (and all subsequent layers) as modified, 
+# forcing a re-execution of the following steps.
+ADD https://worldtimeapi.org/api/ip /tmp/bustcache
+
 # Clone and build rbuilder (gwyneth branch)
 RUN git clone -b gwyneth https://github.com/taikoxyz/rbuilder.git /app/rbuilder
 WORKDIR /app/rbuilder
-RUN git pull
 RUN cargo build --release
 
 # Copy binaries to a temporary location
@@ -47,20 +55,13 @@ FROM ubuntu:22.04 AS runtime
 WORKDIR /app
 
 # Install necessary runtime dependencies and Rust/Cargo
-RUN apt-get update && apt-get install -y \
-    ca-certificates \
-    curl \
-    build-essential \
-    libclang-dev \
-    pkg-config \
-    git \
-    && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/lists/*
 
 # Install Rust and Cargo
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
 ENV PATH="/root/.cargo/bin:${PATH}"
 
-# Copy reth and rbuilder over from the build stage
+# Copy reth and rbuilder binaries over from the build stage
 COPY --from=builder /app/reth /usr/local/bin
 COPY --from=builder /app/rbuilder /usr/local/bin
 
