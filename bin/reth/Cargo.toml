@@ -159,6 +159,8 @@ optimism = [
 # no-op feature flag for switching between the `optimism` and default functionality in CI matrices
 ethereum = []
 
+gwyneth = ["reth-payload-primitives/gwyneth"]
+
 [[bin]]
 name = "reth"
 path = "src/main.rs"

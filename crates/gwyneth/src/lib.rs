@@ -1,4 +1,5 @@
 //! Ethereum Node types config.
+use std::{fmt::Debug, sync::Arc};
 
 use builder::default_gwyneth_payload_builder;
 use reth_evm_ethereum::EthEvmConfig;
@@ -18,11 +19,12 @@ use reth_node_api::{
     payload::{EngineApiMessageVersion, EngineObjectValidationError, PayloadOrAttributes},
     validate_version_specific_fields, EngineTypes,
 };
-use reth_node_api::{FullNodeComponents, PayloadAttributes, PayloadBuilderAttributes};
+use reth_node_api::{PayloadAttributes, PayloadBuilderAttributes};
 use reth_node_builder::{
     components::{ComponentsBuilder, PayloadServiceBuilder},
     node::{FullNodeTypes, NodeTypes},
-    BuilderContext, Node, NodeBuilder, NodeConfig, PayloadBuilderConfig, PayloadTypes,
+    BuilderContext, Node, NodeBuilder, NodeConfig, PayloadBuilderConfig,
+    PayloadTypes,
 };
 use reth_node_core::{
     args::RpcServerArgs,
@@ -39,7 +41,10 @@ use reth_node_ethereum::node::{
 use reth_payload_builder::{
     error::PayloadBuilderError, PayloadBuilderHandle, PayloadBuilderService, PayloadId,
 };
-use reth_provider::{CanonStateSubscriptions, StateProviderFactory};
+use reth_provider::{
+    CanonStateSubscriptions, StateProviderBox,
+    StateProviderFactory,
+};
 use reth_rpc_types::{ExecutionPayloadV1, Withdrawal};
 use reth_tracing::{RethTracer, Tracer};
 use reth_transaction_pool::TransactionPool;
@@ -102,8 +107,8 @@ impl PayloadAttributes for GwynethPayloadAttributes {
 }
 
 /// Gwyneth Payload Builder Attributes
-#[derive(Debug, Clone)]
-pub struct GwynethPayloadBuilderAttributes /* <DB> */ {
+#[derive(Clone, Debug)]
+pub struct GwynethPayloadBuilderAttributes<SyncProvider> {
     /// Inner ethereum payload builder attributes
     pub inner: EthPayloadBuilderAttributes,
     /// Decoded transactions and the original EIP-2718 encoded bytes as received in the payload
@@ -111,11 +116,13 @@ pub struct GwynethPayloadBuilderAttributes /* <DB> */ {
     pub transactions: Vec<WithEncoded<TransactionSigned>>,
     /// The gas limit for the generated payload
     pub gas_limit: Option<u64>,
-    // /// The database of L1
-    // pub provider_factory: ProviderFactory<DB>,
+
+    pub l1_provider: Option<SyncProvider>,
 }
 
-impl PayloadBuilderAttributes for GwynethPayloadBuilderAttributes {
+impl<SyncProvider: Debug + Sync + Send> PayloadBuilderAttributes
+    for GwynethPayloadBuilderAttributes<SyncProvider>
+{
     type RpcPayloadAttributes = GwynethPayloadAttributes;
     type Error = alloy_rlp::Error;
 
@@ -134,6 +141,7 @@ impl PayloadBuilderAttributes for GwynethPayloadBuilderAttributes {
             inner: EthPayloadBuilderAttributes::new(parent, attributes.inner),
             transactions,
             gas_limit: attributes.gas_limit,
+            l1_provider: None,
         })
     }
 
@@ -183,7 +191,8 @@ pub struct GwynethEngineTypes;
 impl PayloadTypes for GwynethEngineTypes {
     type BuiltPayload = EthBuiltPayload;
     type PayloadAttributes = GwynethPayloadAttributes;
-    type PayloadBuilderAttributes = GwynethPayloadBuilderAttributes;
+    type PayloadBuilderAttributes = GwynethPayloadBuilderAttributes<Self::SyncProvider>;
+    type SyncProvider = Arc<StateProviderBox>;
 }
 
 impl EngineTypes for GwynethEngineTypes {
@@ -250,7 +259,7 @@ where
     Client: StateProviderFactory,
     Pool: TransactionPool,
 {
-    type Attributes = GwynethPayloadBuilderAttributes;
+    type Attributes = GwynethPayloadBuilderAttributes<Arc<StateProviderBox>>;
     type BuiltPayload = EthBuiltPayload;
 
     fn try_build(
@@ -282,6 +291,13 @@ where
             chain_spec,
         };
         <reth_ethereum_payload_builder::EthereumPayloadBuilder as PayloadBuilder<Pool, Client>>::build_empty_payload(&reth_ethereum_payload_builder::EthereumPayloadBuilder::default(),client, eth_payload_config)
+    }
+
+    fn on_missing_payload(
+        &self,
+        _args: BuildArguments<Pool, Client, Self::Attributes, Self::BuiltPayload>,
+    ) -> reth_basic_payload_builder::MissingPayloadBehaviour<Self::BuiltPayload> {
+        reth_basic_payload_builder::MissingPayloadBehaviour::RaceEmptyPayload
     }
 }
 

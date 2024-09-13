@@ -83,3 +83,7 @@ tempfile.workspace = true
 [features]
 default = []
 test-utils = ["reth-db/test-utils"]
+gwyneth = [
+    "reth-beacon-consensus/gwyneth", 
+    "reth-payload-builder/gwyneth"
+]

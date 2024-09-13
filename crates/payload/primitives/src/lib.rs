@@ -33,6 +33,8 @@ pub trait PayloadTypes: Send + Sync + Unpin + core::fmt::Debug + Clone {
     type PayloadBuilderAttributes: PayloadBuilderAttributes<RpcPayloadAttributes = Self::PayloadAttributes>
         + Clone
         + Unpin;
+    #[cfg(feature = "gwyneth")]
+    type SyncProvider;
 }
 
 /// Validates the timestamp depending on the version called:

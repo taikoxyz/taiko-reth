@@ -40,3 +40,7 @@ optimism = [
     "reth-rpc/optimism",
     "reth-beacon-consensus/optimism",
 ]
+gwyneth = [
+    "reth-engine-primitives/gwyneth",
+    "reth-beacon-consensus/gwyneth",
+]

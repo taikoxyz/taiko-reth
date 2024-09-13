@@ -42,9 +42,9 @@ use crate::GwynethPayloadBuilderAttributes;
 /// and configuration, this function creates a transaction payload. Returns
 /// a result indicating success with the payload or an error in case of failure.
 #[inline]
-pub fn default_gwyneth_payload_builder<EvmConfig, Pool, Client>(
+pub fn default_gwyneth_payload_builder<EvmConfig, Pool, Client, SP>(
     evm_config: EvmConfig,
-    args: BuildArguments<Pool, Client, GwynethPayloadBuilderAttributes, EthBuiltPayload>,
+    args: BuildArguments<Pool, Client, GwynethPayloadBuilderAttributes<SP>, EthBuiltPayload>,
 ) -> Result<BuildOutcome<EthBuiltPayload>, PayloadBuilderError>
 where
     EvmConfig: ConfigureEvm,

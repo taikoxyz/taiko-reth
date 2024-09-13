@@ -54,3 +54,9 @@ assert_matches.workspace = true
 
 [features]
 optimism = ["reth-primitives/optimism"]
+gwyneth = [
+    "reth-payload-builder/gwyneth",
+    "reth-beacon-consensus/gwyneth",
+    "reth-engine-primitives/gwyneth",
+    "reth-payload-primitives/gwyneth",
+]

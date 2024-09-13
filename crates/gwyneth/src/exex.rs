@@ -4,20 +4,24 @@ use alloy_rlp::Decodable;
 use alloy_sol_types::{sol, SolEventInterface};
 
 sol!(RollupContract, "TaikoL1.json");
-use futures_util::StreamExt;
+use crate::{
+    engine_api::EngineApiContext, GwynethEngineTypes, GwynethNode, GwynethPayloadAttributes,
+    GwynethPayloadBuilderAttributes,
+};
 use reth_consensus::Consensus;
 use reth_db::{test_utils::TempDatabase, DatabaseEnv};
 use reth_ethereum_engine_primitives::EthPayloadAttributes;
 use reth_evm_ethereum::EthEvmConfig;
 use reth_execution_types::Chain;
 use reth_exex::{ExExContext, ExExEvent};
-use reth_node_api::{BuiltPayload, FullNodeTypesAdapter, PayloadBuilderAttributes};
+use reth_node_api::{FullNodeTypesAdapter, PayloadBuilderAttributes};
 use reth_node_builder::{components::Components, FullNode, NodeAdapter};
-use reth_node_ethereum::{node::EthereumAddOns, EthExecutorProvider};
+use reth_node_ethereum::{node::EthereumAddOns, EthExecutorProvider, EthereumNode};
 use reth_payload_builder::EthBuiltPayload;
 use reth_primitives::{
     address, Address, SealedBlock, SealedBlockWithSenders, TransactionSigned, B256, U256,
 };
+use reth_provider::DatabaseProviderFactory;
 use reth_provider::{providers::BlockchainProvider, CanonStateSubscriptions};
 use reth_rpc_types::engine::PayloadStatusEnum;
 use reth_transaction_pool::{
@@ -25,11 +29,6 @@ use reth_transaction_pool::{
     EthTransactionValidator, Pool, TransactionValidationTaskExecutor,
 };
 use RollupContract::{BlockProposed, RollupContractEvents};
-
-use crate::{
-    engine_api::EngineApiContext, GwynethEngineTypes, GwynethNode, GwynethPayloadAttributes,
-    GwynethPayloadBuilderAttributes,
-};
 
 const ROLLUP_CONTRACT_ADDRESS: Address = address!("9fCF7D13d10dEdF17d0f24C62f0cf4ED462f65b7");
 pub const CHAIN_ID: u64 = 167010;
@@ -69,14 +68,11 @@ pub type GwynethFullNode = FullNode<
 pub struct Rollup<Node: reth_node_api::FullNodeComponents> {
     ctx: ExExContext<Node>,
     node: GwynethFullNode,
-    // payload_event_stream: BroadcastStream<Events<GwynethEngineTypes>>,
     engine_api: EngineApiContext<GwynethEngineTypes>,
 }
 
 impl<Node: reth_node_api::FullNodeComponents> Rollup<Node> {
     pub async fn new(ctx: ExExContext<Node>, node: GwynethFullNode) -> eyre::Result<Self> {
-        // let payload_events = node.payload_builder.subscribe().await?;
-        // let payload_event_stream = payload_events.into_stream();
         let engine_api = EngineApiContext {
             engine_api_client: node.auth_server_handle().http_client(),
             canonical_stream: node.provider.canonical_state_stream(),
@@ -108,24 +104,20 @@ impl<Node: reth_node_api::FullNodeComponents> Rollup<Node> {
     pub async fn commit(&mut self, chain: &Chain) -> eyre::Result<()> {
         let events = decode_chain_into_rollup_events(chain);
         println!("Found {:?} events", events.len());
-        for (_, tx, event) in events {
+        for (block, _, event) in events {
             // TODO: Don't emit ProposeBlock event but directely
             //  read the function call RollupContractCalls to extract Txs
             // let _call = RollupContractCalls::abi_decode(tx.input(), true)?;
 
             if let RollupContractEvents::BlockProposed(BlockProposed {
                 blockId: block_number,
-                meta: block_metadata,
+                meta: _,
                 txList: tx_list,
             }) = event
             {
                 println!("block_number: {:?}", block_number);
-                println!("tx_list: {:?}", tx_list);
                 let transactions: Vec<TransactionSigned> = decode_transactions(&tx_list);
-                let tip_tx_hash = transactions[0].hash();
                 println!("transactions: {:?}", transactions);
-
-                println!("payload start");
 
                 let attrs = GwynethPayloadAttributes {
                     inner: EthPayloadAttributes {
@@ -138,11 +130,24 @@ impl<Node: reth_node_api::FullNodeComponents> Rollup<Node> {
                     transactions: Some(transactions.clone()),
                     gas_limit: None,
                 };
-                let builder_attrs =
+
+                let l1_state_provider = self
+                    .ctx
+                    .provider()
+                    .database_provider_ro()
+                    .unwrap()
+                    .state_provider_by_block_number(block.number)
+                    .unwrap();
+
+                let mut builder_attrs =
                     GwynethPayloadBuilderAttributes::try_new(B256::ZERO, attrs).unwrap();
+                builder_attrs.l1_provider = Some(Arc::new(l1_state_provider));
+
                 let payload_id = builder_attrs.inner.payload_id();
+                let parrent_beacon_block_root =
+                    builder_attrs.inner.parent_beacon_block_root.unwrap();
                 // trigger new payload building draining the pool
-                self.node.payload_builder.new_payload(builder_attrs.clone()).await.unwrap();
+                self.node.payload_builder.new_payload(builder_attrs).await.unwrap();
                 // wait for the payload builder to have finished building
                 let mut payload =
                     EthBuiltPayload::new(payload_id, SealedBlock::default(), U256::ZERO);
@@ -162,7 +167,7 @@ impl<Node: reth_node_api::FullNodeComponents> Rollup<Node> {
                     .engine_api
                     .submit_payload(
                         payload.clone(),
-                        builder_attrs,
+                        parrent_beacon_block_root,
                         PayloadStatusEnum::Valid,
                         vec![],
                     )

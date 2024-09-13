@@ -7,6 +7,7 @@ license.workspace = true
 homepage.workspace = true
 repository.workspace = true
 exclude.workspace = true
+required-features = ["gwyneth"]
 
 [lints]
 workspace = true
@@ -14,12 +15,12 @@ workspace = true
 
 [dependencies]
 # reth
-reth-payload-builder.workspace = true
-reth-ethereum-engine-primitives.workspace = true
-reth-ethereum-engine.workspace = true
-reth-basic-payload-builder.workspace = true
-reth-ethereum-payload-builder.workspace = true
-reth-node-builder.workspace = true
+reth-payload-builder = { workspace = true, features = ["gwyneth"]}
+reth-ethereum-engine-primitives = { workspace = true, features = ["gwyneth"]}
+reth-ethereum-engine = { workspace = true, features = ["gwyneth"]}
+reth-basic-payload-builder = { workspace = true, features = ["gwyneth"]}
+reth-ethereum-payload-builder ={ workspace = true, features = ["gwyneth"]}
+reth-node-builder = { workspace = true, features = ["gwyneth"]}
 reth-tracing.workspace = true
 reth-provider.workspace = true
 reth-transaction-pool.workspace = true

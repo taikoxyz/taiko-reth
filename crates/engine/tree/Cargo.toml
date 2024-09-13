@@ -84,3 +84,9 @@ test-utils = [
   "reth-tracing",
   "rand"
 ]
+gwyneth = [
+  "reth-payload-primitives/gwyneth",
+  "reth-beacon-consensus/gwyneth",
+  "reth-engine-primitives/gwyneth",
+  "reth-payload-builder/gwyneth",
+]

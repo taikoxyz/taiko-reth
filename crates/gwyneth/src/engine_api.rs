@@ -3,7 +3,7 @@ use jsonrpsee::{
     http_client::{transport::HttpBackend, HttpClient},
 };
 use reth_ethereum_engine_primitives::ExecutionPayloadEnvelopeV3;
-use reth_node_api::{EngineTypes, PayloadBuilderAttributes};
+use reth_node_api::EngineTypes;
 use reth_payload_builder::PayloadId;
 use reth_primitives::B256;
 use reth_provider::CanonStateNotificationStream;
@@ -43,7 +43,7 @@ impl<E: EngineTypes> EngineApiContext<E> {
     pub async fn submit_payload(
         &self,
         payload: E::BuiltPayload,
-        payload_builder_attributes: E::PayloadBuilderAttributes,
+        parent_beacon_block_root: B256,
         expected_status: PayloadStatusEnum,
         versioned_hashes: Vec<B256>,
     ) -> eyre::Result<B256>
@@ -58,7 +58,7 @@ impl<E: EngineTypes> EngineApiContext<E> {
             &self.engine_api_client,
             envelope_v3.execution_payload(),
             versioned_hashes,
-            payload_builder_attributes.parent_beacon_block_root().unwrap(),
+            parent_beacon_block_root,
         )
         .await?;
 
