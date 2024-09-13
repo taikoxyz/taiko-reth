@@ -200,8 +200,12 @@ where
         (None, None)
     };
 
-    let WithdrawalsOutcome { withdrawals_root, withdrawals } =
-        commit_withdrawals(&mut db, &chain_spec, attributes.inner.timestamp, attributes.inner.withdrawals)?;
+    let WithdrawalsOutcome { withdrawals_root, withdrawals } = commit_withdrawals(
+        &mut db,
+        &chain_spec,
+        attributes.inner.timestamp,
+        attributes.inner.withdrawals,
+    )?;
 
     // merge all transitions into bundle state, this would apply the withdrawal balance changes
     // and 4788 contract call

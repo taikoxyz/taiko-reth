@@ -21,8 +21,9 @@ use reth_payload_builder::EthBuiltPayload;
 use reth_primitives::{
     address, Address, SealedBlock, SealedBlockWithSenders, TransactionSigned, B256, U256,
 };
-use reth_provider::DatabaseProviderFactory;
-use reth_provider::{providers::BlockchainProvider, CanonStateSubscriptions};
+use reth_provider::{
+    providers::BlockchainProvider, CanonStateSubscriptions, DatabaseProviderFactory,
+};
 use reth_rpc_types::engine::PayloadStatusEnum;
 use reth_transaction_pool::{
     blobstore::DiskFileBlobStore, CoinbaseTipOrdering, EthPooledTransaction,

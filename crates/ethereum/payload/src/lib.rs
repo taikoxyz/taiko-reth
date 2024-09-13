@@ -437,7 +437,6 @@ where
         executed_txs.push(tx.into_signed());
     }
 
-
     // check if we have a better block
     if !is_better_payload(best_payload.as_ref(), total_fees) {
         // can skip building the block

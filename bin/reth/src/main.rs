@@ -5,7 +5,6 @@
 #[global_allocator]
 static ALLOC: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 
-
 use gwyneth::GwynethNode;
 use reth::args::{DiscoveryArgs, NetworkArgs, RpcServerArgs};
 use reth_chainspec::ChainSpecBuilder;
@@ -13,10 +12,8 @@ use reth_node_builder::{NodeBuilder, NodeConfig, NodeHandle};
 use reth_node_ethereum::EthereumNode;
 use reth_tasks::TaskManager;
 
-
 fn main() -> eyre::Result<()> {
     reth::cli::Cli::parse_args().run(|builder, _| async move {
-
         let tasks = TaskManager::current();
         let exec = tasks.executor();
 
@@ -30,10 +27,15 @@ fn main() -> eyre::Result<()> {
         };
 
         let chain_spec = ChainSpecBuilder::default()
-                .chain(gwyneth::exex::CHAIN_ID.into())
-                .genesis(serde_json::from_str(include_str!("../../../crates/ethereum/node/tests/assets/genesis.json")).unwrap())
-                .cancun_activated()
-                .build();
+            .chain(gwyneth::exex::CHAIN_ID.into())
+            .genesis(
+                serde_json::from_str(include_str!(
+                    "../../../crates/ethereum/node/tests/assets/genesis.json"
+                ))
+                .unwrap(),
+            )
+            .cancun_activated()
+            .build();
 
         let node_config = NodeConfig::test()
             .with_chain(chain_spec.clone())
@@ -42,17 +44,19 @@ fn main() -> eyre::Result<()> {
             .with_rpc(RpcServerArgs::default().with_unused_ports().with_http())
             .set_dev(true);
 
-        let NodeHandle { node: eth_node, node_exit_future: _ } = NodeBuilder::new(node_config.clone())
-            .testing_node(exec.clone())
-            .node(EthereumNode::default())
-            .launch()
-            .await?;
+        let NodeHandle { node: eth_node, node_exit_future: _ } =
+            NodeBuilder::new(node_config.clone())
+                .testing_node(exec.clone())
+                .node(EthereumNode::default())
+                .launch()
+                .await?;
 
-        let NodeHandle { node: gwyneth_node, node_exit_future: _ } = NodeBuilder::new(node_config.clone())
-            .testing_node(exec.clone())
-            .node(GwynethNode::default())
-            .launch()
-            .await?;
+        let NodeHandle { node: gwyneth_node, node_exit_future: _ } =
+            NodeBuilder::new(node_config.clone())
+                .testing_node(exec.clone())
+                .node(GwynethNode::default())
+                .launch()
+                .await?;
 
         let handle = builder
             .node(EthereumNode::default())
