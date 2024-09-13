@@ -255,7 +255,7 @@ impl Command {
                             clean.1.nibbles.len() > self.skip_node_depth.unwrap_or_default()
                         {
                             first_mismatched_storage = Some((incremental, clean));
-                            break;
+                            break
                         }
                     }
                     (Some(incremental), None) => {
