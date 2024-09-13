@@ -1,3 +1,5 @@
+use std::{fmt::Debug, sync::Arc};
+
 use super::{AccountReader, BlockHashReader, BlockIdReader, StateProofProvider, StateRootProvider};
 use auto_impl::auto_impl;
 use reth_execution_types::ExecutionOutcome;
@@ -9,6 +11,12 @@ use reth_storage_errors::provider::{ProviderError, ProviderResult};
 
 /// Type alias of boxed [`StateProvider`].
 pub type StateProviderBox = Box<dyn StateProvider>;
+
+impl Debug for dyn StateProvider {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("StateProviderBox").finish()
+    }
+}
 
 /// An abstraction for a type that provides state data.
 #[auto_impl(&, Arc, Box)]
@@ -38,10 +46,10 @@ pub trait StateProvider:
 
         if let Some(code_hash) = acc.bytecode_hash {
             if code_hash == KECCAK_EMPTY {
-                return Ok(None)
+                return Ok(None);
             }
             // Get the code from the code hash
-            return self.bytecode_by_hash(code_hash)
+            return self.bytecode_by_hash(code_hash);
         }
 
         // Return `None` if no code hash is set
