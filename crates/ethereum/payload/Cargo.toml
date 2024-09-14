@@ -29,3 +29,6 @@ revm.workspace = true
 
 # misc
 tracing.workspace = true
+
+[features]
+gwyneth = ["reth-payload-builder/gwyneth"]

@@ -36,3 +36,6 @@ tracing.workspace = true
 #misc
 pin-project.workspace = true
 humantime.workspace = true
+
+[features]
+gwyneth = ["reth-beacon-consensus/gwyneth"]

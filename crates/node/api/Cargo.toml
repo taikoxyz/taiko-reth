@@ -21,3 +21,10 @@ reth-network.workspace = true
 reth-payload-builder.workspace = true
 reth-payload-primitives.workspace = true
 reth-tasks.workspace = true
+
+[features]
+gwyneth = [
+    "reth-payload-primitives/gwyneth",
+    "reth-engine-primitives/gwyneth",
+    "reth-payload-builder/gwyneth"
+]

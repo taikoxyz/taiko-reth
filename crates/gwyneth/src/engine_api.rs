@@ -1,29 +1,29 @@
-use crate::traits::PayloadEnvelopeExt;
 use jsonrpsee::{
     core::client::ClientT,
     http_client::{transport::HttpBackend, HttpClient},
 };
-use reth::{
-    api::{EngineTypes, PayloadBuilderAttributes},
-    providers::CanonStateNotificationStream,
-    rpc::{
-        api::EngineApiClient,
-        types::engine::{ForkchoiceState, PayloadStatusEnum},
-    },
-};
+use reth_ethereum_engine_primitives::ExecutionPayloadEnvelopeV3;
+use reth_node_api::EngineTypes;
+use reth_node_core::args::RpcServerArgs;
 use reth_payload_builder::PayloadId;
 use reth_primitives::B256;
+use reth_provider::CanonStateNotificationStream;
+use reth_rpc_api::EngineApiClient;
 use reth_rpc_layer::AuthClientService;
-use std::marker::PhantomData;
+use reth_rpc_types::{
+    engine::{ForkchoiceState, PayloadStatusEnum},
+    ExecutionPayloadV3,
+};
+use std::{marker::PhantomData, net::Ipv4Addr};
 
 /// Helper for engine api operations
-pub struct EngineApiTestContext<E> {
+pub struct EngineApiContext<E> {
     pub canonical_stream: CanonStateNotificationStream,
     pub engine_api_client: HttpClient<AuthClientService<HttpBackend>>,
     pub _marker: PhantomData<E>,
 }
 
-impl<E: EngineTypes> EngineApiTestContext<E> {
+impl<E: EngineTypes> EngineApiContext<E> {
     /// Retrieves a v3 payload from the engine api
     pub async fn get_payload_v3(
         &self,
@@ -44,7 +44,7 @@ impl<E: EngineTypes> EngineApiTestContext<E> {
     pub async fn submit_payload(
         &self,
         payload: E::BuiltPayload,
-        payload_builder_attributes: E::PayloadBuilderAttributes,
+        parent_beacon_block_root: B256,
         expected_status: PayloadStatusEnum,
         versioned_hashes: Vec<B256>,
     ) -> eyre::Result<B256>
@@ -59,7 +59,7 @@ impl<E: EngineTypes> EngineApiTestContext<E> {
             &self.engine_api_client,
             envelope_v3.execution_payload(),
             versioned_hashes,
-            payload_builder_attributes.parent_beacon_block_root().unwrap(),
+            parent_beacon_block_root,
         )
         .await?;
 
@@ -97,5 +97,31 @@ impl<E: EngineTypes> EngineApiTestContext<E> {
         .await?;
 
         Ok(())
+    }
+}
+
+/// The execution payload envelope type.
+pub trait PayloadEnvelopeExt: Send + Sync + std::fmt::Debug {
+    /// Returns the execution payload V3 from the payload
+    fn execution_payload(&self) -> ExecutionPayloadV3;
+}
+
+impl PayloadEnvelopeExt for ExecutionPayloadEnvelopeV3 {
+    fn execution_payload(&self) -> ExecutionPayloadV3 {
+        self.execution_payload.clone()
+    }
+}
+pub trait RpcServerArgsExEx {
+    fn with_static_l2_rpc_ip_and_port(self) -> Self;
+}
+
+impl RpcServerArgsExEx for RpcServerArgs {
+    fn with_static_l2_rpc_ip_and_port(mut self) -> Self {
+        self.http = true;
+        // On the instance the program is running, we wanna have 10111 exposed as the (exex) L2's RPC port.
+        self.http_addr = Ipv4Addr::new(0, 0, 0, 0).into();
+        self.http_port = 10110u16;
+        self.ws_port = 10111u16;
+        self
     }
 }

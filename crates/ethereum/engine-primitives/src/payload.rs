@@ -5,7 +5,8 @@ use reth_chainspec::ChainSpec;
 use reth_evm_ethereum::revm_spec_by_timestamp_after_merge;
 use reth_payload_primitives::{BuiltPayload, PayloadBuilderAttributes};
 use reth_primitives::{
-    constants::EIP1559_INITIAL_BASE_FEE, Address, BlobTransactionSidecar, EthereumHardfork, Header, SealedBlock, TransactionSigned, Withdrawals, B256, U256
+    constants::EIP1559_INITIAL_BASE_FEE, Address, BlobTransactionSidecar, EthereumHardfork, Header,
+    SealedBlock, Withdrawals, B256, U256,
 };
 use reth_rpc_types::engine::{
     ExecutionPayloadEnvelopeV2, ExecutionPayloadEnvelopeV3, ExecutionPayloadEnvelopeV4,
@@ -167,8 +168,6 @@ pub struct EthPayloadBuilderAttributes {
     pub withdrawals: Withdrawals,
     /// Root of the parent beacon block
     pub parent_beacon_block_root: Option<B256>,
-    /// Fixed transaction list
-    pub transactions: Option<Vec<TransactionSigned>>,
 }
 
 // === impl EthPayloadBuilderAttributes ===
@@ -182,7 +181,7 @@ impl EthPayloadBuilderAttributes {
     /// Creates a new payload builder for the given parent block and the attributes.
     ///
     /// Derives the unique [`PayloadId`] for the given parent and attributes
-    pub fn new(parent: B256, attributes: PayloadAttributes, transactions: Option<Vec<TransactionSigned>>) -> Self {
+    pub fn new(parent: B256, attributes: PayloadAttributes) -> Self {
         let id = payload_id(&parent, &attributes);
 
         Self {
@@ -193,7 +192,6 @@ impl EthPayloadBuilderAttributes {
             prev_randao: attributes.prev_randao,
             withdrawals: attributes.withdrawals.unwrap_or_default().into(),
             parent_beacon_block_root: attributes.parent_beacon_block_root,
-            transactions,
         }
     }
 }
@@ -206,7 +204,7 @@ impl PayloadBuilderAttributes for EthPayloadBuilderAttributes {
     ///
     /// Derives the unique [`PayloadId`] for the given parent and attributes
     fn try_new(parent: B256, attributes: PayloadAttributes) -> Result<Self, Infallible> {
-        Ok(Self::new(parent, attributes, None))
+        Ok(Self::new(parent, attributes))
     }
 
     fn payload_id(&self) -> PayloadId {

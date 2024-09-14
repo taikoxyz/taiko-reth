@@ -137,7 +137,7 @@ members = [
     "examples/txpool-tracing/",
     "examples/custom-rlpx-subprotocol",
     "testing/ef-tests/",
-    "testing/testing-utils",
+    "testing/testing-utils", "crates/gwyneth",
 ]
 default-members = ["bin/reth"]
 
@@ -263,6 +263,8 @@ lto = "fat"
 codegen-units = 1
 
 [workspace.dependencies]
+gwyneth = { path = "crates/gwyneth" }
+
 # reth
 reth = { path = "bin/reth" }
 reth-bench = { path = "bin/reth-bench" }

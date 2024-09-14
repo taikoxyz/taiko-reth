@@ -40,3 +40,4 @@ serde_json.workspace = true
 
 [features]
 test-utils = []
+gwyneth = ["reth-payload-primitives/gwyneth"]

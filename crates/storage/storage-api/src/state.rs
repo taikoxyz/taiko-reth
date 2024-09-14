@@ -1,3 +1,5 @@
+use std::{fmt::Debug, sync::Arc};
+
 use super::{AccountReader, BlockHashReader, BlockIdReader, StateProofProvider, StateRootProvider};
 use auto_impl::auto_impl;
 use reth_execution_types::ExecutionOutcome;
@@ -9,6 +11,12 @@ use reth_storage_errors::provider::{ProviderError, ProviderResult};
 
 /// Type alias of boxed [`StateProvider`].
 pub type StateProviderBox = Box<dyn StateProvider>;
+
+impl Debug for dyn StateProvider {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("StateProviderBox").finish()
+    }
+}
 
 /// An abstraction for a type that provides state data.
 #[auto_impl(&, Arc, Box)]

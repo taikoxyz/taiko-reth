@@ -80,3 +80,8 @@ optimism = [
     "reth-blockchain-tree/optimism",
     "reth-rpc/optimism",
 ]
+gwyneth = [
+    "reth-payload-primitives/gwyneth",
+    "reth-engine-primitives/gwyneth",
+    "reth-payload-builder/gwyneth",
+    ]

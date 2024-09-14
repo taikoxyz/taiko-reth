@@ -28,3 +28,9 @@ sha2.workspace = true
 
 [dev-dependencies]
 serde_json.workspace = true
+
+[features]
+gwyneth = [
+    "reth-payload-primitives/gwyneth",
+    "reth-engine-primitives/gwyneth",
+]

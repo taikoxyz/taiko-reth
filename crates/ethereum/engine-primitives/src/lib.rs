@@ -33,6 +33,8 @@ impl PayloadTypes for EthEngineTypes {
     type BuiltPayload = EthBuiltPayload;
     type PayloadAttributes = EthPayloadAttributes;
     type PayloadBuilderAttributes = EthPayloadBuilderAttributes;
+    #[cfg(feature = "gwyneth")]
+    type SyncProvider = ();
 }
 
 impl EngineTypes for EthEngineTypes {
