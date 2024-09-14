@@ -4,6 +4,7 @@ use jsonrpsee::{
 };
 use reth_ethereum_engine_primitives::ExecutionPayloadEnvelopeV3;
 use reth_node_api::EngineTypes;
+use reth_node_core::args::RpcServerArgs;
 use reth_payload_builder::PayloadId;
 use reth_primitives::B256;
 use reth_provider::CanonStateNotificationStream;
@@ -13,7 +14,7 @@ use reth_rpc_types::{
     engine::{ForkchoiceState, PayloadStatusEnum},
     ExecutionPayloadV3,
 };
-use std::marker::PhantomData;
+use std::{marker::PhantomData, net::Ipv4Addr};
 
 /// Helper for engine api operations
 pub struct EngineApiContext<E> {
@@ -112,4 +113,15 @@ impl PayloadEnvelopeExt for ExecutionPayloadEnvelopeV3 {
 }
 pub trait RpcServerArgsExEx {
     fn with_static_l2_rpc_ip_and_port(self) -> Self;
+}
+
+impl RpcServerArgsExEx for RpcServerArgs {
+    fn with_static_l2_rpc_ip_and_port(mut self) -> Self {
+        self.http = true;
+        // On the instance the program is running, we wanna have 10111 exposed as the (exex) L2's RPC port.
+        self.http_addr = Ipv4Addr::new(0, 0, 0, 0).into();
+        self.http_port = 10110u16;
+        self.ws_port = 10111u16;
+        self
+    }
 }

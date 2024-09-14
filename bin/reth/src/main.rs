@@ -5,7 +5,7 @@
 #[global_allocator]
 static ALLOC: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 
-use gwyneth::GwynethNode;
+use gwyneth::{engine_api::RpcServerArgsExEx, GwynethNode};
 use reth::args::{DiscoveryArgs, NetworkArgs, RpcServerArgs};
 use reth_chainspec::ChainSpecBuilder;
 use reth_node_builder::{NodeBuilder, NodeConfig, NodeHandle};
@@ -41,7 +41,7 @@ fn main() -> eyre::Result<()> {
             .with_chain(chain_spec.clone())
             .with_network(network_config.clone())
             .with_unused_ports()
-            .with_rpc(RpcServerArgs::default().with_unused_ports().with_http())
+            .with_rpc(RpcServerArgs::default().with_unused_ports().with_static_l2_rpc_ip_and_port())
             .set_dev(true);
 
         let NodeHandle { node: eth_node, node_exit_future: _ } =
