@@ -24,7 +24,7 @@ use reth_primitives::{
     proofs::{self, calculate_requests_root},
     Block, EthereumHardforks, Header, Receipt, EMPTY_OMMER_ROOT_HASH, U256,
 };
-use reth_provider::StateProviderFactory;
+use reth_provider::{StateProvider, StateProviderFactory};
 use reth_revm::{database::StateProviderDatabase, state_change::apply_blockhashes_update};
 use reth_transaction_pool::{BestTransactionsAttributes, TransactionPool};
 use revm::{
@@ -42,14 +42,15 @@ use crate::GwynethPayloadBuilderAttributes;
 /// and configuration, this function creates a transaction payload. Returns
 /// a result indicating success with the payload or an error in case of failure.
 #[inline]
-pub fn default_gwyneth_payload_builder<EvmConfig, Pool, Client, SP>(
+pub fn default_gwyneth_payload_builder<EvmConfig, Pool, Client, SyncProvider>(
     evm_config: EvmConfig,
-    args: BuildArguments<Pool, Client, GwynethPayloadBuilderAttributes<SP>, EthBuiltPayload>,
+    args: BuildArguments<Pool, Client, GwynethPayloadBuilderAttributes<SyncProvider>, EthBuiltPayload>,
 ) -> Result<BuildOutcome<EthBuiltPayload>, PayloadBuilderError>
 where
     EvmConfig: ConfigureEvm,
     Client: StateProviderFactory,
     Pool: TransactionPool,
+    SyncProvider: StateProvider,
 {
     // Brecht: ethereum payload builder
 
@@ -68,6 +69,11 @@ where
         chain_spec,
         ..
     } = config;
+
+    let l1_provider = attributes.l1_provider.as_ref().unwrap();
+    let l1_state = StateProviderDatabase::new(l1_provider);
+    let mut l1_db =
+        State::builder().with_database_ref(cached_reads.as_db(l1_state)).with_bundle_update().build();
 
     debug!(target: "payload_builder", id=%attributes.inner.id, parent_hash = ?parent_block.hash(), parent_number = parent_block.number, "building new payload");
     let mut cumulative_gas_used = 0;
