@@ -16,7 +16,7 @@ use reth_execution_types::Chain;
 use reth_exex::{ExExContext, ExExEvent};
 use reth_node_api::{FullNodeTypesAdapter, PayloadBuilderAttributes};
 use reth_node_builder::{components::Components, FullNode, NodeAdapter};
-use reth_node_ethereum::{node::EthereumAddOns, EthExecutorProvider, EthereumNode};
+use reth_node_ethereum::{node::EthereumAddOns, EthExecutorProvider};
 use reth_payload_builder::EthBuiltPayload;
 use reth_primitives::{
     address, Address, SealedBlock, SealedBlockWithSenders, TransactionSigned, B256, U256,
