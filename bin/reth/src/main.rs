@@ -21,10 +21,6 @@ fn main() -> eyre::Result<()> {
             discovery: DiscoveryArgs { disable_discovery: true, ..DiscoveryArgs::default() },
             ..NetworkArgs::default()
         };
-        let network_config = NetworkArgs {
-            discovery: DiscoveryArgs { disable_discovery: true, ..DiscoveryArgs::default() },
-            ..NetworkArgs::default()
-        };
 
         let chain_spec = ChainSpecBuilder::default()
             .chain(gwyneth::exex::CHAIN_ID.into())
@@ -43,13 +39,6 @@ fn main() -> eyre::Result<()> {
             .with_unused_ports()
             .with_rpc(RpcServerArgs::default().with_unused_ports().with_static_l2_rpc_ip_and_port())
             .set_dev(true);
-
-        let NodeHandle { node: eth_node, node_exit_future: _ } =
-            NodeBuilder::new(node_config.clone())
-                .testing_node(exec.clone())
-                .node(EthereumNode::default())
-                .launch()
-                .await?;
 
         let NodeHandle { node: gwyneth_node, node_exit_future: _ } =
             NodeBuilder::new(node_config.clone())
