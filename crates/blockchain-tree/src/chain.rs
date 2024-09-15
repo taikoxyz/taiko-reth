@@ -180,6 +180,7 @@ impl AppendableChain {
         DB: Database + Clone,
         E: BlockExecutorProvider,
     {
+        println!("validate_and_execute");
         // some checks are done before blocks comes here.
         externals.consensus.validate_header_against_parent(&block, parent_block)?;
 

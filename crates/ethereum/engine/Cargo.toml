@@ -43,3 +43,9 @@ reth-primitives.workspace = true
 reth-prune-types.workspace = true
 
 tokio = { workspace = true, features = ["sync"] }
+
+[features]
+gwyneth = [
+    "reth-beacon-consensus/gwyneth",
+    "reth-ethereum-engine-primitives/gwyneth",
+]

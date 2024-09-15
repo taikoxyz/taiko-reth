@@ -44,6 +44,8 @@ pub struct NetworkHandle {
     inner: Arc<NetworkInner>,
 }
 
+unsafe impl Send for NetworkHandle {}
+
 // === impl NetworkHandle ===
 
 impl NetworkHandle {

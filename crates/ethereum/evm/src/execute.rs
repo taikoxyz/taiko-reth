@@ -69,6 +69,7 @@ where
     where
         DB: Database<Error: Into<ProviderError>>,
     {
+        println!("eth_executor");
         EthBlockExecutor::new(
             self.chain_spec.clone(),
             self.evm_config.clone(),
@@ -91,6 +92,7 @@ where
     where
         DB: Database<Error: Into<ProviderError> + Display>,
     {
+        println!("executor");
         self.eth_executor(db)
     }
 
@@ -98,6 +100,7 @@ where
     where
         DB: Database<Error: Into<ProviderError> + Display>,
     {
+        println!("batch_executor");
         let executor = self.eth_executor(db);
         EthBatchExecutor {
             executor,
@@ -254,7 +257,8 @@ pub struct EthBlockExecutor<EvmConfig, DB> {
 
 impl<EvmConfig, DB> EthBlockExecutor<EvmConfig, DB> {
     /// Creates a new Ethereum block executor.
-    pub const fn new(chain_spec: Arc<ChainSpec>, evm_config: EvmConfig, state: State<DB>) -> Self {
+    pub fn new(chain_spec: Arc<ChainSpec>, evm_config: EvmConfig, state: State<DB>) -> Self {
+        println!("EthBlockExecutor::new");
         Self { executor: EthEvmExecutor { chain_spec, evm_config }, state }
     }
 
@@ -305,6 +309,8 @@ where
         block: &BlockWithSenders,
         total_difficulty: U256,
     ) -> Result<EthExecuteOutput, BlockExecutionError> {
+        println!("execute_without_verification");
+
         // 1. prepare state on new block
         self.on_new_block(&block.header);
 

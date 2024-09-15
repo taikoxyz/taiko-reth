@@ -1,0 +1,11 @@
+{
+  "chain_prover": "0x373E0B8B80A15cdf587C1263654c6B5edd195a43",
+  "rollup_address_manager": "0x8F0342A7060e76dfc7F6e9dEbfAD9b9eC919952c",
+  "shared_address_manager": "0x17435ccE3d1B4fA2e5f8A08eD921D57C6762A180",
+  "taiko": "0x9fCF7D13d10dEdF17d0f24C62f0cf4ED462f65b7",
+  "taiko_token": "0x422A3492e218383753D8006C7Bfa97815B44373F",
+  "tier_sgx1": "0x1ADB9959EB142bE128E6dfEcc8D571f07cd66DeE",
+  "tier_sgx2": "0x3A8C1bd531b5C1aeFBB9ebc3e021C1251cF4Ccb1",
+  "tier_sgx3": "0x80741a37E3644612F0465145C9709a90B6D77Ee3",
+  "verifier_registry": "0x9ECB6f04D47FA2599449AaA523bF84476f7aD80f"
+}

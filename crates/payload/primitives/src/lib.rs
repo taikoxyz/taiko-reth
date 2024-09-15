@@ -33,6 +33,10 @@ pub trait PayloadTypes: Send + Sync + Unpin + core::fmt::Debug + Clone {
     type PayloadBuilderAttributes: PayloadBuilderAttributes<RpcPayloadAttributes = Self::PayloadAttributes>
         + Clone
         + Unpin;
+
+    #[cfg(feature = "gwyneth")]
+    /// Access L1 read-only state provider, in particular Arc<Box<dyn StateProvider>>
+    type SyncProvider;
 }
 
 /// Validates the timestamp depending on the version called:
@@ -88,7 +92,7 @@ pub fn validate_payload_timestamp(
         //
         // 2. Client software **MUST** return `-38005: Unsupported fork` error if the `timestamp` of
         //    the payload does not fall within the time frame of the Cancun fork.
-        return Err(EngineObjectValidationError::UnsupportedFork)
+        return Err(EngineObjectValidationError::UnsupportedFork);
     }
 
     let is_prague = chain_spec.is_prague_active_at_timestamp(timestamp);

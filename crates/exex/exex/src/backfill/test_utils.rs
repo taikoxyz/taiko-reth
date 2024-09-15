@@ -46,6 +46,7 @@ pub(crate) fn chain_spec(address: Address) -> Arc<ChainSpec> {
     )
 }
 
+// Brecht execute_block_and_commit_to_database
 pub(crate) fn execute_block_and_commit_to_database<DB>(
     provider_factory: &ProviderFactory<DB>,
     chain_spec: Arc<ChainSpec>,
@@ -54,6 +55,7 @@ pub(crate) fn execute_block_and_commit_to_database<DB>(
 where
     DB: reth_db_api::database::Database,
 {
+    println!("execute_block_and_commit_to_database");
     let provider = provider_factory.provider()?;
 
     // Execute the block to produce a block execution output

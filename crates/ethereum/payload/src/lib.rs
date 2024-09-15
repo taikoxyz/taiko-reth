@@ -261,6 +261,8 @@ where
     Client: StateProviderFactory,
     Pool: TransactionPool,
 {
+    // Brecht: ethereum payload builder
+
     let BuildArguments { client, pool, mut cached_reads, config, cancel, best_payload } = args;
 
     let state_provider = client.state_by_block_hash(config.parent_block.hash())?;
@@ -294,6 +296,8 @@ where
     let mut total_fees = U256::ZERO;
 
     let block_number = initialized_block_env.number.to::<u64>();
+
+    // println!("brecht: payload builder: {:?}", attributes.transactions);
 
     // apply eip-4788 pre block contract call
     pre_block_beacon_root_contract_call(

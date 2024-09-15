@@ -13,6 +13,9 @@ default-run = "reth"
 workspace = true
 
 [dependencies]
+
+gwyneth.workspace = true
+
 # reth
 reth-chainspec.workspace = true
 reth-config.workspace = true
@@ -26,6 +29,7 @@ reth-evm.workspace = true
 reth-revm.workspace = true
 reth-stages.workspace = true
 reth-execution-types.workspace = true
+reth-execution-errors.workspace = true
 reth-errors.workspace = true
 reth-transaction-pool.workspace = true
 reth-beacon-consensus.workspace = true
@@ -104,9 +108,16 @@ tempfile.workspace = true
 backon.workspace = true
 similar-asserts.workspace = true
 itertools.workspace = true
+once_cell = "1"
+rusqlite = { version = "0.31.0", features = ["bundled"] }
+foundry-blob-explorers = "0.5"
 
 # p2p
 discv5.workspace = true
+
+# alloy
+alloy-consensus = { version = "0.2", features = ["kzg"] }
+alloy-sol-types = { workspace = true, features = ["json"] }
 
 [target.'cfg(unix)'.dependencies]
 tikv-jemallocator = { version = "0.5.0", optional = true }
@@ -147,6 +158,8 @@ optimism = [
 
 # no-op feature flag for switching between the `optimism` and default functionality in CI matrices
 ethereum = []
+
+gwyneth = ["reth-payload-primitives/gwyneth"]
 
 [[bin]]
 name = "reth"

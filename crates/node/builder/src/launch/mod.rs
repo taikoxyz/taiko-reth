@@ -106,10 +106,13 @@ where
 {
     type Node = NodeHandle<NodeAdapter<T, CB::Components>, AO>;
 
+    // Brecht
     async fn launch_node(
         self,
         target: NodeBuilderWithComponents<T, CB, AO>,
     ) -> eyre::Result<Self::Node> {
+        println!("Brecht: DefaultNodeLauncher launch_node");
+
         let Self { ctx } = self;
         let NodeBuilderWithComponents {
             adapter: NodeTypesAdapter { database },

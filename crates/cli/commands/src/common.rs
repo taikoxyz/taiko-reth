@@ -55,6 +55,7 @@ impl EnvironmentArgs {
     /// Initializes environment according to [`AccessRights`] and returns an instance of
     /// [`Environment`].
     pub fn init(&self, access: AccessRights) -> eyre::Result<Environment> {
+        println!("EnvironmentArgs::init");
         let data_dir = self.datadir.clone().resolve_datadir(self.chain.chain);
         let db_path = data_dir.db();
         let sf_path = data_dir.static_files();

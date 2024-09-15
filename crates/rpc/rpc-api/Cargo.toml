@@ -31,3 +31,4 @@ client = [
     "jsonrpsee/async-client",
     "reth-rpc-eth-api/client"
 ]
+gwyneth = ["reth-engine-primitives/gwyneth"]

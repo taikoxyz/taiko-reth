@@ -184,6 +184,8 @@ where
         &self,
         block_number: u64,
     ) -> Result<(BlockWithSenders, BlockExecutionOutput<Receipt>), BlockExecutionError> {
+        println!("SingleBlockBackfillJob::execute_block");
+
         let td = self
             .provider
             .header_td_by_number(block_number)?

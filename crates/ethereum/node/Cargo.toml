@@ -59,3 +59,8 @@ serde_json.workspace = true
 [features]
 default = []
 test-utils = ["reth-node-builder/test-utils"]
+gwyneth = [
+    "reth-basic-payload-builder/gwyneth",
+    "reth-beacon-consensus/gwyneth",
+    "reth-payload-builder/gwyneth",
+]

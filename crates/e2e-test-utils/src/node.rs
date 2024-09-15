@@ -138,8 +138,11 @@ where
         <Node::Engine as EngineTypes>::ExecutionPayloadV3:
             From<<Node::Engine as PayloadTypes>::BuiltPayload> + PayloadEnvelopeExt,
     {
+        println!("new payload start");
         let (payload, eth_attr) = self.new_payload(attributes_generator).await?;
+        println!("new payload stop");
 
+        println!("submit payload");
         let block_hash = self
             .engine_api
             .submit_payload(
@@ -149,9 +152,12 @@ where
                 versioned_hashes,
             )
             .await?;
+        println!("submit payload done");
 
+        println!("update_forkchoice");
         // trigger forkchoice update via engine api to commit the block to the blockchain
         self.engine_api.update_forkchoice(block_hash, block_hash).await?;
+        println!("update_forkchoice done");
 
         Ok((payload, eth_attr))
     }

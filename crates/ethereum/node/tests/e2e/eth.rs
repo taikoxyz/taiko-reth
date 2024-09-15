@@ -45,6 +45,8 @@ async fn can_run_eth_node() -> eyre::Result<()> {
     // assert the block has been committed to the blockchain
     node.assert_new_block(tx_hash, block_hash, block_number).await?;
 
+    println!("Ran node");
+
     Ok(())
 }
 
