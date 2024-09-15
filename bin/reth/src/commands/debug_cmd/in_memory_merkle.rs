@@ -1,10 +1,7 @@
 //! Command for debugging in-memory merkle trie calculation.
 
-use crate::{
-    args::NetworkArgs,
-    macros::block_executor,
-    utils::{get_single_body, get_single_header},
-};
+use std::{path::PathBuf, sync::Arc};
+
 use backon::{ConstantBuilder, Retryable};
 use clap::Parser;
 use reth_cli_commands::common::{AccessRights, Environment, EnvironmentArgs};
@@ -13,22 +10,28 @@ use reth_cli_util::get_secret_key;
 use reth_config::Config;
 use reth_db::DatabaseEnv;
 use reth_errors::BlockValidationError;
-use reth_evm::execute::{BlockExecutionOutput, BlockExecutorProvider, Executor};
+use reth_evm::execute::{BlockExecutorProvider, Executor};
 use reth_execution_types::ExecutionOutcome;
-use reth_network::NetworkHandle;
+use reth_network::{BlockDownloaderProvider, NetworkHandle};
 use reth_network_api::NetworkInfo;
 use reth_primitives::BlockHashOrNumber;
 use reth_provider::{
-    AccountExtReader, ChainSpecProvider, HashingWriter, HeaderProvider, LatestStateProviderRef,
-    OriginalValuesKnown, ProviderFactory, StageCheckpointReader, StateWriter,
-    StaticFileProviderFactory, StorageReader,
+    writer::UnifiedStorageWriter, AccountExtReader, ChainSpecProvider, HashingWriter,
+    HeaderProvider, LatestStateProviderRef, OriginalValuesKnown, ProviderFactory,
+    StageCheckpointReader, StateWriter, StaticFileProviderFactory, StorageReader,
 };
 use reth_revm::database::StateProviderDatabase;
 use reth_stages::StageId;
 use reth_tasks::TaskExecutor;
 use reth_trie::StateRoot;
-use std::{path::PathBuf, sync::Arc};
+use reth_trie_db::DatabaseStateRoot;
 use tracing::*;
+
+use crate::{
+    args::NetworkArgs,
+    macros::block_executor,
+    utils::{get_single_body, get_single_header},
+};
 
 /// `reth debug in-memory-merkle` command
 /// This debug routine requires that the node is positioned at the block before the target.
@@ -134,7 +137,7 @@ impl Command {
 
         let merkle_block_td =
             provider.header_td_by_number(merkle_block_number)?.unwrap_or_default();
-        let BlockExecutionOutput { state, receipts, requests, .. } = executor.execute(
+        let block_execution_output = executor.execute(
             (
                 &block
                     .clone()
@@ -145,12 +148,13 @@ impl Command {
             )
                 .into(),
         )?;
-        let execution_outcome =
-            ExecutionOutcome::new(state, receipts.into(), block.number, vec![requests.into()]);
+        let execution_outcome = ExecutionOutcome::from((block_execution_output, block.number));
 
         // Unpacked `BundleState::state_root_slow` function
-        let (in_memory_state_root, in_memory_updates) =
-            execution_outcome.hash_state_slow().state_root_with_updates(provider.tx_ref())?;
+        let (in_memory_state_root, in_memory_updates) = StateRoot::overlay_root_with_updates(
+            provider.tx_ref(),
+            execution_outcome.hash_state_slow(),
+        )?;
 
         if in_memory_state_root == block.state_root {
             info!(target: "reth::cli", state_root = ?in_memory_state_root, "Computed in-memory state root matches");
@@ -166,7 +170,8 @@ impl Command {
                 .try_seal_with_senders()
                 .map_err(|_| BlockValidationError::SenderRecoveryError)?,
         )?;
-        execution_outcome.write_to_storage(&provider_rw, None, OriginalValuesKnown::No)?;
+        let mut storage_writer = UnifiedStorageWriter::from_database(&provider_rw);
+        storage_writer.write_to_storage(execution_outcome, OriginalValuesKnown::No)?;
         let storage_lists = provider_rw.changed_storages_with_range(block.number..=block.number)?;
         let storages = provider_rw.plain_state_storages(storage_lists)?;
         provider_rw.insert_storage_for_hashing(storages)?;

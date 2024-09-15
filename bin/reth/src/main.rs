@@ -69,3 +69,23 @@ fn main() -> eyre::Result<()> {
         handle.wait_for_node_exit().await
     })
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use clap::Parser;
+
+    /// A helper type to parse Args more easily
+    #[derive(Parser)]
+    struct CommandParser<T: Args> {
+        #[command(flatten)]
+        args: T,
+    }
+
+    #[test]
+    fn test_parse_engine_args() {
+        let default_args = EngineArgs::default();
+        let args = CommandParser::<EngineArgs>::parse_from(["reth"]).args;
+        assert_eq!(args, default_args);
+    }
+}
