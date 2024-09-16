@@ -11,7 +11,7 @@ use reth_basic_payload_builder::{
 use reth_errors::RethError;
 use reth_evm::{
     system_calls::{
-        post_block_withdrawal_requests_contract_call, pre_block_beacon_root_contract_call,
+        post_block_withdrawal_requests_contract_call, pre_block_beacon_root_contract_call, pre_block_blockhashes_contract_call,
     },
     ConfigureEvm,
 };
@@ -19,14 +19,15 @@ use reth_evm_ethereum::eip6110::parse_deposits_from_receipts;
 use reth_execution_types::ExecutionOutcome;
 use reth_payload_builder::{error::PayloadBuilderError, EthBuiltPayload};
 use reth_primitives::{
-    constants::BEACON_NONCE,
+    constants::{eip4844::MAX_DATA_GAS_PER_BLOCK, BEACON_NONCE},
     eip4844::calculate_excess_blob_gas,
     proofs::{self, calculate_requests_root},
     Block, EthereumHardforks, Header, Receipt, EMPTY_OMMER_ROOT_HASH, U256,
 };
 use reth_provider::{StateProvider, StateProviderFactory};
-use reth_revm::{database::StateProviderDatabase, state_change::apply_blockhashes_update};
+use reth_revm::database::StateProviderDatabase;
 use reth_transaction_pool::{BestTransactionsAttributes, TransactionPool};
+use reth_trie::HashedPostState;
 use revm::{
     db::states::bundle_state::BundleRetention,
     primitives::{EVMError, EnvWithHandlerCfg, ResultAndState},
@@ -35,6 +36,8 @@ use revm::{
 use tracing::{debug, trace, warn};
 
 use crate::GwynethPayloadBuilderAttributes;
+
+
 
 /// Constructs an Ethereum transaction payload using the best transactions from the pool.
 ///
@@ -72,8 +75,8 @@ where
 
     let l1_provider = attributes.l1_provider.as_ref().unwrap();
     let l1_state = StateProviderDatabase::new(l1_provider);
-    let mut l1_db =
-        State::builder().with_database_ref(cached_reads.as_db(l1_state)).with_bundle_update().build();
+    // let mut l1_db =
+    //     State::builder().with_database_ref(cached_reads.as_db(l1_state)).with_bundle_update().build();
 
     debug!(target: "payload_builder", id=%attributes.inner.id, parent_hash = ?parent_block.hash(), parent_number = parent_block.number, "building new payload");
     let mut cumulative_gas_used = 0;
@@ -102,8 +105,6 @@ where
         &chain_spec,
         &initialized_cfg,
         &initialized_block_env,
-        block_number,
-        attributes.inner.timestamp,
         attributes.inner.parent_beacon_block_root,
     )
     .map_err(|err| {
@@ -116,30 +117,59 @@ where
     })?;
 
     // apply eip-2935 blockhashes update
-    apply_blockhashes_update(
+    pre_block_blockhashes_contract_call(
         &mut db,
+        &evm_config,
         &chain_spec,
-        initialized_block_env.timestamp.to::<u64>(),
-        block_number,
+        &initialized_cfg,
+        &initialized_block_env,
         parent_block.hash(),
     )
-    .map_err(|err| PayloadBuilderError::Internal(err.into()))?;
+    .map_err(|err| {
+        warn!(target: "payload_builder", parent_hash=%parent_block.hash(), %err, "failed to update blockhashes for empty payload");
+        PayloadBuilderError::Internal(err.into())
+    })?;
 
     let mut receipts = Vec::new();
-    for sequencer_tx in &attributes.transactions {
+    for tx in &attributes.transactions {
+        // // ensure we still have capacity for this transaction
+        // if cumulative_gas_used + tx.gas_limit() > block_gas_limit {
+        //     // we can't fit this transaction into the block, so we need to mark it as invalid
+        //     // which also removes all dependent transaction from the iterator before we can
+        //     // continue
+        //     best_txs.mark_invalid(&tx);
+        //     continue
+        // }
+
         // Check if the job was cancelled, if so we can exit early.
         if cancel.is_cancelled() {
             return Ok(BuildOutcome::Cancelled)
         }
 
-        let sequencer_tx = sequencer_tx.clone().1.try_into_ecrecovered().unwrap();
+        let tx = tx.clone().1.try_into_ecrecovered().unwrap();
+
+        // // There's only limited amount of blob space available per block, so we need to check if
+        // // the EIP-4844 can still fit in the block
+        // if let Some(blob_tx) = tx.transaction.as_eip4844() {
+        //     let tx_blob_gas = blob_tx.blob_gas();
+        //     if sum_blob_gas_used + tx_blob_gas > MAX_DATA_GAS_PER_BLOCK {
+        //         // we can't fit this _blob_ transaction into the block, so we mark it as
+        //         // invalid, which removes its dependent transactions from
+        //         // the iterator. This is similar to the gas limit condition
+        //         // for regular transactions above.
+        //         trace!(target: "payload_builder", tx=?tx.hash, ?sum_blob_gas_used, ?tx_blob_gas, "skipping blob transaction because it would exceed the max data gas per block");
+        //         best_txs.mark_invalid(&tx);
+        //         continue
+        //     }
+        // }
 
         let env = EnvWithHandlerCfg::new_with_cfg_env(
             initialized_cfg.clone(),
             initialized_block_env.clone(),
-            evm_config.tx_env(&sequencer_tx),
+            evm_config.tx_env(&tx),
         );
 
+        // Configure the environment for the block.
         let mut evm = evm_config.evm_with_env(&mut db, env);
 
         let ResultAndState { result, state } = match evm.transact() {
@@ -147,7 +177,7 @@ where
             Err(err) => {
                 match err {
                     EVMError::Transaction(err) => {
-                        trace!(target: "payload_builder", %err, ?sequencer_tx, "Error in sequencer transaction, skipping.");
+                        trace!(target: "payload_builder", %err, ?tx, "Error in sequencer transaction, skipping.");
                         continue
                     }
                     err => {
@@ -157,11 +187,21 @@ where
                 }
             }
         };
-
-        // to release the db reference drop evm.
+        // drop evm so db is released.
         drop(evm);
         // commit changes
         db.commit(state);
+
+        // add to the total blob gas used if the transaction successfully executed
+        if let Some(blob_tx) = tx.transaction.as_eip4844() {
+            let tx_blob_gas = blob_tx.blob_gas();
+            sum_blob_gas_used += tx_blob_gas;
+
+            // if we've reached the max data gas per block, we can skip blob txs entirely
+            if sum_blob_gas_used == MAX_DATA_GAS_PER_BLOCK {
+                best_txs.skip_blobs();
+            }
+        }
 
         let gas_used = result.gas_used();
 
@@ -169,16 +209,25 @@ where
         cumulative_gas_used += gas_used;
 
         // Push transaction changeset and calculate header bloom filter for receipt.
+        #[allow(clippy::needless_update)] // side-effect of optimism fields
         receipts.push(Some(Receipt {
-            tx_type: sequencer_tx.tx_type(),
+            tx_type: tx.tx_type(),
             success: result.is_success(),
             cumulative_gas_used,
             logs: result.into_logs().into_iter().map(Into::into).collect(),
+            ..Default::default()
         }));
 
+        // update add to total fees
+        let miner_fee = tx
+            .effective_tip_per_gas(Some(base_fee))
+            .expect("fee is always valid; execution succeeded");
+        total_fees += U256::from(miner_fee) * U256::from(gas_used);
+
         // append transaction to the list of executed transactions
-        executed_txs.push(sequencer_tx.into_signed());
+        executed_txs.push(tx.into_signed());
     }
+
     // check if we have a better block
     if !is_better_payload(best_payload.as_ref(), total_fees) {
         // can skip building the block
@@ -206,12 +255,8 @@ where
         (None, None)
     };
 
-    let WithdrawalsOutcome { withdrawals_root, withdrawals } = commit_withdrawals(
-        &mut db,
-        &chain_spec,
-        attributes.inner.timestamp,
-        attributes.inner.withdrawals,
-    )?;
+    let WithdrawalsOutcome { withdrawals_root, withdrawals } =
+        commit_withdrawals(&mut db, &chain_spec, attributes.inner.timestamp, attributes.inner.withdrawals)?;
 
     // merge all transitions into bundle state, this would apply the withdrawal balance changes
     // and 4788 contract call
@@ -230,7 +275,9 @@ where
     // calculate the state root
     let state_root = {
         let state_provider = db.database.0.inner.borrow_mut();
-        state_provider.db.state_root(execution_outcome.state())?
+        state_provider
+            .db
+            .state_root(HashedPostState::from_bundle_state(&execution_outcome.state().state))?
     };
 
     // create the block header
