@@ -3,6 +3,7 @@ participants:
     el_image: taiko_reth
     cl_type: lighthouse
     cl_image: sigp/lighthouse:latest
+    cl_extra_params: [--always-prepare-payload, --prepare-payload-lookahead, "12000"]
   - el_type: reth
     el_image: taiko_reth
     cl_type: teku
