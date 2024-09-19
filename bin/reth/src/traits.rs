@@ -21,5 +21,5 @@ impl PayloadEnvelopeExt for ExecutionPayloadEnvelopeV3 {
     }
 }
 pub trait RpcServerArgsExEx {
-    fn with_static_l2_rpc_ip_and_port(self) -> Self;
+    fn with_static_l2_rpc_ip_and_port(self, chain_id: u64) -> Self;
 }
