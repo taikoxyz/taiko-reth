@@ -37,7 +37,7 @@ RUN cargo build --profile $BUILD_PROFILE --features "$FEATURES" --locked --bin r
 # always freshly cloned and not cached !)
 # Since the content of this file will change 
 # with each build, Docker will consider this 
-# layer (and all subsequent layers) as modified, 
+# layer (and all subsequent layers) as modified,
 # forcing a re-execution of the following steps.
 ADD https://worldtimeapi.org/api/ip /tmp/bustcache
 
@@ -70,6 +70,10 @@ COPY --from=builder /app/rbuilder /app/rbuilder
 
 # Copy licenses
 COPY LICENSE-* ./
+
+# Create start script
+RUN echo '#!/bin/bash\nrbuilder run /app/rbuilder/config-gwyneth-reth.toml' > /app/start_rbuilder.sh && \
+    chmod +x /app/start_rbuilder.sh
 
 EXPOSE 30303 30303/udp 9001 8545 8546
 ENTRYPOINT ["/usr/local/bin/reth"]
