@@ -15,20 +15,6 @@ use reth_revm::database::StateProviderDatabase;
 use reth_testing_utils::generators::sign_tx_with_key_pair;
 use secp256k1::Keypair;
 
-pub(crate) fn to_execution_outcome(
-    chain_id: u64,
-    block_number: u64,
-    block_execution_output: &BlockExecutionOutput<Receipt>,
-) -> ExecutionOutcome {
-    ExecutionOutcome {
-        chain_id,
-        bundle: block_execution_output.state.clone(),
-        receipts: block_execution_output.receipts.clone().into(),
-        first_block: block_number,
-        requests: vec![Requests(block_execution_output.requests.clone())],
-    }
-}
-
 pub(crate) fn chain_spec(address: Address) -> Arc<ChainSpec> {
     // Create a chain spec with a genesis state that contains the
     // provided sender
@@ -70,7 +56,7 @@ where
     block_execution_output.state.reverts.sort();
 
     // Convert the block execution output to an execution outcome for committing to the database
-    let execution_outcome = to_execution_outcome(block.number, &block_execution_output);
+    let execution_outcome = ExecutionOutcome::from((&block_execution_output, block.number));
 
     // Commit the block's execution outcome to the database
     let provider_rw = provider_factory.provider_rw()?;

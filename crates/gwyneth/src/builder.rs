@@ -69,13 +69,13 @@ where
 
     let state_provider = client.state_by_block_hash(parent_block.hash())?;
     let state = StateProviderDatabase::new(state_provider);
+    let mut sync_state = SyncStateProviderDatabase::new(Some(chain_spec.chain().id()), state);
 
     let (l1_id, l1_provider) = attributes.l1_provider.unwrap();
     let l1_box: Box<dyn StateProvider>  = Box::new(l1_provider);
     let l1_state = StateProviderDatabase::new(l1_box);
-
-    let mut sync_state = SyncStateProviderDatabase::new(Some(chain_spec.chain().id()), state);
     sync_state.add_db(l1_id, l1_state);
+    
     let mut sync_cached_reads = to_sync_cached_reads(cached_reads, chain_spec.chain.id());
     let mut sync_db = 
         State::builder().with_database_ref(sync_cached_reads.as_db(sync_state)).with_bundle_update().build();

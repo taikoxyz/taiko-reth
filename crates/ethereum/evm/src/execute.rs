@@ -354,12 +354,10 @@ where
                 .sum();
 
             // return balance to DAO beneficiary.
-            *balance_increments.entry(DAO_HARDFORK_BENEFICIARY).or_default() += drained_balance;
+            *balance_increments.entry(ChainAddress(id, DAO_HARDFORK_BENEFICIARY)).or_default() += drained_balance;
         }
         // increment balances
-        self.state
-            .increment_balances(balance_increments.iter().map_while(|(a, b)| Some((ChainAddress(id, *a), *b))))
-            .map_err(|_| BlockValidationError::IncrementBalanceFailed)?;
+        self.state.increment_balances(balance_increments).map_err(|_| BlockValidationError::IncrementBalanceFailed)?;
 
         Ok(())
     }

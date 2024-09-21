@@ -14,7 +14,7 @@ use reth_primitives::{
     Signature, Transaction, TransactionSigned, TransactionSignedEcRecovered, TxEip1559, B256, U256,
 };
 use reth_trie::{root::state_root_unhashed, updates::TrieUpdates, HashedPostState};
-use revm::{db::BundleState, primitives::AccountInfo};
+use revm::{db::BundleState, primitives::{AccountInfo, ChainAddress}};
 use std::{
     collections::HashMap,
     ops::Range,
@@ -272,7 +272,7 @@ impl TestBlockBuilder {
         for tx in &block.body {
             self.signer_execute_account_info.balance -= Self::single_tx_cost();
             bundle_state_builder = bundle_state_builder.state_present_account_info(
-                self.signer,
+                ChainAddress(self.chain_spec.chain.id(), self.signer),
                 AccountInfo {
                     nonce: tx.nonce(),
                     balance: self.signer_execute_account_info.balance,

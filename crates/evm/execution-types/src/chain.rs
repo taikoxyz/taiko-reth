@@ -512,7 +512,7 @@ pub enum ChainSplit {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use reth_primitives::{Receipt, Receipts, TxType, B256};
+    use reth_primitives::{constants::ETHEREUM_CHAIN_ID, Receipt, Receipts, TxType, B256};
     use revm::primitives::{AccountInfo, ChainAddress, HashMap};
 
     #[test]
@@ -549,8 +549,8 @@ mod tests {
 
     #[test]
     fn test_number_split() {
-        let addr1 = ChainAddress(1, Address::new([2; 20]));
-        let addr2 = ChainAddress(1, Address::new([3; 20]));
+        let addr1 = ChainAddress(ETHEREUM_CHAIN_ID, Address::new([2; 20]));
+        let addr2 = ChainAddress(ETHEREUM_CHAIN_ID, Address::new([3; 20]));
         let execution_outcome1 = ExecutionOutcome::new(
             None,
             BundleState::new(
@@ -696,7 +696,7 @@ mod tests {
         // Create an ExecutionOutcome object with the created bundle, receipts, an empty requests
         // vector, and first_block set to 10
         let execution_outcome = ExecutionOutcome {
-            chain_id: 1,
+            chain_id: None,
             bundle: Default::default(),
             receipts,
             requests: vec![],
@@ -716,7 +716,7 @@ mod tests {
 
         // Create an ExecutionOutcome object with a single receipt vector containing receipt1
         let execution_outcome1 = ExecutionOutcome {
-            chain_id:1,
+            chain_id:None,
             bundle: Default::default(),
             receipts: Receipts { receipt_vec: vec![vec![Some(receipt1)]] },
             requests: vec![],

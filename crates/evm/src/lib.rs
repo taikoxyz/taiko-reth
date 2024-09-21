@@ -139,7 +139,7 @@ pub trait ConfigureEvmEnv: Send + Sync + Unpin + Clone + 'static {
     /// Fill [`BlockEnv`] field according to the chain spec and given header
     fn fill_block_env(&self, chain_id: u64, block_env: &mut BlockEnv, header: &Header, after_merge: bool) {
         block_env.number = U256::from(header.number);
-        block_env.coinbase = ChainAddress(block_env.coinbase.0, header.beneficiary);
+        block_env.coinbase = ChainAddress(chain_id, header.beneficiary);
         block_env.timestamp = U256::from(header.timestamp);
         if after_merge {
             block_env.prevrandao = Some(header.mix_hash);

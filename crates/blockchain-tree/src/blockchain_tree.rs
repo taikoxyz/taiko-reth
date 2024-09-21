@@ -15,8 +15,7 @@ use reth_evm::execute::BlockExecutorProvider;
 use reth_execution_errors::{BlockExecutionError, BlockValidationError};
 use reth_execution_types::{Chain, ExecutionOutcome};
 use reth_primitives::{
-    BlockHash, BlockNumHash, BlockNumber, EthereumHardfork, ForkBlock, GotExpected, Receipt,
-    SealedBlock, SealedBlockWithSenders, SealedHeader, StaticFileSegment, B256, U256,
+    BlockHash, BlockNumHash, BlockNumber, BufMut, EthereumHardfork, ForkBlock, GotExpected, Receipt, SealedBlock, SealedBlockWithSenders, SealedHeader, StaticFileSegment, B256, U256
 };
 use reth_provider::{
     BlockExecutionWriter, BlockNumReader, BlockWriter, CanonStateNotification,
@@ -648,8 +647,8 @@ where
                         chain_id = ?chain_id,
                         chain_tip = ?chain.tip().num_hash(),
                         "Prepend unwound block state to blockchain tree chain");
-
-                    chain.prepend_state(cloned_execution_outcome.all_states().clone())
+                    let chain_id = self.externals.provider_factory.chain_spec().chain.id();
+                    chain.prepend_state(cloned_execution_outcome.state(chain_id))
                 }
             }
         }

@@ -372,8 +372,9 @@ impl StorageInner {
 
         trace!(target: "consensus::auto", transactions=?&block.body, "executing transactions");
 
+        let chain_id = chain_spec.chain().id();
         let mut db = SyncStateProviderDatabase::new(
-            Some(chain_spec.chain().id()), 
+            Some(chain_id), 
             StateProviderDatabase::new(
                 provider.latest().map_err(InternalBlockExecutionError::LatestBlock)?,
             )
@@ -383,7 +384,8 @@ impl StorageInner {
         let block_execution_output =
             executor.executor(&mut db).execute((&block, U256::ZERO).into())?;
         let gas_used = block_execution_output.gas_used;
-        let execution_outcome = ExecutionOutcome::from((block_execution_output, chain_spec.chain().id(), block.number));
+        let execution_outcome = ExecutionOutcome::from((block_execution_output, chain_id, block.number))
+            .filter_current_chain();
         let hashed_state = HashedPostState::from_bundle_state(&execution_outcome.all_states().state);
 
         // todo(onbjerg): we should not pass requests around as this is building a block, which

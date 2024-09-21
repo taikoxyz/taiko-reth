@@ -244,7 +244,7 @@ mod tests {
     use reth_evm_ethereum::execute::EthExecutorProvider;
     use reth_primitives::public_key_to_address;
     use reth_provider::{
-        providers::BlockchainProvider, test_utils::create_test_provider_factory_with_chain_spec,
+        providers::BlockchainProvider, test_utils::create_test_provider_factory_with_chain_spec, ExecutionOutcome,
     };
     use reth_testing_utils::generators;
     use secp256k1::Keypair;
@@ -270,8 +270,7 @@ mod tests {
         let blocks_and_execution_outputs =
             blocks_and_execution_outputs(provider_factory, chain_spec, key_pair)?;
         let (block, block_execution_output) = blocks_and_execution_outputs.first().unwrap();
-        let execution_outcome = to_execution_outcome(block.number, block_execution_output);
-
+        let execution_outcome = ExecutionOutcome::from((block_execution_output, chain_spec.chain.id(), block.number));
         // Backfill the first block
         let factory = BackfillJobFactory::new(executor, blockchain_db);
         let job = factory.backfill(1..=1);

@@ -8409,7 +8409,6 @@ dependencies = [
 name = "reth-revm"
 version = "1.0.6"
 dependencies = [
- "auto_impl",
  "reth-chainspec",
  "reth-consensus-common",
  "reth-ethereum-forks",

@@ -13,7 +13,7 @@ use reth_basic_payload_builder::{
     commit_withdrawals, is_better_payload, BuildArguments, BuildOutcome, PayloadBuilder,
     PayloadConfig, WithdrawalsOutcome,
 };
-use reth_errors::RethError;
+use reth_errors::{DatabaseError, ProviderError, RethError};
 use reth_evm::{
     system_calls::{
         post_block_consolidation_requests_contract_call,
@@ -174,7 +174,7 @@ where
         let state_root = db
             .database
             .get_db(chain_spec.chain.id())
-            .unwrap()
+            .ok_or( ProviderError::Database(DatabaseError::GetSyncDatabase(chain_spec.chain.id())))?
             .state_root(HashedPostState::from_bundle_state(&bundle_state.state))
             .map_err(|err| {
                 warn!(target: "payload_builder",
@@ -512,7 +512,7 @@ where
         state_provider
             .db
             .get_db(chain_spec.chain.id())
-            .unwrap()
+            .ok_or( ProviderError::Database(DatabaseError::GetSyncDatabase(chain_spec.chain.id())))?
             .state_root(HashedPostState::from_bundle_state(&execution_outcome.all_states().state))?
     };
 

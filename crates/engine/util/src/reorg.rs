@@ -351,14 +351,11 @@ where
     drop(evm);
 
     if let Some(withdrawals) = &reorg_target.withdrawals {
-        let balance_increments = post_block_withdrawals_balance_increments(
+        state.increment_balances(post_block_withdrawals_balance_increments(
             chain_spec,
             reorg_target.timestamp,
             withdrawals,
-        ).iter()
-        .map(|(addr, inc)| (ChainAddress(chain_spec.chain.id(), *addr), *inc))
-        .collect::<HashMap<_,_>>();
-        state.increment_balances(balance_increments)?;
+        ))?;
     }
 
     // merge all transitions into bundle state, this would apply the withdrawal balance changes

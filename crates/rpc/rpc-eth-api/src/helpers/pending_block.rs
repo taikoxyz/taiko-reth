@@ -394,9 +394,8 @@ pub trait LoadPendingBlock: EthApiTypes {
         );
 
         // increment account balances for withdrawals
-        db.increment_balances(
-            balance_increments.iter().map_while(|(acc, bal)| Some((ChainAddress(chain_id, *acc), *bal)))
-        ).map_err(Self::Error::from_eth_err)?;
+        db.increment_balances(balance_increments).map_err(Self::Error::from_eth_err)?;
+
 
         // merge all transitions into bundle state.
         db.merge_transitions(BundleRetention::PlainState);

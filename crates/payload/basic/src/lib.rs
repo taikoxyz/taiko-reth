@@ -898,9 +898,8 @@ pub fn commit_withdrawals<DB: SyncDatabase<Error = ProviderError>>(
     }
 
     let balance_increments =
-        post_block_withdrawals_balance_increments(chain_spec, timestamp, &withdrawals)
-        .into_iter()
-        .map(|(addr, balance)| (ChainAddress(chain_spec.chain().id(), addr), balance));
+        post_block_withdrawals_balance_increments(chain_spec, timestamp, &withdrawals);
+
 
     db.increment_balances(balance_increments)?;
 
