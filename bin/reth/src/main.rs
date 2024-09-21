@@ -62,7 +62,7 @@ fn main() -> eyre::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use clap::Parser;
+    use clap::{Args, Parser};
 
     /// A helper type to parse Args more easily
     #[derive(Parser)]

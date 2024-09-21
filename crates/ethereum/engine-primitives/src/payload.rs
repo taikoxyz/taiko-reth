@@ -16,7 +16,9 @@ use reth_rpc_types_compat::engine::payload::{
     block_to_payload_v1, block_to_payload_v3, block_to_payload_v4,
     convert_block_to_payload_field_v2,
 };
-use revm_primitives::{BlobExcessGasAndPrice, BlockEnv, CfgEnv, CfgEnvWithHandlerCfg, ChainAddress, SpecId};
+use revm_primitives::{
+    BlobExcessGasAndPrice, BlockEnv, CfgEnv, CfgEnvWithHandlerCfg, ChainAddress, SpecId,
+};
 use std::convert::Infallible;
 
 /// Contains the built payload.

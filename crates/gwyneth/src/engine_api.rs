@@ -118,7 +118,8 @@ pub trait RpcServerArgsExEx {
 impl RpcServerArgsExEx for RpcServerArgs {
     fn with_static_l2_rpc_ip_and_port(mut self) -> Self {
         self.http = true;
-        // On the instance the program is running, we wanna have 10111 exposed as the (exex) L2's RPC port.
+        // On the instance the program is running, we wanna have 10111 exposed as the (exex) L2's
+        // RPC port.
         self.http_addr = Ipv4Addr::new(0, 0, 0, 0).into();
         self.http_port = 10110u16;
         self.ws_port = 10111u16;

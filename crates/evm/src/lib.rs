@@ -17,9 +17,9 @@ use core::ops::Deref;
 use crate::builder::RethEvmBuilder;
 use reth_chainspec::ChainSpec;
 use reth_primitives::{Address, Header, TransactionSigned, TransactionSignedEcRecovered, U256};
-use revm::{SyncDatabase, Evm, GetInspector};
+use revm::{Evm, GetInspector, SyncDatabase};
 use revm_primitives::{
-    BlockEnv, Bytes, CfgEnvWithHandlerCfg, ChainAddress, Env, EnvWithHandlerCfg, SpecId, TxEnv
+    BlockEnv, Bytes, CfgEnvWithHandlerCfg, ChainAddress, Env, EnvWithHandlerCfg, SpecId, TxEnv,
 };
 
 pub mod builder;
@@ -137,7 +137,13 @@ pub trait ConfigureEvmEnv: Send + Sync + Unpin + Clone + 'static {
     );
 
     /// Fill [`BlockEnv`] field according to the chain spec and given header
-    fn fill_block_env(&self, chain_id: u64, block_env: &mut BlockEnv, header: &Header, after_merge: bool) {
+    fn fill_block_env(
+        &self,
+        chain_id: u64,
+        block_env: &mut BlockEnv,
+        header: &Header,
+        after_merge: bool,
+    ) {
         block_env.number = U256::from(header.number);
         block_env.coinbase = ChainAddress(chain_id, header.beneficiary);
         block_env.timestamp = U256::from(header.timestamp);

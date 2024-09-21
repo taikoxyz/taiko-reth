@@ -1,14 +1,18 @@
 use crate::primitives::alloy_primitives::{BlockNumber, StorageKey, StorageValue};
-use core::{fmt::Error, ops::{Deref, DerefMut}};
-use std::collections::HashMap;
+use core::{
+    fmt::Error,
+    ops::{Deref, DerefMut},
+};
 use reth_chainspec::Chain;
 use reth_primitives::{constants::ETHEREUM_CHAIN_ID, Account, Address, B256, U256};
 use reth_storage_api::StateProvider;
 use reth_storage_errors::provider::{ProviderError, ProviderResult};
 use revm::{
-    db::{CacheDB, DatabaseRef}, primitives::{AccountInfo, Bytecode, ChainAddress}, Database, SyncDatabase, SyncDatabaseRef
+    db::{CacheDB, DatabaseRef},
+    primitives::{AccountInfo, Bytecode, ChainAddress},
+    Database, SyncDatabase, SyncDatabaseRef,
 };
-
+use std::collections::HashMap;
 
 #[derive(Debug, Clone)]
 pub struct SyncStateProviderDatabase<DB>(pub HashMap<u64, StateProviderDatabase<DB>>);
@@ -60,7 +64,6 @@ impl<DB> DerefMut for SyncStateProviderDatabase<DB> {
         &mut self.0
     }
 }
-
 
 pub trait SyncEvmStateProvider: Send + Sync {
     /// Get basic account information.
@@ -168,7 +171,6 @@ impl<DB: EvmStateProvider> SyncDatabaseRef for SyncStateProviderDatabase<DB> {
         Ok(self.block_hash(chain_id, number)?.unwrap_or_default())
     }
 }
-
 
 /// A helper trait responsible for providing that necessary state for the EVM execution.
 ///
@@ -324,8 +326,7 @@ impl<DB: EvmStateProvider> DatabaseRef for StateProviderDatabase<DB> {
     }
 }
 
-
-pub struct CachedDBSyncStateProvider<S> (pub CacheDB<SyncStateProviderDatabase<S>>);
+pub struct CachedDBSyncStateProvider<S>(pub CacheDB<SyncStateProviderDatabase<S>>);
 
 impl<S> CachedDBSyncStateProvider<S> {
     pub fn new(db: SyncStateProviderDatabase<S>) -> Self {

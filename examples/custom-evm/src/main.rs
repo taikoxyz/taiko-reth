@@ -14,7 +14,7 @@ use reth::{
         handler::register::EvmHandler,
         inspector_handle_register,
         precompile::{Precompile, PrecompileOutput, PrecompileSpecId},
-        ContextPrecompiles, SyncDatabase, Evm, EvmBuilder, GetInspector,
+        ContextPrecompiles, Evm, EvmBuilder, GetInspector, SyncDatabase,
     },
     tasks::TaskManager,
 };

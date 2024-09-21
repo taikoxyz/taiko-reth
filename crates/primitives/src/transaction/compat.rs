@@ -25,7 +25,8 @@ impl FillTxEnv for TransactionSigned {
                 tx_env.gas_limit = tx.gas_limit;
                 tx_env.gas_price = U256::from(tx.gas_price);
                 tx_env.gas_priority_fee = None;
-                tx_env.transact_to =TransactTo::Call(ChainAddress(tx.chain_id.unwrap(), *tx.to.to().unwrap()));
+                tx_env.transact_to =
+                    TransactTo::Call(ChainAddress(tx.chain_id.unwrap(), *tx.to.to().unwrap()));
                 tx_env.value = tx.value;
                 tx_env.data = tx.input.clone();
                 tx_env.chain_id = tx.chain_id;
@@ -39,7 +40,8 @@ impl FillTxEnv for TransactionSigned {
                 tx_env.gas_limit = tx.gas_limit;
                 tx_env.gas_price = U256::from(tx.gas_price);
                 tx_env.gas_priority_fee = None;
-                tx_env.transact_to = TransactTo::Call(ChainAddress(tx.chain_id, *tx.to.to().unwrap()));
+                tx_env.transact_to =
+                    TransactTo::Call(ChainAddress(tx.chain_id, *tx.to.to().unwrap()));
                 tx_env.value = tx.value;
                 tx_env.data = tx.input.clone();
                 tx_env.chain_id = Some(tx.chain_id);
@@ -53,7 +55,8 @@ impl FillTxEnv for TransactionSigned {
                 tx_env.gas_limit = tx.gas_limit;
                 tx_env.gas_price = U256::from(tx.max_fee_per_gas);
                 tx_env.gas_priority_fee = Some(U256::from(tx.max_priority_fee_per_gas));
-                tx_env.transact_to = TransactTo::Call(ChainAddress(tx.chain_id, *tx.to.to().unwrap()));
+                tx_env.transact_to =
+                    TransactTo::Call(ChainAddress(tx.chain_id, *tx.to.to().unwrap()));
                 tx_env.value = tx.value;
                 tx_env.data = tx.input.clone();
                 tx_env.chain_id = Some(tx.chain_id);
@@ -81,7 +84,8 @@ impl FillTxEnv for TransactionSigned {
                 tx_env.gas_limit = tx.gas_limit;
                 tx_env.gas_price = U256::from(tx.max_fee_per_gas);
                 tx_env.gas_priority_fee = Some(U256::from(tx.max_priority_fee_per_gas));
-                tx_env.transact_to = TransactTo::Call(ChainAddress(tx.chain_id, *tx.to.to().unwrap()));
+                tx_env.transact_to =
+                    TransactTo::Call(ChainAddress(tx.chain_id, *tx.to.to().unwrap()));
                 tx_env.value = tx.value;
                 tx_env.data = tx.input.clone();
                 tx_env.chain_id = Some(tx.chain_id);
@@ -98,7 +102,8 @@ impl FillTxEnv for TransactionSigned {
                 tx_env.gas_limit = tx.gas_limit;
                 tx_env.gas_price = U256::ZERO;
                 tx_env.gas_priority_fee = None;
-                tx_env.transact_to = TransactTo::Call(ChainAddress(tx.chain_id, *tx.to.to().unwrap()));
+                tx_env.transact_to =
+                    TransactTo::Call(ChainAddress(tx.chain_id, *tx.to.to().unwrap()));
                 tx_env.value = tx.value;
                 tx_env.data = tx.input.clone();
                 tx_env.chain_id = None;

@@ -240,7 +240,11 @@ pub fn apply_block_overrides(chain_id: u64, overrides: BlockOverrides, env: &mut
 }
 
 /// Applies the given state overrides (a set of [`AccountOverride`]) to the [`CacheDB`].
-pub fn apply_state_overrides<DB>(chain_id: u64, overrides: StateOverride, db: &mut CacheDB<DB>) -> EthResult<()>
+pub fn apply_state_overrides<DB>(
+    chain_id: u64,
+    overrides: StateOverride,
+    db: &mut CacheDB<DB>,
+) -> EthResult<()>
 where
     DB: SyncDatabaseRef,
     EthApiError: From<<DB as SyncDatabaseRef>::Error>,
@@ -261,8 +265,8 @@ where
     DB: SyncDatabaseRef,
     EthApiError: From<<DB as SyncDatabaseRef>::Error>,
 {
-    // we need to fetch the account via the `SyncDatabaseRef` to not update the state of the account,
-    // which is modified via `Database::basic_ref`
+    // we need to fetch the account via the `SyncDatabaseRef` to not update the state of the
+    // account, which is modified via `Database::basic_ref`
     let mut account_info = SyncDatabaseRef::basic_ref(db, account)?.unwrap_or_default();
 
     if let Some(nonce) = account_override.nonce {

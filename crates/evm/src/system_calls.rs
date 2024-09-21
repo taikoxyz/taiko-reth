@@ -20,7 +20,8 @@ use reth_execution_errors::{BlockExecutionError, BlockValidationError};
 use reth_primitives::{Buf, Request};
 use revm::{interpreter::Host, DatabaseCommit, Evm, SyncDatabase};
 use revm_primitives::{
-    Address, BlockEnv, Bytes, CfgEnvWithHandlerCfg, ChainAddress, EnvWithHandlerCfg, ExecutionResult, FixedBytes, ResultAndState, B256
+    Address, BlockEnv, Bytes, CfgEnvWithHandlerCfg, ChainAddress, EnvWithHandlerCfg,
+    ExecutionResult, FixedBytes, ResultAndState, B256,
 };
 
 /// Apply the [EIP-2935](https://eips.ethereum.org/EIPS/eip-2935) pre block contract call.

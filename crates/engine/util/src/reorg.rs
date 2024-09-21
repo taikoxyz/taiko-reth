@@ -272,7 +272,10 @@ where
     // Configure state
     let state_provider = provider.state_by_block_hash(reorg_target.parent_hash)?;
     let mut state = State::builder()
-        .with_database_ref(SyncStateProviderDatabase::new(None, StateProviderDatabase::new(&state_provider)))
+        .with_database_ref(SyncStateProviderDatabase::new(
+            None,
+            StateProviderDatabase::new(&state_provider),
+        ))
         .with_bundle_update()
         .build();
 

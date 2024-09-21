@@ -1,6 +1,7 @@
 use crate::{chain, BlockExecutionOutput};
 use reth_primitives::{
-    constants::ETHEREUM_CHAIN_ID, logs_bloom, Account, Address, BlockNumber, Bloom, Bytecode, Log, Receipt, Receipts, Requests, StorageEntry, B256, MAINNET_GENESIS_HASH, U256
+    constants::ETHEREUM_CHAIN_ID, logs_bloom, Account, Address, BlockNumber, Bloom, Bytecode, Log,
+    Receipt, Receipts, Requests, StorageEntry, B256, MAINNET_GENESIS_HASH, U256,
 };
 use reth_trie::HashedPostState;
 use revm::{
@@ -68,7 +69,6 @@ pub type AccountRevertInit = (Option<Option<Account>>, Vec<StorageEntry>);
 pub type RevertsInit = HashMap<BlockNumber, HashMap<Address, AccountRevertInit>>;
 
 impl ExecutionOutcome {
-
     // FIX(Cecilia): new(chain_id: u64, ...) -> Self
 
     /// Creates a new `ExecutionOutcome`.
@@ -123,7 +123,9 @@ impl ExecutionOutcome {
                     )
                 })
             }),
-            contracts_init.into_iter().map(|(code_hash, bytecode)| ((chain_id_inner, code_hash), bytecode.0)),
+            contracts_init
+                .into_iter()
+                .map(|(code_hash, bytecode)| ((chain_id_inner, code_hash), bytecode.0)),
         );
 
         Self { chain_id, bundle, receipts, first_block, requests }
@@ -142,7 +144,7 @@ impl ExecutionOutcome {
         }
     }
 
-    /// Filter the ExecutionOutcome for the current chain 
+    /// Filter the ExecutionOutcome for the current chain
     /// if chain_id is not set, default to Ethereum.
     pub fn filter_current_chain(&self) -> Self {
         Self {
@@ -195,7 +197,9 @@ impl ExecutionOutcome {
     /// Only support the account of current chain, or default to Ethereum.
     pub fn account(&self, address: &Address) -> Option<Option<Account>> {
         let chain_id = self.chain_id.unwrap_or(ETHEREUM_CHAIN_ID);
-        self.bundle.account(&ChainAddress(chain_id, *address)).map(|a| a.info.clone().map(Into::into))
+        self.bundle
+            .account(&ChainAddress(chain_id, *address))
+            .map(|a| a.info.clone().map(Into::into))
     }
 
     /// Get storage if value is known.
@@ -203,7 +207,9 @@ impl ExecutionOutcome {
     /// This means that depending on status we can potentially return `U256::ZERO`.
     pub fn storage(&self, address: &Address, storage_key: U256) -> Option<U256> {
         let chain_id = self.chain_id.unwrap_or(ETHEREUM_CHAIN_ID);
-        self.bundle.account(&ChainAddress(chain_id, *address)).and_then(|a| a.storage_slot(storage_key))
+        self.bundle
+            .account(&ChainAddress(chain_id, *address))
+            .and_then(|a| a.storage_slot(storage_key))
     }
 
     /// Return bytecode if known.
@@ -444,7 +450,12 @@ mod tests {
     fn test_initialisation() {
         // Create a new BundleState object with initial data
         let bundle = BundleState::new(
-            vec![(ChainAddress(CHAIN_ID, Address::new([2; 20])), None, Some(AccountInfo::default()), HashMap::default())],
+            vec![(
+                ChainAddress(CHAIN_ID, Address::new([2; 20])),
+                None,
+                Some(AccountInfo::default()),
+                HashMap::default(),
+            )],
             vec![vec![(ChainAddress(CHAIN_ID, Address::new([2; 20])), None, vec![])]],
             vec![],
         );
@@ -502,7 +513,13 @@ mod tests {
 
         // Assert that creating a new ExecutionOutcome using the constructor matches exec_res
         assert_eq!(
-            ExecutionOutcome::new(Some(CHAIN_ID), bundle, receipts.clone(), first_block, requests.clone()),
+            ExecutionOutcome::new(
+                Some(CHAIN_ID),
+                bundle,
+                receipts.clone(),
+                first_block,
+                requests.clone()
+            ),
             exec_res
         );
 
@@ -748,8 +765,13 @@ mod tests {
 
         // Create a ExecutionOutcome object with the created bundle, receipts, requests, and
         // first_block
-        let mut exec_res =
-            ExecutionOutcome { chain_id: Some(CHAIN_ID), bundle: Default::default(), receipts, requests, first_block };
+        let mut exec_res = ExecutionOutcome {
+            chain_id: Some(CHAIN_ID),
+            bundle: Default::default(),
+            receipts,
+            requests,
+            first_block,
+        };
 
         // Assert that the revert_to method returns true when reverting to the initial block number.
         assert!(exec_res.revert_to(123));
@@ -802,8 +824,13 @@ mod tests {
         let first_block = 123;
 
         // Create an ExecutionOutcome object.
-        let mut exec_res =
-            ExecutionOutcome { chain_id: Some(CHAIN_ID), bundle: Default::default(), receipts, requests, first_block };
+        let mut exec_res = ExecutionOutcome {
+            chain_id: Some(CHAIN_ID),
+            bundle: Default::default(),
+            receipts,
+            requests,
+            first_block,
+        };
 
         // Extend the ExecutionOutcome object by itself.
         exec_res.extend(exec_res.clone());
@@ -864,8 +891,13 @@ mod tests {
 
         // Create a ExecutionOutcome object with the created bundle, receipts, requests, and
         // first_block
-        let exec_res =
-            ExecutionOutcome { chain_id: Some(CHAIN_ID), bundle: Default::default(), receipts, requests, first_block };
+        let exec_res = ExecutionOutcome {
+            chain_id: Some(CHAIN_ID),
+            bundle: Default::default(),
+            receipts,
+            requests,
+            first_block,
+        };
 
         // Split the ExecutionOutcome at block number 124
         let result = exec_res.clone().split_at(124);

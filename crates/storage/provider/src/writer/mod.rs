@@ -953,8 +953,13 @@ mod tests {
         )]));
         init_state.merge_transitions(BundleRetention::Reverts);
 
-        let outcome =
-            ExecutionOutcome::new(None, init_state.take_bundle(), Receipts::default(), 0, Vec::new());
+        let outcome = ExecutionOutcome::new(
+            None,
+            init_state.take_bundle(),
+            Receipts::default(),
+            0,
+            Vec::new(),
+        );
         let mut writer = UnifiedStorageWriter::from_database(&provider);
         writer
             .write_to_storage(outcome, OriginalValuesKnown::Yes)
@@ -1267,8 +1272,13 @@ mod tests {
             },
         )]));
         init_state.merge_transitions(BundleRetention::Reverts);
-        let outcome =
-            ExecutionOutcome::new(None, init_state.take_bundle(), Receipts::default(), 0, Vec::new());
+        let outcome = ExecutionOutcome::new(
+            None,
+            init_state.take_bundle(),
+            Receipts::default(),
+            0,
+            Vec::new(),
+        );
         let mut writer = UnifiedStorageWriter::from_database(&provider);
         writer
             .write_to_storage(outcome, OriginalValuesKnown::Yes)

@@ -28,12 +28,16 @@ use reth_provider::{
     ReceiptProvider, StateProviderFactory,
 };
 use reth_revm::{
-    database::{StateProviderDatabase, SyncStateProviderDatabase}, state_change::post_block_withdrawals_balance_increments,
+    database::{StateProviderDatabase, SyncStateProviderDatabase},
+    state_change::post_block_withdrawals_balance_increments,
 };
 use reth_rpc_eth_types::{EthApiError, PendingBlock, PendingBlockEnv, PendingBlockEnvOrigin};
 use reth_transaction_pool::{BestTransactionsAttributes, TransactionPool};
 use reth_trie::HashedPostState;
-use revm::{db::{states::bundle_state::BundleRetention, State}, DatabaseCommit};
+use revm::{
+    db::{states::bundle_state::BundleRetention, State},
+    DatabaseCommit,
+};
 use revm_primitives::ChainAddress;
 use tokio::sync::Mutex;
 use tracing::debug;
@@ -237,7 +241,10 @@ pub trait LoadPendingBlock: EthApiTypes {
             .provider()
             .history_by_block_hash(parent_hash)
             .map_err(Self::Error::from_eth_err)?;
-        let state = SyncStateProviderDatabase::new(Some(cfg.chain_id), StateProviderDatabase::new(state_provider));
+        let state = SyncStateProviderDatabase::new(
+            Some(cfg.chain_id),
+            StateProviderDatabase::new(state_provider),
+        );
         let mut db = State::builder().with_database(state).with_bundle_update().build();
 
         let chain_id = cfg.chain_id;
@@ -396,7 +403,6 @@ pub trait LoadPendingBlock: EthApiTypes {
         // increment account balances for withdrawals
         db.increment_balances(balance_increments).map_err(Self::Error::from_eth_err)?;
 
-
         // merge all transitions into bundle state.
         db.merge_transitions(BundleRetention::PlainState);
 
@@ -406,8 +412,10 @@ pub trait LoadPendingBlock: EthApiTypes {
             vec![receipts.clone()].into(),
             block_number,
             Vec::new(),
-        ).filter_current_chain();
-        let hashed_state = HashedPostState::from_bundle_state(&execution_outcome.current_state().state);
+        )
+        .filter_current_chain();
+        let hashed_state =
+            HashedPostState::from_bundle_state(&execution_outcome.current_state().state);
 
         let receipts_root = self.receipts_root(&block_env, &execution_outcome, block_number);
 
@@ -416,12 +424,14 @@ pub trait LoadPendingBlock: EthApiTypes {
 
         // calculate the state root
         let state_provider = &db.database;
-        let state_root =
-            state_provider
-                .get_db(chain_spec.chain().id())
-                .ok_or(ProviderError::Database(DatabaseError::Other("Database not found".to_string())).into())?
-                .state_root(hashed_state)
-                .map_err(Self::Error::from_eth_err)?;
+        let state_root = state_provider
+            .get_db(chain_spec.chain().id())
+            .ok_or(
+                ProviderError::Database(DatabaseError::Other("Database not found".to_string()))
+                    .into(),
+            )?
+            .state_root(hashed_state)
+            .map_err(Self::Error::from_eth_err)?;
 
         // create the block header
         let transactions_root = calculate_transaction_root(&executed_txs);

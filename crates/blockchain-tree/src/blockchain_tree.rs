@@ -15,7 +15,8 @@ use reth_evm::execute::BlockExecutorProvider;
 use reth_execution_errors::{BlockExecutionError, BlockValidationError};
 use reth_execution_types::{Chain, ExecutionOutcome};
 use reth_primitives::{
-    BlockHash, BlockNumHash, BlockNumber, BufMut, EthereumHardfork, ForkBlock, GotExpected, Receipt, SealedBlock, SealedBlockWithSenders, SealedHeader, StaticFileSegment, B256, U256
+    BlockHash, BlockNumHash, BlockNumber, BufMut, EthereumHardfork, ForkBlock, GotExpected,
+    Receipt, SealedBlock, SealedBlockWithSenders, SealedHeader, StaticFileSegment, B256, U256,
 };
 use reth_provider::{
     BlockExecutionWriter, BlockNumReader, BlockWriter, CanonStateNotification,

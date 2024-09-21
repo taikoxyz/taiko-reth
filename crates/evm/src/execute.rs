@@ -151,7 +151,8 @@ mod tests {
 
     impl BlockExecutorProvider for TestExecutorProvider {
         type Executor<DB: SyncDatabase<Error: Into<ProviderError> + Display>> = TestExecutor<DB>;
-        type BatchExecutor<DB: SyncDatabase<Error: Into<ProviderError> + Display>> = TestExecutor<DB>;
+        type BatchExecutor<DB: SyncDatabase<Error: Into<ProviderError> + Display>> =
+            TestExecutor<DB>;
 
         fn executor<DB>(&self, _db: DB) -> Self::Executor<DB>
         where

@@ -25,7 +25,8 @@ use reth_evm::{
 use reth_evm_ethereum::{eip6110::parse_deposits_from_receipts, EthEvmConfig};
 use reth_execution_types::ExecutionOutcome;
 use reth_payload_builder::{
-    database::to_sync_cached_reads, error::PayloadBuilderError, EthBuiltPayload, EthPayloadBuilderAttributes
+    database::to_sync_cached_reads, error::PayloadBuilderError, EthBuiltPayload,
+    EthPayloadBuilderAttributes,
 };
 use reth_primitives::{
     constants::{
@@ -110,7 +111,12 @@ where
             err
         })?;
         let mut db = State::builder()
-            .with_database((SyncStateProviderDatabase::new(Some(chain_spec.chain.id()), StateProviderDatabase::new(state))))
+            .with_database(
+                (SyncStateProviderDatabase::new(
+                    Some(chain_spec.chain.id()),
+                    StateProviderDatabase::new(state),
+                )),
+            )
             .with_bundle_update()
             .build();
 
@@ -174,7 +180,7 @@ where
         let state_root = db
             .database
             .get_db(chain_spec.chain.id())
-            .ok_or( ProviderError::Database(DatabaseError::GetSyncDatabase(chain_spec.chain.id())))?
+            .ok_or(ProviderError::Database(DatabaseError::GetSyncDatabase(chain_spec.chain.id())))?
             .state_root(HashedPostState::from_bundle_state(&bundle_state.state))
             .map_err(|err| {
                 warn!(target: "payload_builder",
@@ -291,8 +297,10 @@ where
     let state_provider = client.state_by_block_hash(parent_block.hash())?;
     let state = SyncStateProviderDatabase::new(None, StateProviderDatabase::new(state_provider));
     let mut sync_cached_reads = to_sync_cached_reads(cached_reads, chain_spec.chain.id());
-    let mut db =
-        State::builder().with_database_ref(sync_cached_reads.as_db(state)).with_bundle_update().build();
+    let mut db = State::builder()
+        .with_database_ref(sync_cached_reads.as_db(state))
+        .with_bundle_update()
+        .build();
 
     debug!(target: "payload_builder", id=%attributes.id, parent_hash = ?parent_block.hash(), parent_number = parent_block.number, "building new payload");
     let mut cumulative_gas_used = 0;
@@ -457,7 +465,10 @@ where
     // check if we have a better block
     if !is_better_payload(best_payload.as_ref(), total_fees) {
         // can skip building the block
-        return Ok(BuildOutcome::Aborted { fees: total_fees, cached_reads: sync_cached_reads.into() })
+        return Ok(BuildOutcome::Aborted {
+            fees: total_fees,
+            cached_reads: sync_cached_reads.into(),
+        })
     }
 
     // calculate the requests and the requests root
@@ -512,7 +523,7 @@ where
         state_provider
             .db
             .get_db(chain_spec.chain.id())
-            .ok_or( ProviderError::Database(DatabaseError::GetSyncDatabase(chain_spec.chain.id())))?
+            .ok_or(ProviderError::Database(DatabaseError::GetSyncDatabase(chain_spec.chain.id())))?
             .state_root(HashedPostState::from_bundle_state(&execution_outcome.all_states().state))?
     };
 

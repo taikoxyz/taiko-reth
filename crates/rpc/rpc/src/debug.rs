@@ -102,9 +102,10 @@ where
             .spawn_with_state_at_block(at, move |state| {
                 let block_hash = at.as_block_hash();
                 let mut results = Vec::with_capacity(transactions.len());
-                let mut db = CacheDB::new(
-                    SyncStateProviderDatabase::new(Some(cfg.chain_id), StateProviderDatabase::new(state))
-                );
+                let mut db = CacheDB::new(SyncStateProviderDatabase::new(
+                    Some(cfg.chain_id),
+                    StateProviderDatabase::new(state),
+                ));
                 let mut transactions = transactions.into_iter().enumerate().peekable();
                 while let Some((index, tx)) = transactions.next() {
                     let tx_hash = tx.hash;
@@ -246,9 +247,10 @@ where
                 // configure env for the target transaction
                 let tx = transaction.into_recovered();
 
-                let mut db = CacheDB::new(
-                    SyncStateProviderDatabase::new(Some(cfg.chain_id), StateProviderDatabase::new(state))
-                );
+                let mut db = CacheDB::new(SyncStateProviderDatabase::new(
+                    Some(cfg.chain_id),
+                    StateProviderDatabase::new(state),
+                ));
                 // replay all transactions prior to the targeted transaction
                 let index = this.eth_api().replay_transactions_until(
                     &mut db,
@@ -500,9 +502,10 @@ where
             .spawn_with_state_at_block(at.into(), move |state| {
                 // the outer vec for the bundles
                 let mut all_bundles = Vec::with_capacity(bundles.len());
-                let mut db = CacheDB::new(
-                    SyncStateProviderDatabase::new(Some(cfg.chain_id), StateProviderDatabase::new(state))
-                );
+                let mut db = CacheDB::new(SyncStateProviderDatabase::new(
+                    Some(cfg.chain_id),
+                    StateProviderDatabase::new(state),
+                ));
 
                 if replay_block_txs {
                     // only need to replay the transactions in the block if not all transactions are
@@ -589,7 +592,10 @@ where
             .spawn_with_state_at_block(block.parent_hash.into(), move |state| {
                 let evm_config = Call::evm_config(this.eth_api()).clone();
                 let mut db = StateBuilder::new()
-                    .with_database(SyncStateProviderDatabase::new(None, StateProviderDatabase::new(state)))
+                    .with_database(SyncStateProviderDatabase::new(
+                        None,
+                        StateProviderDatabase::new(state),
+                    ))
                     .with_bundle_update()
                     .build();
 
@@ -751,7 +757,7 @@ where
                         return Ok((frame.into(), res.state))
                     }
                     // FIX(Cecilia): fucking alloy
-                    _ => unimplemented!()
+                    _ => unimplemented!(),
                 },
                 #[cfg(not(feature = "js-tracer"))]
                 GethDebugTracerType::JsTracer(_) => {

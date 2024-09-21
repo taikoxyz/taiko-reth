@@ -5,7 +5,10 @@
 use reth_chainspec::Chain;
 use reth_errors::ProviderResult;
 use reth_primitives::{Address, B256, U256};
-use reth_revm::{database::SyncStateProviderDatabase, db::CacheDB, DatabaseRef, Database, SyncDatabaseRef, SyncDatabase};
+use reth_revm::{
+    database::SyncStateProviderDatabase, db::CacheDB, Database, DatabaseRef, SyncDatabase,
+    SyncDatabaseRef,
+};
 use reth_storage_api::StateProvider;
 use reth_trie::HashedStorage;
 use revm_primitives::ChainAddress;
@@ -166,15 +169,15 @@ impl<'a, 'b> SyncDatabase for StateCacheDbRefMutWrapper<'a, 'b> {
         self.0.basic(address)
     }
 
-    fn code_by_hash(&mut self, chain_id: u64, code_hash: B256) -> Result<revm_primitives::Bytecode, Self::Error> {
+    fn code_by_hash(
+        &mut self,
+        chain_id: u64,
+        code_hash: B256,
+    ) -> Result<revm_primitives::Bytecode, Self::Error> {
         self.0.code_by_hash(chain_id, code_hash)
     }
 
-    fn storage(
-        &mut self,
-        address: ChainAddress,
-        index: U256,
-    ) -> Result<U256, Self::Error> {
+    fn storage(&mut self, address: ChainAddress, index: U256) -> Result<U256, Self::Error> {
         self.0.storage(address, index)
     }
 
@@ -193,19 +196,19 @@ impl<'a, 'b> SyncDatabaseRef for StateCacheDbRefMutWrapper<'a, 'b> {
         self.0.basic_ref(address)
     }
 
-    fn code_by_hash_ref(&self, chain_id: u64, code_hash: B256) -> Result<revm_primitives::Bytecode, Self::Error> {
+    fn code_by_hash_ref(
+        &self,
+        chain_id: u64,
+        code_hash: B256,
+    ) -> Result<revm_primitives::Bytecode, Self::Error> {
         self.0.code_by_hash_ref(chain_id, code_hash)
     }
 
-    fn storage_ref(
-        &self,
-        address: ChainAddress,
-        index: U256,
-    ) -> Result<U256, Self::Error> {
+    fn storage_ref(&self, address: ChainAddress, index: U256) -> Result<U256, Self::Error> {
         self.0.storage_ref(address, index)
     }
 
-    fn block_hash_ref(&self,chain_id: u64, number: u64) -> Result<B256, Self::Error> {
+    fn block_hash_ref(&self, chain_id: u64, number: u64) -> Result<B256, Self::Error> {
         self.0.block_hash_ref(chain_id, number)
     }
 }
@@ -219,8 +222,8 @@ impl<'a, 'b> SyncDatabaseRef for StateCacheDbRefMutWrapper<'a, 'b> {
 //         self.0.basic(address)
 //     }
 
-//     fn code_by_hash(&mut self, code_hash: B256) -> Result<revm_primitives::Bytecode, Self::Error> {
-//         self.0.code_by_hash(code_hash)
+//     fn code_by_hash(&mut self, code_hash: B256) -> Result<revm_primitives::Bytecode, Self::Error>
+// {         self.0.code_by_hash(code_hash)
 //     }
 
 //     fn storage(
@@ -246,8 +249,8 @@ impl<'a, 'b> SyncDatabaseRef for StateCacheDbRefMutWrapper<'a, 'b> {
 //         self.0.basic_ref(address)
 //     }
 
-//     fn code_by_hash_ref(&self, code_hash: B256) -> Result<revm_primitives::Bytecode, Self::Error> {
-//         self.0.code_by_hash_ref(code_hash)
+//     fn code_by_hash_ref(&self, code_hash: B256) -> Result<revm_primitives::Bytecode, Self::Error>
+// {         self.0.code_by_hash_ref(code_hash)
 //     }
 
 //     fn storage_ref(

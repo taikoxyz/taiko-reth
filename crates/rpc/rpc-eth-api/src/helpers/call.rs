@@ -7,13 +7,20 @@ use crate::{AsEthApiError, FromEthApiError, FromEvmError, IntoEthApiError};
 use futures::{io::Chain, Future};
 use reth_evm::{ConfigureEvm, ConfigureEvmEnv};
 use reth_primitives::{
-    constants::ETHEREUM_CHAIN_ID, revm_primitives::{
+    constants::ETHEREUM_CHAIN_ID,
+    revm_primitives::{
         BlockEnv, CfgEnvWithHandlerCfg, EnvWithHandlerCfg, ExecutionResult, HaltReason,
         ResultAndState, TransactTo, TxEnv,
-    }, transaction::AccessListResult, Bytes, TransactionSignedEcRecovered, TxKind, B256, U256
+    },
+    transaction::AccessListResult,
+    Bytes, TransactionSignedEcRecovered, TxKind, B256, U256,
 };
 use reth_provider::{ChainSpecProvider, StateProvider};
-use reth_revm::{database::{CachedDBSyncStateProvider, StateProviderDatabase, SyncStateProviderDatabase}, db::CacheDB, DatabaseRef};
+use reth_revm::{
+    database::{CachedDBSyncStateProvider, StateProviderDatabase, SyncStateProviderDatabase},
+    db::CacheDB,
+    DatabaseRef,
+};
 use reth_rpc_eth_types::{
     cache::db::{StateCacheDbRefMutWrapper, StateProviderTraitObjWrapper},
     error::ensure_success,
@@ -130,7 +137,10 @@ pub trait EthCall: Call + LoadPendingBlock {
             let this = self.clone();
             self.spawn_with_state_at_block(at.into(), move |state| {
                 let mut results = Vec::with_capacity(transactions.len());
-                let mut db = CacheDB::new(SyncStateProviderDatabase::new(Some(cfg.chain_id), StateProviderDatabase::new(state)));
+                let mut db = CacheDB::new(SyncStateProviderDatabase::new(
+                    Some(cfg.chain_id),
+                    StateProviderDatabase::new(state),
+                ));
 
                 if replay_block_txs {
                     // only need to replay the transactions in the block if not all transactions are
@@ -239,7 +249,10 @@ pub trait EthCall: Call + LoadPendingBlock {
         // <https://github.com/ethereum/go-ethereum/blob/8990c92aea01ca07801597b00c0d83d4e2d9b811/internal/ethapi/api.go#L1476-L1476>
         env.cfg.disable_base_fee = true;
 
-        let mut db = CacheDB::new(SyncStateProviderDatabase::new(Some(chain_id), StateProviderDatabase::new(state)));
+        let mut db = CacheDB::new(SyncStateProviderDatabase::new(
+            Some(chain_id),
+            StateProviderDatabase::new(state),
+        ));
 
         if request.gas.is_none() && env.tx.gas_price > U256::ZERO {
             // no gas limit was provided in the request, so we need to cap the request's gas limit
@@ -250,8 +263,11 @@ pub trait EthCall: Call + LoadPendingBlock {
         let to = if let Some(TxKind::Call(to)) = request.to {
             to
         } else {
-            let nonce =
-                db.basic_ref(ChainAddress(chain_id, from)).map_err(Self::Error::from_eth_err)?.unwrap_or_default().nonce;
+            let nonce = db
+                .basic_ref(ChainAddress(chain_id, from))
+                .map_err(Self::Error::from_eth_err)?
+                .unwrap_or_default()
+                .nonce;
             from.create(nonce)
         };
 
@@ -390,8 +406,10 @@ pub trait Call: LoadState + SpawnBlocking {
             let this = self.clone();
             self.spawn_tracing(move |_| {
                 let state = this.state_at_block_id(at)?;
-                let mut db =
-                    CacheDB::new(SyncStateProviderDatabase::new(Some(cfg.chain_id), StateProviderDatabase::new(StateProviderTraitObjWrapper(&state))));
+                let mut db = CacheDB::new(SyncStateProviderDatabase::new(
+                    Some(cfg.chain_id),
+                    StateProviderDatabase::new(StateProviderTraitObjWrapper(&state)),
+                ));
 
                 let env = this.prepare_call_env(
                     cfg,
@@ -445,7 +463,10 @@ pub trait Call: LoadState + SpawnBlocking {
 
             let this = self.clone();
             self.spawn_with_state_at_block(parent_block.into(), move |state| {
-                let mut db = CacheDB::new(SyncStateProviderDatabase::new(Some(cfg.chain_id), StateProviderDatabase::new(state)));
+                let mut db = CacheDB::new(SyncStateProviderDatabase::new(
+                    Some(cfg.chain_id),
+                    StateProviderDatabase::new(state),
+                ));
 
                 // replay all transactions prior to the targeted transaction
                 this.replay_transactions_until(
@@ -577,13 +598,15 @@ pub trait Call: LoadState + SpawnBlocking {
         // Configure the evm env
         let mut env = self.build_call_evm_env(cfg, block, request)?;
         // FIX(Cecilia): hack to get the write db
-        let mut sync_db = CachedDBSyncStateProvider::new(
-            SyncStateProviderDatabase::new(Some(chain_id), StateProviderDatabase::new(state))
-        );
+        let mut sync_db = CachedDBSyncStateProvider::new(SyncStateProviderDatabase::new(
+            Some(chain_id),
+            StateProviderDatabase::new(state),
+        ));
 
         // Apply any state overrides if specified.
         if let Some(state_override) = state_override {
-            apply_state_overrides(chain_id, state_override, &mut sync_db.0).map_err(Self::Error::from_eth_err)?;
+            apply_state_overrides(chain_id, state_override, &mut sync_db.0)
+                .map_err(Self::Error::from_eth_err)?;
         }
 
         // Optimize for simple transfer transactions, potentially reducing the gas estimate.
@@ -616,8 +639,9 @@ pub trait Call: LoadState + SpawnBlocking {
         // The caller allowance is check by doing `(account.balance - tx.value) / tx.gas_price`
         if env.tx.gas_price > U256::ZERO {
             // cap the highest gas limit by max gas caller can afford with given gas price
-            highest_gas_limit = highest_gas_limit
-                .min(caller_gas_allowance(&mut sync_db, &env.tx).map_err(Self::Error::from_eth_err)?);
+            highest_gas_limit = highest_gas_limit.min(
+                caller_gas_allowance(&mut sync_db, &env.tx).map_err(Self::Error::from_eth_err)?,
+            );
         }
 
         // We can now normalize the highest gas limit to a u64
@@ -971,8 +995,11 @@ pub trait Call: LoadState + SpawnBlocking {
         if let Some(mut block_overrides) = overrides.block {
             if let Some(block_hashes) = block_overrides.block_hash.take() {
                 // override block hashes
-                db.block_hashes
-                    .extend(block_hashes.into_iter().map(|(num, hash)| ((cfg.chain_id, U256::from(num)), hash)))
+                db.block_hashes.extend(
+                    block_hashes
+                        .into_iter()
+                        .map(|(num, hash)| ((cfg.chain_id, U256::from(num)), hash)),
+                )
             }
             apply_block_overrides(chain_id, *block_overrides, &mut block);
         }
@@ -1010,5 +1037,5 @@ fn convert_tx_kind(kind: TxKind, chain_id: u64) -> TransactTo {
     match kind {
         TxKind::Call(to) => TransactTo::Call(ChainAddress(chain_id, to)),
         TxKind::Create => TransactTo::Create,
-    }  
+    }
 }

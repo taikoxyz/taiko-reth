@@ -210,7 +210,8 @@ pub fn insert_state<'a, 'b, DB: Database>(
         Receipts::default(),
         block,
         Vec::new(),
-    ).filter_current_chain();
+    )
+    .filter_current_chain();
 
     let mut storage_writer = UnifiedStorageWriter::from_database(provider);
     storage_writer.write_to_storage(execution_outcome, OriginalValuesKnown::Yes)?;

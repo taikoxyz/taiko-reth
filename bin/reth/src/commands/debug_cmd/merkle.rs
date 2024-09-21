@@ -18,9 +18,9 @@ use reth_network_api::NetworkInfo;
 use reth_network_p2p::full_block::FullBlockClient;
 use reth_primitives::BlockHashOrNumber;
 use reth_provider::{
-    StaticFileProviderFactory,
     writer::UnifiedStorageWriter, BlockNumReader, BlockWriter, ChainSpecProvider, HeaderProvider,
     LatestStateProviderRef, OriginalValuesKnown, ProviderError, ProviderFactory, StateWriter,
+    StaticFileProviderFactory,
 };
 use reth_revm::database::{StateProviderDatabase, SyncStateProviderDatabase};
 use reth_stages::{

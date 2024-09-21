@@ -3,7 +3,7 @@
 #[cfg(not(feature = "std"))]
 use alloc::boxed::Box;
 
-use revm::{inspector_handle_register, SyncDatabase, Evm, EvmBuilder, GetInspector};
+use revm::{inspector_handle_register, Evm, EvmBuilder, GetInspector, SyncDatabase};
 use revm_primitives::EnvWithHandlerCfg;
 
 /// Builder for creating an EVM with a database and environment.
@@ -92,7 +92,10 @@ pub trait EvmFactory {
     /// This does not automatically configure the EVM with [`crate::ConfigureEvmEnv`] methods. It is
     /// up to the caller to call an appropriate method to fill the transaction and block
     /// environment before executing any transactions using the provided EVM.
-    fn evm<DB: SyncDatabase>(self, db: DB) -> Evm<'static, Self::DefaultExternalContext<'static>, DB>
+    fn evm<DB: SyncDatabase>(
+        self,
+        db: DB,
+    ) -> Evm<'static, Self::DefaultExternalContext<'static>, DB>
     where
         Self: Sized,
     {

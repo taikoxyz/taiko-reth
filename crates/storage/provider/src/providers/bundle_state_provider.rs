@@ -1,7 +1,9 @@
 use crate::{
     AccountReader, BlockHashReader, ExecutionDataProvider, StateProvider, StateRootProvider,
 };
-use reth_primitives::{constants::ETHEREUM_CHAIN_ID, Account, Address, BlockNumber, Bytecode, Bytes, B256};
+use reth_primitives::{
+    constants::ETHEREUM_CHAIN_ID, Account, Address, BlockNumber, Bytecode, Bytes, B256,
+};
 use reth_storage_api::{StateProofProvider, StorageRootProvider};
 use reth_storage_errors::provider::ProviderResult;
 use reth_trie::{
@@ -34,17 +36,18 @@ impl<SP: StateProvider, EDP: ExecutionDataProvider> BundleStateProvider<SP, EDP>
     }
 
     pub fn filter_bundle_state(&self) -> HashMap<&ChainAddress, &BundleAccount> {
-        let chain_id = self.block_execution_data_provider.execution_outcome().chain_id.unwrap_or(ETHEREUM_CHAIN_ID);
-        self.block_execution_data_provider.execution_outcome().all_states().state
+        let chain_id = self
+            .block_execution_data_provider
+            .execution_outcome()
+            .chain_id
+            .unwrap_or(ETHEREUM_CHAIN_ID);
+        self.block_execution_data_provider
+            .execution_outcome()
+            .all_states()
+            .state
             .iter()
-            .filter_map(|(a, b)| {
-                if a.0 == chain_id { 
-                    Some((a, b)) 
-                } else {
-                    None
-                }
-            })
-            .collect::<HashMap<_,_>>()
+            .filter_map(|(a, b)| if a.0 == chain_id { Some((a, b)) } else { None })
+            .collect::<HashMap<_, _>>()
     }
 }
 
@@ -134,7 +137,11 @@ impl<SP: StateProvider, EDP: ExecutionDataProvider> StorageRootProvider
         address: Address,
         hashed_storage: HashedStorage,
     ) -> ProviderResult<B256> {
-        let chain_id = self.block_execution_data_provider.execution_outcome().chain_id.unwrap_or(ETHEREUM_CHAIN_ID);
+        let chain_id = self
+            .block_execution_data_provider
+            .execution_outcome()
+            .chain_id
+            .unwrap_or(ETHEREUM_CHAIN_ID);
         let bundle_state = self.block_execution_data_provider.execution_outcome().all_states();
         let mut storage = bundle_state
             .account(&ChainAddress(chain_id, address))

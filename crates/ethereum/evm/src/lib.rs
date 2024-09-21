@@ -15,7 +15,9 @@ extern crate alloc;
 use reth_chainspec::{ChainSpec, Head};
 use reth_evm::{ConfigureEvm, ConfigureEvmEnv};
 use reth_primitives::{transaction::FillTxEnv, Address, Header, TransactionSigned, U256};
-use revm_primitives::{AnalysisKind, Bytes, CfgEnvWithHandlerCfg, ChainAddress, Env, TransactTo, TxEnv, TxKind};
+use revm_primitives::{
+    AnalysisKind, Bytes, CfgEnvWithHandlerCfg, ChainAddress, Env, TransactTo, TxEnv, TxKind,
+};
 
 #[cfg(not(feature = "std"))]
 use alloc::vec::Vec;
@@ -76,7 +78,7 @@ impl ConfigureEvmEnv for EthEvmConfig {
         let chain_id = env.cfg.chain_id;
         let tx = TxEnv {
             caller: ChainAddress(chain_id, caller),
-            transact_to: TransactTo::Call(ChainAddress(chain_id, contract)), 
+            transact_to: TransactTo::Call(ChainAddress(chain_id, contract)),
             // Explicitly set nonce to None so revm does not do any nonce checks
             nonce: None,
             gas_limit: 30_000_000,

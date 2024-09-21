@@ -15,7 +15,8 @@ use reth_rpc_types::mev::{EthCallBundle, EthCallBundleResponse, EthCallBundleTra
 use reth_tasks::pool::BlockingTaskGuard;
 use revm::{
     db::CacheDB,
-    primitives::{ResultAndState, TxEnv}, SyncDatabaseRef,
+    primitives::{ResultAndState, TxEnv},
+    SyncDatabaseRef,
 };
 use revm_primitives::{EnvKzgSettings, EnvWithHandlerCfg, SpecId, MAX_BLOB_GAS_PER_BLOCK};
 
@@ -151,9 +152,10 @@ where
                 let basefee = Some(block_env.basefee.to::<u64>());
                 let chain_id = cfg.chain_id;
                 let env = EnvWithHandlerCfg::new_with_cfg_env(cfg, block_env, TxEnv::default());
-                let db = CacheDB::new(
-                    SyncStateProviderDatabase::new(Some(chain_id), StateProviderDatabase::new(state))
-                );
+                let db = CacheDB::new(SyncStateProviderDatabase::new(
+                    Some(chain_id),
+                    StateProviderDatabase::new(state),
+                ));
 
                 let initial_coinbase = SyncDatabaseRef::basic_ref(&db, coinbase)
                     .map_err(Eth::Error::from_eth_err)?

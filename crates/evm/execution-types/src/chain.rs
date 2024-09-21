@@ -554,12 +554,7 @@ mod tests {
         let execution_outcome1 = ExecutionOutcome::new(
             None,
             BundleState::new(
-                vec![(
-                    addr1,
-                    None,
-                    Some(AccountInfo::default()),
-                    HashMap::default(),
-                )],
+                vec![(addr1, None, Some(AccountInfo::default()), HashMap::default())],
                 vec![vec![(addr1, None, vec![])]],
                 vec![],
             ),
@@ -571,12 +566,7 @@ mod tests {
         let execution_outcome2 = ExecutionOutcome::new(
             None,
             BundleState::new(
-                vec![(
-                    addr2,
-                    None,
-                    Some(AccountInfo::default()),
-                    HashMap::default(),
-                )],
+                vec![(addr2, None, Some(AccountInfo::default()), HashMap::default())],
                 vec![vec![(addr2, None, vec![])]],
                 vec![],
             ),
@@ -716,7 +706,7 @@ mod tests {
 
         // Create an ExecutionOutcome object with a single receipt vector containing receipt1
         let execution_outcome1 = ExecutionOutcome {
-            chain_id:None,
+            chain_id: None,
             bundle: Default::default(),
             receipts: Receipts { receipt_vec: vec![vec![Some(receipt1)]] },
             requests: vec![],

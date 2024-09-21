@@ -19,7 +19,7 @@ use reth::{
     revm::{
         inspector_handle_register,
         interpreter::{Interpreter, OpCode},
-        SyncDatabase, Evm, EvmContext, Inspector,
+        Evm, EvmContext, Inspector, SyncDatabase,
     },
     rpc::{api::eth::helpers::Call, compat::transaction::transaction_to_call_request},
     transaction_pool::TransactionPool,

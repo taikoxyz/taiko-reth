@@ -14,7 +14,10 @@ use reth_primitives::{
     Signature, Transaction, TransactionSigned, TransactionSignedEcRecovered, TxEip1559, B256, U256,
 };
 use reth_trie::{root::state_root_unhashed, updates::TrieUpdates, HashedPostState};
-use revm::{db::BundleState, primitives::{AccountInfo, ChainAddress}};
+use revm::{
+    db::BundleState,
+    primitives::{AccountInfo, ChainAddress},
+};
 use std::{
     collections::HashMap,
     ops::Range,

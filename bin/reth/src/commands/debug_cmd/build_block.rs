@@ -31,7 +31,10 @@ use reth_provider::{
     ProviderFactory, StageCheckpointReader, StateProviderFactory,
 };
 use reth_prune::PruneModes;
-use reth_revm::{database::{StateProviderDatabase, SyncStateProviderDatabase}, primitives::EnvKzgSettings};
+use reth_revm::{
+    database::{StateProviderDatabase, SyncStateProviderDatabase},
+    primitives::EnvKzgSettings,
+};
 use reth_rpc_types::engine::{BlobsBundleV1, PayloadAttributes};
 use reth_stages::StageId;
 use reth_transaction_pool::{
@@ -277,7 +280,7 @@ impl Command {
                 let chain_id = provider_factory.chain_spec().chain.id();
                 let db = SyncStateProviderDatabase::new(
                     Some(chain_id),
-                    StateProviderDatabase::new(blockchain_db.latest()?)
+                    StateProviderDatabase::new(blockchain_db.latest()?),
                 );
                 let executor = block_executor!(provider_factory.chain_spec()).executor(db);
 

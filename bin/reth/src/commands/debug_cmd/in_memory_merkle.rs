@@ -134,7 +134,7 @@ impl Command {
             StateProviderDatabase::new(LatestStateProviderRef::new(
                 provider.tx_ref(),
                 provider_factory.static_file_provider(),
-            ))
+            )),
         );
 
         let executor = block_executor!(provider_factory.chain_spec()).executor(db);
@@ -152,7 +152,8 @@ impl Command {
             )
                 .into(),
         )?;
-        let execution_outcome = ExecutionOutcome::from((block_execution_output, chain_id, block.number));
+        let execution_outcome =
+            ExecutionOutcome::from((block_execution_output, chain_id, block.number));
 
         // Unpacked `BundleState::state_root_slow` function
         let (in_memory_state_root, in_memory_updates) = StateRoot::overlay_root_with_updates(

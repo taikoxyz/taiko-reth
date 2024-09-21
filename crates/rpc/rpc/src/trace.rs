@@ -157,9 +157,10 @@ where
         self.eth_api()
             .spawn_with_state_at_block(at, move |state| {
                 let mut results = Vec::with_capacity(calls.len());
-                let mut db = CacheDB::new(
-                    SyncStateProviderDatabase::new(Some(cfg.chain_id), StateProviderDatabase::new(state))
-                );
+                let mut db = CacheDB::new(SyncStateProviderDatabase::new(
+                    Some(cfg.chain_id),
+                    StateProviderDatabase::new(state),
+                ));
 
                 let mut calls = calls.into_iter().peekable();
 

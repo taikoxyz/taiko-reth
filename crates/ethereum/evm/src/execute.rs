@@ -28,7 +28,8 @@ use reth_revm::{
     state_change::post_block_balance_increments, Evm, State,
 };
 use revm_primitives::{
-    db::{SyncDatabase, DatabaseCommit}, BlockEnv, CfgEnvWithHandlerCfg, ChainAddress, EVMError, EnvWithHandlerCfg, ResultAndState
+    db::{DatabaseCommit, SyncDatabase},
+    BlockEnv, CfgEnvWithHandlerCfg, ChainAddress, EVMError, EnvWithHandlerCfg, ResultAndState,
 };
 
 #[cfg(not(feature = "std"))]
@@ -348,16 +349,21 @@ where
             // drain balances from hardcoded addresses.
             let drained_balance: u128 = self
                 .state
-                .drain_balances(DAO_HARDKFORK_ACCOUNTS.iter().map_while(|a| Some(ChainAddress(id, *a))))
+                .drain_balances(
+                    DAO_HARDKFORK_ACCOUNTS.iter().map_while(|a| Some(ChainAddress(id, *a))),
+                )
                 .map_err(|_| BlockValidationError::IncrementBalanceFailed)?
                 .into_iter()
                 .sum();
 
             // return balance to DAO beneficiary.
-            *balance_increments.entry(ChainAddress(id, DAO_HARDFORK_BENEFICIARY)).or_default() += drained_balance;
+            *balance_increments.entry(ChainAddress(id, DAO_HARDFORK_BENEFICIARY)).or_default() +=
+                drained_balance;
         }
         // increment balances
-        self.state.increment_balances(balance_increments).map_err(|_| BlockValidationError::IncrementBalanceFailed)?;
+        self.state
+            .increment_balances(balance_increments)
+            .map_err(|_| BlockValidationError::IncrementBalanceFailed)?;
 
         Ok(())
     }
@@ -475,19 +481,21 @@ mod tests {
         eip4788::{BEACON_ROOTS_ADDRESS, BEACON_ROOTS_CODE, SYSTEM_ADDRESS},
         eip7002::{WITHDRAWAL_REQUEST_PREDEPLOY_ADDRESS, WITHDRAWAL_REQUEST_PREDEPLOY_CODE},
     };
+    use core::{iter::Chain, sync};
     use reth_chainspec::{ChainSpecBuilder, ForkCondition};
     use reth_primitives::{
         constants::{EMPTY_ROOT_HASH, ETH_TO_WEI},
         keccak256, public_key_to_address, Account, Block, Transaction, TxKind, TxLegacy, B256,
     };
     use reth_revm::{
-        database::{StateProviderDatabase, SyncStateProviderDatabase}, test_utils::StateProviderTest, TransitionState,
+        database::{StateProviderDatabase, SyncStateProviderDatabase},
+        test_utils::StateProviderTest,
+        TransitionState,
     };
     use reth_storage_api::StateProvider;
     use reth_testing_utils::generators::{self, sign_tx_with_key_pair};
     use revm_primitives::{b256, fixed_bytes, Bytes, BLOCKHASH_SERVE_WINDOW};
     use secp256k1::{Keypair, Secp256k1};
-    use core::{iter::Chain, sync};
     use std::collections::HashMap;
 
     fn create_state_provider_with_beacon_root_contract() -> StateProviderTest {
@@ -613,14 +621,19 @@ mod tests {
             timestamp_index % history_buffer_length + history_buffer_length;
 
         // get timestamp storage and compare
-        let timestamp_storage =
-            executor.state.storage(ChainAddress(chain_id, BEACON_ROOTS_ADDRESS), U256::from(timestamp_index)).unwrap();
+        let timestamp_storage = executor
+            .state
+            .storage(ChainAddress(chain_id, BEACON_ROOTS_ADDRESS), U256::from(timestamp_index))
+            .unwrap();
         assert_eq!(timestamp_storage, U256::from(header.timestamp));
 
         // get parent beacon block root storage and compare
         let parent_beacon_block_root_storage = executor
             .state
-            .storage(ChainAddress(chain_id,BEACON_ROOTS_ADDRESS), U256::from(parent_beacon_block_root_index))
+            .storage(
+                ChainAddress(chain_id, BEACON_ROOTS_ADDRESS),
+                U256::from(parent_beacon_block_root_index),
+            )
             .expect("storage value should exist");
         assert_eq!(parent_beacon_block_root_storage, U256::from(0x69));
     }
@@ -726,7 +739,12 @@ mod tests {
             );
 
         // ensure that the nonce of the system address account has not changed
-        let nonce = executor.state_mut().basic(ChainAddress(chain_id, SYSTEM_ADDRESS)).unwrap().unwrap().nonce;
+        let nonce = executor
+            .state_mut()
+            .basic(ChainAddress(chain_id, SYSTEM_ADDRESS))
+            .unwrap()
+            .unwrap()
+            .nonce;
         assert_eq!(nonce, 0);
     }
 
@@ -873,7 +891,10 @@ mod tests {
         // get parent beacon block root storage and compare
         let parent_beacon_block_root_storage = executor
             .state_mut()
-            .storage(ChainAddress(chain_id, BEACON_ROOTS_ADDRESS), U256::from(parent_beacon_block_root_index))
+            .storage(
+                ChainAddress(chain_id, BEACON_ROOTS_ADDRESS),
+                U256::from(parent_beacon_block_root_index),
+            )
             .unwrap();
         assert_eq!(parent_beacon_block_root_storage, U256::from(0x69));
     }
@@ -1050,11 +1071,18 @@ mod tests {
             );
 
         // the hash for the ancestor of the fork activation block should be present
-        assert!(executor.state_mut().basic(ChainAddress(chain_id, HISTORY_STORAGE_ADDRESS)).unwrap().is_some());
+        assert!(executor
+            .state_mut()
+            .basic(ChainAddress(chain_id, HISTORY_STORAGE_ADDRESS))
+            .unwrap()
+            .is_some());
         assert_ne!(
             executor
                 .state_mut()
-                .storage(ChainAddress(chain_id, HISTORY_STORAGE_ADDRESS), U256::from(fork_activation_block - 1))
+                .storage(
+                    ChainAddress(chain_id, HISTORY_STORAGE_ADDRESS),
+                    U256::from(fork_activation_block - 1)
+                )
                 .unwrap(),
             U256::ZERO
         );
@@ -1062,7 +1090,10 @@ mod tests {
         // the hash of the block itself should not be in storage
         assert!(executor
             .state_mut()
-            .storage(ChainAddress(chain_id, HISTORY_STORAGE_ADDRESS), U256::from(fork_activation_block))
+            .storage(
+                ChainAddress(chain_id, HISTORY_STORAGE_ADDRESS),
+                U256::from(fork_activation_block)
+            )
             .unwrap()
             .is_zero());
     }
@@ -1114,7 +1145,11 @@ mod tests {
             );
 
         // the hash for the ancestor of the fork activation block should be present
-        assert!(executor.state_mut().basic(ChainAddress(chain_id, HISTORY_STORAGE_ADDRESS)).unwrap().is_some());
+        assert!(executor
+            .state_mut()
+            .basic(ChainAddress(chain_id, HISTORY_STORAGE_ADDRESS))
+            .unwrap()
+            .is_some());
         assert_ne!(
             executor
                 .state_mut()
@@ -1211,9 +1246,16 @@ mod tests {
             );
 
         // the block hash of genesis should now be in storage, but not block 1
-        assert!(executor.state_mut().basic(ChainAddress(chain_id, HISTORY_STORAGE_ADDRESS)).unwrap().is_some());
+        assert!(executor
+            .state_mut()
+            .basic(ChainAddress(chain_id, HISTORY_STORAGE_ADDRESS))
+            .unwrap()
+            .is_some());
         assert_ne!(
-            executor.state_mut().storage(ChainAddress(chain_id, HISTORY_STORAGE_ADDRESS), U256::ZERO).unwrap(),
+            executor
+                .state_mut()
+                .storage(ChainAddress(chain_id, HISTORY_STORAGE_ADDRESS), U256::ZERO)
+                .unwrap(),
             U256::ZERO
         );
         assert!(executor
@@ -1253,13 +1295,23 @@ mod tests {
             );
 
         // the block hash of genesis and block 1 should now be in storage, but not block 2
-        assert!(executor.state_mut().basic(ChainAddress(chain_id, HISTORY_STORAGE_ADDRESS)).unwrap().is_some());
+        assert!(executor
+            .state_mut()
+            .basic(ChainAddress(chain_id, HISTORY_STORAGE_ADDRESS))
+            .unwrap()
+            .is_some());
         assert_ne!(
-            executor.state_mut().storage(ChainAddress(chain_id, HISTORY_STORAGE_ADDRESS), U256::ZERO).unwrap(),
+            executor
+                .state_mut()
+                .storage(ChainAddress(chain_id, HISTORY_STORAGE_ADDRESS), U256::ZERO)
+                .unwrap(),
             U256::ZERO
         );
         assert_ne!(
-            executor.state_mut().storage(ChainAddress(chain_id, HISTORY_STORAGE_ADDRESS), U256::from(1)).unwrap(),
+            executor
+                .state_mut()
+                .storage(ChainAddress(chain_id, HISTORY_STORAGE_ADDRESS), U256::from(1))
+                .unwrap(),
             U256::ZERO
         );
         assert!(executor

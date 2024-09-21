@@ -28,10 +28,18 @@ use reth_revm::state_change::post_block_withdrawals_balance_increments;
 use reth_tasks::TaskSpawner;
 use reth_transaction_pool::TransactionPool;
 use revm::{
-    db::State, primitives::{BlockEnv, CfgEnvWithHandlerCfg, ChainAddress}, SyncDatabase
+    db::State,
+    primitives::{BlockEnv, CfgEnvWithHandlerCfg, ChainAddress},
+    SyncDatabase,
 };
 use std::{
-    collections::HashMap, fmt, future::Future, ops::Deref, pin::Pin, sync::{atomic::AtomicBool, Arc}, task::{Context, Poll}, time::{Duration, SystemTime, UNIX_EPOCH}
+    fmt,
+    future::Future,
+    ops::Deref,
+    pin::Pin,
+    sync::{atomic::AtomicBool, Arc},
+    task::{Context, Poll},
+    time::{Duration, SystemTime, UNIX_EPOCH},
 };
 use tokio::{
     sync::{oneshot, Semaphore},
@@ -899,7 +907,6 @@ pub fn commit_withdrawals<DB: SyncDatabase<Error = ProviderError>>(
 
     let balance_increments =
         post_block_withdrawals_balance_increments(chain_spec, timestamp, &withdrawals);
-
 
     db.increment_balances(balance_increments)?;
 

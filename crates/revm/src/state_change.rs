@@ -78,8 +78,9 @@ pub fn insert_post_block_withdrawals_balance_increments(
         if let Some(withdrawals) = withdrawals {
             for withdrawal in withdrawals {
                 if withdrawal.amount > 0 {
-                    *balance_increments.entry(ChainAddress(chain_spec.chain.id(), withdrawal.address)).or_default() +=
-                        withdrawal.amount_wei().to::<u128>();
+                    *balance_increments
+                        .entry(ChainAddress(chain_spec.chain.id(), withdrawal.address))
+                        .or_default() += withdrawal.amount_wei().to::<u128>();
                 }
             }
         }
@@ -140,11 +141,15 @@ mod tests {
         assert_eq!(balance_increments.len(), 2);
         // Verify that the balance increments map contains the correct values for each address
         assert_eq!(
-            *balance_increments.get(&ChainAddress(chain_spec.chain().id(), Address::from([1; 20]))).unwrap(),
+            *balance_increments
+                .get(&ChainAddress(chain_spec.chain().id(), Address::from([1; 20])))
+                .unwrap(),
             (1000 * GWEI_TO_WEI).into()
         );
         assert_eq!(
-            *balance_increments.get(&ChainAddress(chain_spec.chain().id(), Address::from([2; 20]))).unwrap(),
+            *balance_increments
+                .get(&ChainAddress(chain_spec.chain().id(), Address::from([2; 20])))
+                .unwrap(),
             (500 * GWEI_TO_WEI).into()
         );
     }

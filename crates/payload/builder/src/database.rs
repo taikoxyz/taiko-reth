@@ -2,9 +2,10 @@
 
 use reth_primitives::{
     revm_primitives::{
-        db::{SyncDatabase, DatabaseRef},
+        db::{DatabaseRef, SyncDatabase},
         AccountInfo, Address, Bytecode, B256,
-    }, U256,
+    },
+    U256,
 };
 use reth_revm::revm::{primitives::ChainAddress, Database, SyncDatabaseRef};
 use std::{
@@ -163,20 +164,11 @@ impl From<SyncCachedReads> for CachedReads {
 }
 
 pub fn to_sync_cached_reads(cache_reads: CachedReads, chain_id: u64) -> SyncCachedReads {
-    let accouts = cache_reads
-        .accounts
-        .into_iter()
-        .map(|(k, v)| (ChainAddress(chain_id, k), v))
-        .collect();
-    let contracts = cache_reads
-        .contracts
-        .into_iter()
-        .map(|(k, v)| ((chain_id, k), v)).collect();
-    let block_hashes = cache_reads
-        .block_hashes
-        .into_iter()
-        .map(|(k, v)| ((chain_id, k), v))
-        .collect();
+    let accouts =
+        cache_reads.accounts.into_iter().map(|(k, v)| (ChainAddress(chain_id, k), v)).collect();
+    let contracts = cache_reads.contracts.into_iter().map(|(k, v)| ((chain_id, k), v)).collect();
+    let block_hashes =
+        cache_reads.block_hashes.into_iter().map(|(k, v)| ((chain_id, k), v)).collect();
     SyncCachedReads { accounts: accouts, contracts, block_hashes }
 }
 
@@ -217,7 +209,7 @@ pub struct SyncCachedReadsDbMut<'a, DB> {
 impl<'a, DB: SyncDatabaseRef> SyncDatabase for SyncCachedReadsDbMut<'a, DB> {
     type Error = <DB as SyncDatabaseRef>::Error;
 
-    fn basic(&mut self,address: ChainAddress) -> Result<Option<AccountInfo>, Self::Error>  {
+    fn basic(&mut self, address: ChainAddress) -> Result<Option<AccountInfo>, Self::Error> {
         let basic = match self.cached.accounts.entry(address) {
             Entry::Occupied(entry) => entry.get().info.clone(),
             Entry::Vacant(entry) => {
@@ -227,15 +219,17 @@ impl<'a, DB: SyncDatabaseRef> SyncDatabase for SyncCachedReadsDbMut<'a, DB> {
         Ok(basic)
     }
 
-    fn code_by_hash(&mut self,chain_id: u64, code_hash: B256) -> Result<Bytecode, Self::Error>  {
+    fn code_by_hash(&mut self, chain_id: u64, code_hash: B256) -> Result<Bytecode, Self::Error> {
         let code = match self.cached.contracts.entry((chain_id, code_hash)) {
             Entry::Occupied(entry) => entry.get().clone(),
-            Entry::Vacant(entry) => entry.insert(self.db.code_by_hash_ref(chain_id, code_hash)?).clone(),
+            Entry::Vacant(entry) => {
+                entry.insert(self.db.code_by_hash_ref(chain_id, code_hash)?).clone()
+            }
         };
         Ok(code)
     }
 
-    fn storage(&mut self,address: ChainAddress, index: U256) -> Result<U256, Self::Error>  {
+    fn storage(&mut self, address: ChainAddress, index: U256) -> Result<U256, Self::Error> {
         match self.cached.accounts.entry(address) {
             Entry::Occupied(mut acc_entry) => match acc_entry.get_mut().storage.entry(index) {
                 Entry::Occupied(entry) => Ok(*entry.get()),
@@ -258,15 +252,14 @@ impl<'a, DB: SyncDatabaseRef> SyncDatabase for SyncCachedReadsDbMut<'a, DB> {
         }
     }
 
-    fn block_hash(&mut self,chain_id: u64, number: u64) -> Result<B256, Self::Error>  {
-                let code = match self.cached.block_hashes.entry((chain_id, number)) {
+    fn block_hash(&mut self, chain_id: u64, number: u64) -> Result<B256, Self::Error> {
+        let code = match self.cached.block_hashes.entry((chain_id, number)) {
             Entry::Occupied(entry) => *entry.get(),
             Entry::Vacant(entry) => *entry.insert(self.db.block_hash_ref(chain_id, number)?),
         };
         Ok(code)
     }
 }
-
 
 #[derive(Debug)]
 pub struct SyncCachedReadsDBRef<'a, DB> {
@@ -277,23 +270,22 @@ pub struct SyncCachedReadsDBRef<'a, DB> {
 impl<'a, DB: SyncDatabaseRef> SyncDatabaseRef for SyncCachedReadsDBRef<'a, DB> {
     type Error = <DB as SyncDatabaseRef>::Error;
 
-    fn basic_ref(&self,address: ChainAddress) -> Result<Option<AccountInfo> ,Self::Error>  {
+    fn basic_ref(&self, address: ChainAddress) -> Result<Option<AccountInfo>, Self::Error> {
         self.inner.borrow_mut().basic(address)
     }
 
-    fn code_by_hash_ref(&self,chain_id: u64, code_hash: B256) -> Result<Bytecode,Self::Error>  {
+    fn code_by_hash_ref(&self, chain_id: u64, code_hash: B256) -> Result<Bytecode, Self::Error> {
         self.inner.borrow_mut().code_by_hash(chain_id, code_hash)
     }
 
-    fn storage_ref(&self,address: ChainAddress, index: U256) -> Result<U256,Self::Error>  {
+    fn storage_ref(&self, address: ChainAddress, index: U256) -> Result<U256, Self::Error> {
         self.inner.borrow_mut().storage(address, index)
     }
 
-    fn block_hash_ref(&self,chain_id: u64, number: u64) -> Result<B256,Self::Error>  {
+    fn block_hash_ref(&self, chain_id: u64, number: u64) -> Result<B256, Self::Error> {
         self.inner.borrow_mut().block_hash(chain_id, number)
     }
 }
-
 
 #[derive(Debug, Clone)]
 struct CachedAccount {
