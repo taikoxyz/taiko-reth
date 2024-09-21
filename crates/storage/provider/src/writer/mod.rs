@@ -785,7 +785,7 @@ mod tests {
         state.merge_transitions(BundleRetention::Reverts);
 
         let outcome =
-            ExecutionOutcome::new(state.take_bundle(), Receipts::default(), 1, Vec::new());
+            ExecutionOutcome::new(None, state.take_bundle(), Receipts::default(), 1, Vec::new());
         let mut writer = UnifiedStorageWriter::from_database(&provider);
         writer
             .write_to_storage(outcome, OriginalValuesKnown::Yes)
@@ -886,7 +886,7 @@ mod tests {
 
         state.merge_transitions(BundleRetention::Reverts);
         let outcome =
-            ExecutionOutcome::new(state.take_bundle(), Receipts::default(), 2, Vec::new());
+            ExecutionOutcome::new(None, state.take_bundle(), Receipts::default(), 2, Vec::new());
         let mut writer = UnifiedStorageWriter::from_database(&provider);
         writer
             .write_to_storage(outcome, OriginalValuesKnown::Yes)
@@ -954,7 +954,7 @@ mod tests {
         init_state.merge_transitions(BundleRetention::Reverts);
 
         let outcome =
-            ExecutionOutcome::new(init_state.take_bundle(), Receipts::default(), 0, Vec::new());
+            ExecutionOutcome::new(None, init_state.take_bundle(), Receipts::default(), 0, Vec::new());
         let mut writer = UnifiedStorageWriter::from_database(&provider);
         writer
             .write_to_storage(outcome, OriginalValuesKnown::Yes)
@@ -1102,7 +1102,7 @@ mod tests {
 
         let bundle = state.take_bundle();
 
-        let outcome = ExecutionOutcome::new(bundle, Receipts::default(), 1, Vec::new());
+        let outcome = ExecutionOutcome::new(None, bundle, Receipts::default(), 1, Vec::new());
         let mut writer = UnifiedStorageWriter::from_database(&provider);
         writer
             .write_to_storage(outcome, OriginalValuesKnown::Yes)
@@ -1268,7 +1268,7 @@ mod tests {
         )]));
         init_state.merge_transitions(BundleRetention::Reverts);
         let outcome =
-            ExecutionOutcome::new(init_state.take_bundle(), Receipts::default(), 0, Vec::new());
+            ExecutionOutcome::new(None, init_state.take_bundle(), Receipts::default(), 0, Vec::new());
         let mut writer = UnifiedStorageWriter::from_database(&provider);
         writer
             .write_to_storage(outcome, OriginalValuesKnown::Yes)
@@ -1316,7 +1316,7 @@ mod tests {
         // Commit block #1 changes to the database.
         state.merge_transitions(BundleRetention::Reverts);
         let outcome =
-            ExecutionOutcome::new(state.take_bundle(), Receipts::default(), 1, Vec::new());
+            ExecutionOutcome::new(None, state.take_bundle(), Receipts::default(), 1, Vec::new());
         let mut writer = UnifiedStorageWriter::from_database(&provider);
         writer
             .write_to_storage(outcome, OriginalValuesKnown::Yes)
@@ -1349,6 +1349,7 @@ mod tests {
     #[test]
     fn revert_to_indices() {
         let base = ExecutionOutcome {
+            chain_id: None,
             bundle: BundleState::default(),
             receipts: vec![vec![Some(Receipt::default()); 2]; 7].into(),
             first_block: 10,
@@ -1415,6 +1416,7 @@ mod tests {
                 StateRoot::overlay_root(
                     tx,
                     ExecutionOutcome::new(
+                        None,
                         state.bundle_state.clone(),
                         Receipts::default(),
                         0,
@@ -1575,7 +1577,7 @@ mod tests {
         test.prepend_state(previous_state);
 
         assert_eq!(test.receipts.len(), 1);
-        let end_state = test.state();
+        let end_state = test.all_states();
         assert_eq!(end_state.state.len(), 2);
         // reverts num should stay the same.
         assert_eq!(end_state.reverts.len(), 1);

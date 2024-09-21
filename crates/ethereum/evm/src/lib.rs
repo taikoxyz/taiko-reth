@@ -15,7 +15,7 @@ extern crate alloc;
 use reth_chainspec::{ChainSpec, Head};
 use reth_evm::{ConfigureEvm, ConfigureEvmEnv};
 use reth_primitives::{transaction::FillTxEnv, Address, Header, TransactionSigned, U256};
-use revm_primitives::{AnalysisKind, Bytes, CfgEnvWithHandlerCfg, Env, TxEnv, TxKind};
+use revm_primitives::{AnalysisKind, Bytes, CfgEnvWithHandlerCfg, ChainAddress, Env, TransactTo, TxEnv, TxKind};
 
 #[cfg(not(feature = "std"))]
 use alloc::vec::Vec;
@@ -73,9 +73,10 @@ impl ConfigureEvmEnv for EthEvmConfig {
         data: Bytes,
     ) {
         #[allow(clippy::needless_update)] // side-effect of optimism fields
+        let chain_id = env.cfg.chain_id;
         let tx = TxEnv {
-            caller,
-            transact_to: TxKind::Call(contract),
+            caller: ChainAddress(chain_id, caller),
+            transact_to: TransactTo::Call(ChainAddress(chain_id, contract)), 
             // Explicitly set nonce to None so revm does not do any nonce checks
             nonce: None,
             gas_limit: 30_000_000,

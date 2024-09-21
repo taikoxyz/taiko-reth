@@ -16,10 +16,12 @@ use reth_testing_utils::generators::sign_tx_with_key_pair;
 use secp256k1::Keypair;
 
 pub(crate) fn to_execution_outcome(
+    chain_id: u64,
     block_number: u64,
     block_execution_output: &BlockExecutionOutput<Receipt>,
 ) -> ExecutionOutcome {
     ExecutionOutcome {
+        chain_id,
         bundle: block_execution_output.state.clone(),
         receipts: block_execution_output.receipts.clone().into(),
         first_block: block_number,

@@ -14,7 +14,7 @@ use reth::{
         handler::register::EvmHandler,
         inspector_handle_register,
         precompile::{Precompile, PrecompileSpecId},
-        ContextPrecompile, ContextPrecompiles, Database, Evm, EvmBuilder, GetInspector,
+        ContextPrecompile, ContextPrecompiles, SyncDatabase, Evm, EvmBuilder, GetInspector,
     },
     tasks::TaskManager,
 };
@@ -67,7 +67,7 @@ impl MyEvmConfig {
         handler: &mut EvmHandler<EXT, DB>,
         cache: Arc<RwLock<PrecompileCache>>,
     ) where
-        DB: Database,
+        DB: SyncDatabase,
     {
         // first we need the evm spec id, which determines the precompiles
         let spec_id = handler.cfg.spec_id;
@@ -96,7 +96,7 @@ impl MyEvmConfig {
         cache: Arc<RwLock<LruMap<(Bytes, u64), PrecompileResult>>>,
     ) -> ContextPrecompile<DB>
     where
-        DB: Database,
+        DB: SyncDatabase,
     {
         let ContextPrecompile::Ordinary(precompile) = precompile else {
             // context stateful precompiles are not supported, due to lifetime issues or skill
@@ -166,7 +166,7 @@ impl ConfigureEvmEnv for MyEvmConfig {
 impl ConfigureEvm for MyEvmConfig {
     type DefaultExternalContext<'a> = ();
 
-    fn evm<DB: Database>(&self, db: DB) -> Evm<'_, Self::DefaultExternalContext<'_>, DB> {
+    fn evm<DB: SyncDatabase>(&self, db: DB) -> Evm<'_, Self::DefaultExternalContext<'_>, DB> {
         let new_cache = self.precompile_cache.clone();
         EvmBuilder::default()
             .with_db(db)
@@ -179,7 +179,7 @@ impl ConfigureEvm for MyEvmConfig {
 
     fn evm_with_inspector<DB, I>(&self, db: DB, inspector: I) -> Evm<'_, I, DB>
     where
-        DB: Database,
+        DB: SyncDatabase,
         I: GetInspector<DB>,
     {
         let new_cache = self.precompile_cache.clone();

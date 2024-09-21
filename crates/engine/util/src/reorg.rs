@@ -13,7 +13,7 @@ use reth_primitives::{
 };
 use reth_provider::{BlockReader, ExecutionOutcome, ProviderError, StateProviderFactory};
 use reth_revm::{
-    database::StateProviderDatabase,
+    database::{StateProviderDatabase, SyncStateProviderDatabase},
     db::{states::bundle_state::BundleRetention, State},
     state_change::post_block_withdrawals_balance_increments,
     DatabaseCommit,
@@ -24,9 +24,9 @@ use reth_rpc_types::{
 };
 use reth_rpc_types_compat::engine::payload::block_to_payload;
 use reth_trie::HashedPostState;
-use revm_primitives::{BlockEnv, CfgEnvWithHandlerCfg, EVMError, EnvWithHandlerCfg};
+use revm_primitives::{BlockEnv, CfgEnvWithHandlerCfg, ChainAddress, EVMError, EnvWithHandlerCfg};
 use std::{
-    collections::VecDeque,
+    collections::{HashMap, VecDeque},
     future::Future,
     pin::Pin,
     task::{ready, Context, Poll},
@@ -272,7 +272,7 @@ where
     // Configure state
     let state_provider = provider.state_by_block_hash(reorg_target.parent_hash)?;
     let mut state = State::builder()
-        .with_database_ref(StateProviderDatabase::new(&state_provider))
+        .with_database_ref(SyncStateProviderDatabase::new(None, StateProviderDatabase::new(&state_provider)))
         .with_bundle_update()
         .build();
 
@@ -351,11 +351,14 @@ where
     drop(evm);
 
     if let Some(withdrawals) = &reorg_target.withdrawals {
-        state.increment_balances(post_block_withdrawals_balance_increments(
+        let balance_increments = post_block_withdrawals_balance_increments(
             chain_spec,
             reorg_target.timestamp,
             withdrawals,
-        ))?;
+        ).iter()
+        .map(|(addr, inc)| (ChainAddress(chain_spec.chain.id(), *addr), *inc))
+        .collect::<HashMap<_,_>>();
+        state.increment_balances(balance_increments)?;
     }
 
     // merge all transitions into bundle state, this would apply the withdrawal balance changes
@@ -363,12 +366,13 @@ where
     state.merge_transitions(BundleRetention::PlainState);
 
     let outcome = ExecutionOutcome::new(
+        None,
         state.take_bundle(),
         Receipts::from(vec![receipts]),
         reorg_target.number,
         Default::default(),
     );
-    let hashed_state = HashedPostState::from_bundle_state(&outcome.state().state);
+    let hashed_state = HashedPostState::from_bundle_state(&outcome.current_state().state);
 
     let (blob_gas_used, excess_blob_gas) =
         if chain_spec.is_cancun_active_at_timestamp(reorg_target.timestamp) {

@@ -18,10 +18,9 @@ use alloy_eips::{
 use reth_chainspec::{ChainSpec, EthereumHardforks};
 use reth_execution_errors::{BlockExecutionError, BlockValidationError};
 use reth_primitives::{Buf, Request};
-use revm::{interpreter::Host, Database, DatabaseCommit, Evm};
+use revm::{interpreter::Host, DatabaseCommit, Evm, SyncDatabase};
 use revm_primitives::{
-    Address, BlockEnv, Bytes, CfgEnvWithHandlerCfg, EnvWithHandlerCfg, ExecutionResult, FixedBytes,
-    ResultAndState, B256,
+    Address, BlockEnv, Bytes, CfgEnvWithHandlerCfg, ChainAddress, EnvWithHandlerCfg, ExecutionResult, FixedBytes, ResultAndState, B256
 };
 
 /// Apply the [EIP-2935](https://eips.ethereum.org/EIPS/eip-2935) pre block contract call.
@@ -40,7 +39,7 @@ pub fn pre_block_blockhashes_contract_call<EvmConfig, DB>(
     parent_block_hash: B256,
 ) -> Result<(), BlockExecutionError>
 where
-    DB: Database + DatabaseCommit,
+    DB: SyncDatabase + DatabaseCommit,
     DB::Error: Display,
     EvmConfig: ConfigureEvm,
 {
@@ -81,7 +80,7 @@ pub fn apply_blockhashes_contract_call<EvmConfig, EXT, DB>(
     evm: &mut Evm<'_, EXT, DB>,
 ) -> Result<(), BlockExecutionError>
 where
-    DB: Database + DatabaseCommit,
+    DB: SyncDatabase + DatabaseCommit,
     DB::Error: core::fmt::Display,
     EvmConfig: ConfigureEvm,
 {
@@ -114,7 +113,7 @@ where
         }
     };
 
-    state.remove(&alloy_eips::eip4788::SYSTEM_ADDRESS);
+    state.remove(&ChainAddress(chain_spec.chain().id(), alloy_eips::eip4788::SYSTEM_ADDRESS));
     state.remove(&evm.block().coinbase);
 
     evm.context.evm.db.commit(state);
@@ -141,7 +140,7 @@ pub fn pre_block_beacon_root_contract_call<EvmConfig, DB>(
     parent_beacon_block_root: Option<B256>,
 ) -> Result<(), BlockExecutionError>
 where
-    DB: Database + DatabaseCommit,
+    DB: SyncDatabase + DatabaseCommit,
     DB::Error: Display,
     EvmConfig: ConfigureEvm,
 {
@@ -183,7 +182,7 @@ pub fn apply_beacon_root_contract_call<EvmConfig, EXT, DB>(
     evm: &mut Evm<'_, EXT, DB>,
 ) -> Result<(), BlockExecutionError>
 where
-    DB: Database + DatabaseCommit,
+    DB: SyncDatabase + DatabaseCommit,
     DB::Error: core::fmt::Display,
     EvmConfig: ConfigureEvm,
 {
@@ -229,7 +228,7 @@ where
         }
     };
 
-    state.remove(&alloy_eips::eip4788::SYSTEM_ADDRESS);
+    state.remove(&ChainAddress(chain_spec.chain().id(), alloy_eips::eip4788::SYSTEM_ADDRESS));
     state.remove(&evm.block().coinbase);
 
     evm.context.evm.db.commit(state);
@@ -254,7 +253,7 @@ pub fn post_block_withdrawal_requests_contract_call<EvmConfig, DB>(
     initialized_block_env: &BlockEnv,
 ) -> Result<Vec<Request>, BlockExecutionError>
 where
-    DB: Database + DatabaseCommit,
+    DB: SyncDatabase + DatabaseCommit,
     DB::Error: Display,
     EvmConfig: ConfigureEvm,
 {
@@ -282,7 +281,7 @@ pub fn apply_withdrawal_requests_contract_call<EvmConfig, EXT, DB>(
     evm: &mut Evm<'_, EXT, DB>,
 ) -> Result<Vec<Request>, BlockExecutionError>
 where
-    DB: Database + DatabaseCommit,
+    DB: SyncDatabase + DatabaseCommit,
     DB::Error: core::fmt::Display,
     EvmConfig: ConfigureEvm,
 {
@@ -316,7 +315,7 @@ where
     };
 
     // cleanup the state
-    state.remove(&alloy_eips::eip7002::SYSTEM_ADDRESS);
+    state.remove(&ChainAddress(evm.cfg().chain_id, alloy_eips::eip7002::SYSTEM_ADDRESS));
     state.remove(&evm.block().coinbase);
     evm.context.evm.db.commit(state);
 
@@ -384,7 +383,7 @@ pub fn post_block_consolidation_requests_contract_call<EvmConfig, DB>(
     initialized_block_env: &BlockEnv,
 ) -> Result<Vec<Request>, BlockExecutionError>
 where
-    DB: Database + DatabaseCommit,
+    DB: SyncDatabase + DatabaseCommit,
     DB::Error: Display,
     EvmConfig: ConfigureEvm,
 {
@@ -412,7 +411,7 @@ pub fn apply_consolidation_requests_contract_call<EvmConfig, EXT, DB>(
     evm: &mut Evm<'_, EXT, DB>,
 ) -> Result<Vec<Request>, BlockExecutionError>
 where
-    DB: Database + DatabaseCommit,
+    DB: SyncDatabase + DatabaseCommit,
     DB::Error: core::fmt::Display,
     EvmConfig: ConfigureEvm,
 {
@@ -447,7 +446,7 @@ where
     };
 
     // cleanup the state
-    state.remove(&alloy_eips::eip7002::SYSTEM_ADDRESS);
+    state.remove(&ChainAddress(evm.cfg().chain_id, alloy_eips::eip7002::SYSTEM_ADDRESS));
     state.remove(&evm.block().coinbase);
     evm.context.evm.db.commit(state);
 

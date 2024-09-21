@@ -565,6 +565,15 @@ similar-asserts = "1.5.0"
 tempfile = "3.8"
 test-fuzz = "5" 
 
-#[patch.crates-io]
-#revm = { path = "../revm/crates/revm" }
-#revm-primitives = { path = "../revm/crates/primitives" }
+[patch.crates-io]
+revm = { path = "../revm/crates/revm", features = [
+    "std",
+    "secp256k1",
+    "blst",
+], default-features = false }
+revm-primitives = { path = "../revm/crates/primitives", features = [
+    "std",
+], default-features = false }
+revm-interpreter = { path = "../revm/crates/interpreter" }
+revm-precompile = { path = "../revm/crates/precompile" }
+revm-inspectors = { path = "../revm-inspectors" }

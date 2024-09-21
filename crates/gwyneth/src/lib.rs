@@ -3,6 +3,7 @@ use std::{fmt::Debug, sync::Arc};
 
 use builder::default_gwyneth_payload_builder;
 use reth_evm_ethereum::EthEvmConfig;
+use reth_primitives::ChainId;
 use reth_tasks::TaskManager;
 use thiserror::Error;
 
@@ -112,7 +113,7 @@ pub struct GwynethPayloadBuilderAttributes<SyncProvider> {
     /// The gas limit for the generated payload
     pub gas_limit: Option<u64>,
 
-    pub l1_provider: Option<SyncProvider>,
+    pub l1_provider: Option<(ChainId, SyncProvider)>,
 }
 
 impl<SyncProvider: Debug + Sync + Send> PayloadBuilderAttributes

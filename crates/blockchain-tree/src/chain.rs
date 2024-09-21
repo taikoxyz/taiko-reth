@@ -21,7 +21,7 @@ use reth_provider::{
     providers::{BundleStateProvider, ConsistentDbView},
     FullExecutionDataProvider, ProviderError, StateRootProvider,
 };
-use reth_revm::database::StateProviderDatabase;
+use reth_revm::database::{StateProviderDatabase, SyncStateProviderDatabase};
 use reth_trie::{updates::TrieUpdates, HashedPostState};
 use reth_trie_parallel::parallel_root::ParallelStateRoot;
 use std::{
@@ -123,7 +123,8 @@ impl AppendableChain {
             BlockchainTreeError::BlockNumberNotFoundInChain { block_number: parent_number },
         )?;
 
-        let mut execution_outcome = self.execution_outcome().clone();
+        // Filter out the bundle state that belongs to the current chain.
+        let mut execution_outcome = self.execution_outcome().filter_current_chain();
 
         // Revert state to the state after execution of the parent block
         execution_outcome.revert_to(parent.number);
@@ -151,7 +152,8 @@ impl AppendableChain {
         // forked from and not the new chain we are creating.
         let size = execution_outcome.receipts().len();
         execution_outcome.receipts_mut().drain(0..size - 1);
-        execution_outcome.state_mut().take_n_reverts(size - 1);
+        // take all states since we have filtered
+        execution_outcome.all_states_mut().take_n_reverts(size - 1);
         execution_outcome.set_first_block(block.number);
 
         // If all is okay, return new chain back. Present chain is not modified.
@@ -205,7 +207,7 @@ impl AppendableChain {
 
         let provider = BundleStateProvider::new(state_provider, bundle_state_data_provider);
 
-        let db = StateProviderDatabase::new(&provider);
+        let db = SyncStateProviderDatabase::new(None, StateProviderDatabase::new(&provider));
         let executor = externals.executor_factory.executor(db);
         let block_hash = block.hash();
         let block = block.unseal();
@@ -234,7 +236,7 @@ impl AppendableChain {
                     .map_err(ProviderError::from)?
             } else {
                 let hashed_state =
-                    HashedPostState::from_bundle_state(&initial_execution_outcome.state().state);
+                    HashedPostState::from_bundle_state(&initial_execution_outcome.current_state().state);
                 let state_root = provider.state_root(hashed_state)?;
                 (state_root, None)
             };

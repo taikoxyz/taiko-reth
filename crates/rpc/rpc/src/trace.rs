@@ -9,7 +9,7 @@ use reth_consensus_common::calc::{
 use reth_evm::ConfigureEvmEnv;
 use reth_primitives::{BlockId, Bytes, Header, B256, U256};
 use reth_provider::{BlockReader, ChainSpecProvider, EvmEnvProvider, StateProviderFactory};
-use reth_revm::database::StateProviderDatabase;
+use reth_revm::database::{StateProviderDatabase, SyncStateProviderDatabase};
 use reth_rpc_api::TraceApiServer;
 use reth_rpc_eth_api::{
     helpers::{Call, TraceExt},
@@ -157,7 +157,9 @@ where
         self.eth_api()
             .spawn_with_state_at_block(at, move |state| {
                 let mut results = Vec::with_capacity(calls.len());
-                let mut db = CacheDB::new(StateProviderDatabase::new(state));
+                let mut db = CacheDB::new(
+                    SyncStateProviderDatabase::new(Some(cfg.chain_id), StateProviderDatabase::new(state))
+                );
 
                 let mut calls = calls.into_iter().peekable();
 

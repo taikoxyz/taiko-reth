@@ -28,8 +28,7 @@ use reth_revm::{
     state_change::post_block_balance_increments, Evm, State,
 };
 use revm_primitives::{
-    db::{Database, DatabaseCommit},
-    BlockEnv, CfgEnvWithHandlerCfg, EVMError, EnvWithHandlerCfg, ResultAndState,
+    db::{SyncDatabase, DatabaseCommit}, BlockEnv, CfgEnvWithHandlerCfg, ChainAddress, EVMError, EnvWithHandlerCfg, ResultAndState
 };
 
 #[cfg(not(feature = "std"))]
@@ -69,7 +68,7 @@ where
 {
     fn eth_executor<DB>(&self, db: DB) -> EthBlockExecutor<EvmConfig, DB>
     where
-        DB: Database<Error: Into<ProviderError>>,
+        DB: SyncDatabase<Error: Into<ProviderError>>,
     {
         println!("eth_executor");
         EthBlockExecutor::new(
@@ -84,15 +83,15 @@ impl<EvmConfig> BlockExecutorProvider for EthExecutorProvider<EvmConfig>
 where
     EvmConfig: ConfigureEvm,
 {
-    type Executor<DB: Database<Error: Into<ProviderError> + Display>> =
+    type Executor<DB: SyncDatabase<Error: Into<ProviderError> + Display>> =
         EthBlockExecutor<EvmConfig, DB>;
 
-    type BatchExecutor<DB: Database<Error: Into<ProviderError> + Display>> =
+    type BatchExecutor<DB: SyncDatabase<Error: Into<ProviderError> + Display>> =
         EthBatchExecutor<EvmConfig, DB>;
 
     fn executor<DB>(&self, db: DB) -> Self::Executor<DB>
     where
-        DB: Database<Error: Into<ProviderError> + Display>,
+        DB: SyncDatabase<Error: Into<ProviderError> + Display>,
     {
         println!("executor");
         self.eth_executor(db)
@@ -100,7 +99,7 @@ where
 
     fn batch_executor<DB>(&self, db: DB) -> Self::BatchExecutor<DB>
     where
-        DB: Database<Error: Into<ProviderError> + Display>,
+        DB: SyncDatabase<Error: Into<ProviderError> + Display>,
     {
         println!("batch_executor");
         let executor = self.eth_executor(db);
@@ -145,7 +144,7 @@ where
         mut evm: Evm<'_, Ext, &mut State<DB>>,
     ) -> Result<EthExecuteOutput, BlockExecutionError>
     where
-        DB: Database,
+        DB: SyncDatabase,
         DB::Error: Into<ProviderError> + Display,
     {
         // apply pre execution changes
@@ -276,7 +275,7 @@ impl<EvmConfig, DB> EthBlockExecutor<EvmConfig, DB> {
 impl<EvmConfig, DB> EthBlockExecutor<EvmConfig, DB>
 where
     EvmConfig: ConfigureEvm,
-    DB: Database<Error: Into<ProviderError> + Display>,
+    DB: SyncDatabase<Error: Into<ProviderError> + Display>,
 {
     /// Configures a new evm configuration and block environment for the given block.
     ///
@@ -342,13 +341,14 @@ where
     ) -> Result<(), BlockExecutionError> {
         let mut balance_increments =
             post_block_balance_increments(self.chain_spec(), block, total_difficulty);
+        let id = self.chain_spec().chain().id();
 
         // Irregular state change at Ethereum DAO hardfork
         if self.chain_spec().fork(EthereumHardfork::Dao).transitions_at_block(block.number) {
             // drain balances from hardcoded addresses.
             let drained_balance: u128 = self
                 .state
-                .drain_balances(DAO_HARDKFORK_ACCOUNTS)
+                .drain_balances(DAO_HARDKFORK_ACCOUNTS.iter().map_while(|a| Some(ChainAddress(id, *a))))
                 .map_err(|_| BlockValidationError::IncrementBalanceFailed)?
                 .into_iter()
                 .sum();
@@ -358,7 +358,7 @@ where
         }
         // increment balances
         self.state
-            .increment_balances(balance_increments)
+            .increment_balances(balance_increments.iter().map_while(|(a, b)| Some((ChainAddress(id, *a), *b))))
             .map_err(|_| BlockValidationError::IncrementBalanceFailed)?;
 
         Ok(())
@@ -368,7 +368,7 @@ where
 impl<EvmConfig, DB> Executor<DB> for EthBlockExecutor<EvmConfig, DB>
 where
     EvmConfig: ConfigureEvm,
-    DB: Database<Error: Into<ProviderError> + Display>,
+    DB: SyncDatabase<Error: Into<ProviderError> + Display>,
 {
     type Input<'a> = BlockExecutionInput<'a, BlockWithSenders>;
     type Output = BlockExecutionOutput<Receipt>;
@@ -415,7 +415,7 @@ impl<EvmConfig, DB> EthBatchExecutor<EvmConfig, DB> {
 impl<EvmConfig, DB> BatchExecutor<DB> for EthBatchExecutor<EvmConfig, DB>
 where
     EvmConfig: ConfigureEvm,
-    DB: Database<Error: Into<ProviderError> + Display>,
+    DB: SyncDatabase<Error: Into<ProviderError> + Display>,
 {
     type Input<'a> = BlockExecutionInput<'a, BlockWithSenders>;
     type Output = ExecutionOutcome;
@@ -448,6 +448,7 @@ where
 
     fn finalize(mut self) -> Self::Output {
         ExecutionOutcome::new(
+            Some(self.executor.executor.chain_spec.chain().id()),
             self.executor.state.take_bundle(),
             self.batch_record.take_receipts(),
             self.batch_record.first_block().unwrap_or_default(),
@@ -482,11 +483,13 @@ mod tests {
         keccak256, public_key_to_address, Account, Block, Transaction, TxKind, TxLegacy, B256,
     };
     use reth_revm::{
-        database::StateProviderDatabase, test_utils::StateProviderTest, TransitionState,
+        database::{StateProviderDatabase, SyncStateProviderDatabase}, test_utils::StateProviderTest, TransitionState,
     };
+    use reth_storage_api::StateProvider;
     use reth_testing_utils::generators::{self, sign_tx_with_key_pair};
     use revm_primitives::{b256, fixed_bytes, Bytes, BLOCKHASH_SERVE_WINDOW};
     use secp256k1::{Keypair, Secp256k1};
+    use core::{iter::Chain, sync};
     use std::collections::HashMap;
 
     fn create_state_provider_with_beacon_root_contract() -> StateProviderTest {
@@ -531,6 +534,10 @@ mod tests {
         EthExecutorProvider { chain_spec, evm_config: Default::default() }
     }
 
+    fn get_sync_db<DB: StateProvider>(chain_id: u64, db: DB) -> SyncStateProviderDatabase<DB> {
+        SyncStateProviderDatabase::new(Some(chain_id), StateProviderDatabase::new(db))
+    }
+
     #[test]
     fn eip_4788_non_genesis_call() {
         let mut header =
@@ -544,12 +551,12 @@ mod tests {
                 .with_fork(EthereumHardfork::Cancun, ForkCondition::Timestamp(1))
                 .build(),
         );
-
+        let chain_id = chain_spec.chain().id();
         let provider = executor_provider(chain_spec);
 
         // attempt to execute a block without parent beacon block root, expect err
         let err = provider
-            .executor(StateProviderDatabase::new(&db))
+            .executor(get_sync_db(chain_id, &db))
             .execute(
                 (
                     &BlockWithSenders {
@@ -578,7 +585,7 @@ mod tests {
         // fix header, set a gas limit
         header.parent_beacon_block_root = Some(B256::with_last_byte(0x69));
 
-        let mut executor = provider.executor(StateProviderDatabase::new(&db));
+        let mut executor = provider.executor(get_sync_db(chain_id, &db));
 
         // Now execute a block with the fixed header, ensure that it does not fail
         executor
@@ -609,13 +616,13 @@ mod tests {
 
         // get timestamp storage and compare
         let timestamp_storage =
-            executor.state.storage(BEACON_ROOTS_ADDRESS, U256::from(timestamp_index)).unwrap();
+            executor.state.storage(ChainAddress(chain_id, BEACON_ROOTS_ADDRESS), U256::from(timestamp_index)).unwrap();
         assert_eq!(timestamp_storage, U256::from(header.timestamp));
 
         // get parent beacon block root storage and compare
         let parent_beacon_block_root_storage = executor
             .state
-            .storage(BEACON_ROOTS_ADDRESS, U256::from(parent_beacon_block_root_index))
+            .storage(ChainAddress(chain_id,BEACON_ROOTS_ADDRESS), U256::from(parent_beacon_block_root_index))
             .expect("storage value should exist");
         assert_eq!(parent_beacon_block_root_storage, U256::from(0x69));
     }
@@ -641,12 +648,12 @@ mod tests {
                 .with_fork(EthereumHardfork::Cancun, ForkCondition::Timestamp(1))
                 .build(),
         );
-
+        let chain_id = chain_spec.chain().id();
         let provider = executor_provider(chain_spec);
 
         // attempt to execute an empty block with parent beacon block root, this should not fail
         provider
-            .batch_executor(StateProviderDatabase::new(&db))
+            .batch_executor(get_sync_db(chain_id, &db))
             .execute_and_verify_one(
                 (
                     &BlockWithSenders {
@@ -684,7 +691,7 @@ mod tests {
                 .with_fork(EthereumHardfork::Cancun, ForkCondition::Timestamp(1))
                 .build(),
         );
-
+        let chain_id = chain_spec.chain().id();
         let provider = executor_provider(chain_spec);
 
         // construct the header for block one
@@ -696,7 +703,7 @@ mod tests {
             ..Header::default()
         };
 
-        let mut executor = provider.batch_executor(StateProviderDatabase::new(&db));
+        let mut executor = provider.batch_executor(get_sync_db(chain_id, &db));
 
         // attempt to execute an empty block with parent beacon block root, this should not fail
         executor
@@ -721,7 +728,7 @@ mod tests {
             );
 
         // ensure that the nonce of the system address account has not changed
-        let nonce = executor.state_mut().basic(SYSTEM_ADDRESS).unwrap().unwrap().nonce;
+        let nonce = executor.state_mut().basic(ChainAddress(chain_id, SYSTEM_ADDRESS)).unwrap().unwrap().nonce;
         assert_eq!(nonce, 0);
     }
 
@@ -736,10 +743,10 @@ mod tests {
                 .with_fork(EthereumHardfork::Cancun, ForkCondition::Timestamp(0))
                 .build(),
         );
-
+        let chain_id = chain_spec.chain().id();
         let mut header = chain_spec.genesis_header();
         let provider = executor_provider(chain_spec);
-        let mut executor = provider.batch_executor(StateProviderDatabase::new(&db));
+        let mut executor = provider.batch_executor(get_sync_db(chain_id, &db));
 
         // attempt to execute the genesis block with non-zero parent beacon block root, expect err
         header.parent_beacon_block_root = Some(B256::with_last_byte(0x69));
@@ -822,11 +829,11 @@ mod tests {
                 .with_fork(EthereumHardfork::Cancun, ForkCondition::Timestamp(1))
                 .build(),
         );
-
+        let chain_id = chain_spec.chain().id();
         let provider = executor_provider(chain_spec);
 
         // execute header
-        let mut executor = provider.batch_executor(StateProviderDatabase::new(&db));
+        let mut executor = provider.batch_executor(get_sync_db(chain_id, &db));
 
         // Now execute a block with the fixed header, ensure that it does not fail
         executor
@@ -861,14 +868,14 @@ mod tests {
         // get timestamp storage and compare
         let timestamp_storage = executor
             .state_mut()
-            .storage(BEACON_ROOTS_ADDRESS, U256::from(timestamp_index))
+            .storage(ChainAddress(chain_id, BEACON_ROOTS_ADDRESS), U256::from(timestamp_index))
             .unwrap();
         assert_eq!(timestamp_storage, U256::from(header.timestamp));
 
         // get parent beacon block root storage and compare
         let parent_beacon_block_root_storage = executor
             .state_mut()
-            .storage(BEACON_ROOTS_ADDRESS, U256::from(parent_beacon_block_root_index))
+            .storage(ChainAddress(chain_id, BEACON_ROOTS_ADDRESS), U256::from(parent_beacon_block_root_index))
             .unwrap();
         assert_eq!(parent_beacon_block_root_storage, U256::from(0x69));
     }
@@ -906,9 +913,9 @@ mod tests {
                 .with_fork(EthereumHardfork::Prague, ForkCondition::Never)
                 .build(),
         );
-
+        let chain_id = chain_spec.chain().id();
         let provider = executor_provider(chain_spec);
-        let mut executor = provider.batch_executor(StateProviderDatabase::new(&db));
+        let mut executor = provider.batch_executor(get_sync_db(chain_id, &db));
 
         // construct the header for block one
         let header = Header { timestamp: 1, number: 1, ..Header::default() };
@@ -940,10 +947,10 @@ mod tests {
         //
         // we load the account first, because revm expects it to be
         // loaded
-        executor.state_mut().basic(HISTORY_STORAGE_ADDRESS).unwrap();
+        executor.state_mut().basic(ChainAddress(chain_id, HISTORY_STORAGE_ADDRESS)).unwrap();
         assert!(executor
             .state_mut()
-            .storage(HISTORY_STORAGE_ADDRESS, U256::ZERO)
+            .storage(ChainAddress(chain_id, HISTORY_STORAGE_ADDRESS), U256::ZERO)
             .unwrap()
             .is_zero());
     }
@@ -958,10 +965,11 @@ mod tests {
                 .with_fork(EthereumHardfork::Prague, ForkCondition::Timestamp(0))
                 .build(),
         );
+        let chain_id = chain_spec.chain().id();
 
         let header = chain_spec.genesis_header();
         let provider = executor_provider(chain_spec);
-        let mut executor = provider.batch_executor(StateProviderDatabase::new(&db));
+        let mut executor = provider.batch_executor(get_sync_db(chain_id, &db));
 
         // attempt to execute genesis block, this should not fail
         executor
@@ -990,10 +998,10 @@ mod tests {
         //
         // we load the account first, because revm expects it to be
         // loaded
-        executor.state_mut().basic(HISTORY_STORAGE_ADDRESS).unwrap();
+        executor.state_mut().basic(ChainAddress(chain_id, HISTORY_STORAGE_ADDRESS)).unwrap();
         assert!(executor
             .state_mut()
-            .storage(HISTORY_STORAGE_ADDRESS, U256::ZERO)
+            .storage(ChainAddress(chain_id, HISTORY_STORAGE_ADDRESS), U256::ZERO)
             .unwrap()
             .is_zero());
     }
@@ -1009,6 +1017,7 @@ mod tests {
                 .with_fork(EthereumHardfork::Prague, ForkCondition::Timestamp(1))
                 .build(),
         );
+        let chain_id = chain_spec.chain().id();
 
         let header = Header {
             parent_hash: B256::random(),
@@ -1018,7 +1027,7 @@ mod tests {
             ..Header::default()
         };
         let provider = executor_provider(chain_spec);
-        let mut executor = provider.batch_executor(StateProviderDatabase::new(&db));
+        let mut executor = provider.batch_executor(get_sync_db(chain_id, &db));
 
         // attempt to execute the fork activation block, this should not fail
         executor
@@ -1043,11 +1052,11 @@ mod tests {
             );
 
         // the hash for the ancestor of the fork activation block should be present
-        assert!(executor.state_mut().basic(HISTORY_STORAGE_ADDRESS).unwrap().is_some());
+        assert!(executor.state_mut().basic(ChainAddress(chain_id, HISTORY_STORAGE_ADDRESS)).unwrap().is_some());
         assert_ne!(
             executor
                 .state_mut()
-                .storage(HISTORY_STORAGE_ADDRESS, U256::from(fork_activation_block - 1))
+                .storage(ChainAddress(chain_id, HISTORY_STORAGE_ADDRESS), U256::from(fork_activation_block - 1))
                 .unwrap(),
             U256::ZERO
         );
@@ -1055,7 +1064,7 @@ mod tests {
         // the hash of the block itself should not be in storage
         assert!(executor
             .state_mut()
-            .storage(HISTORY_STORAGE_ADDRESS, U256::from(fork_activation_block))
+            .storage(ChainAddress(chain_id, HISTORY_STORAGE_ADDRESS), U256::from(fork_activation_block))
             .unwrap()
             .is_zero());
     }
@@ -1071,9 +1080,10 @@ mod tests {
                 .with_fork(EthereumHardfork::Prague, ForkCondition::Timestamp(1))
                 .build(),
         );
+        let chain_id = chain_spec.chain().id();
 
         let provider = executor_provider(chain_spec);
-        let mut executor = provider.batch_executor(StateProviderDatabase::new(&db));
+        let mut executor = provider.batch_executor(get_sync_db(chain_id, &db));
 
         let header = Header {
             parent_hash: B256::random(),
@@ -1106,12 +1116,12 @@ mod tests {
             );
 
         // the hash for the ancestor of the fork activation block should be present
-        assert!(executor.state_mut().basic(HISTORY_STORAGE_ADDRESS).unwrap().is_some());
+        assert!(executor.state_mut().basic(ChainAddress(chain_id, HISTORY_STORAGE_ADDRESS)).unwrap().is_some());
         assert_ne!(
             executor
                 .state_mut()
                 .storage(
-                    HISTORY_STORAGE_ADDRESS,
+                    ChainAddress(chain_id, HISTORY_STORAGE_ADDRESS),
                     U256::from(fork_activation_block % BLOCKHASH_SERVE_WINDOW as u64 - 1)
                 )
                 .unwrap(),
@@ -1129,13 +1139,14 @@ mod tests {
                 .with_fork(EthereumHardfork::Prague, ForkCondition::Timestamp(0))
                 .build(),
         );
+        let chain_id = chain_spec.chain().id();
 
         let mut header = chain_spec.genesis_header();
         header.requests_root = Some(EMPTY_ROOT_HASH);
         let header_hash = header.hash_slow();
 
         let provider = executor_provider(chain_spec);
-        let mut executor = provider.batch_executor(StateProviderDatabase::new(&db));
+        let mut executor = provider.batch_executor(get_sync_db(chain_id, &db));
 
         // attempt to execute the genesis block, this should not fail
         executor
@@ -1163,10 +1174,10 @@ mod tests {
         //
         // we load the account first, because revm expects it to be
         // loaded
-        executor.state_mut().basic(HISTORY_STORAGE_ADDRESS).unwrap();
+        executor.state_mut().basic(ChainAddress(chain_id, HISTORY_STORAGE_ADDRESS)).unwrap();
         assert!(executor
             .state_mut()
-            .storage(HISTORY_STORAGE_ADDRESS, U256::ZERO)
+            .storage(ChainAddress(chain_id, HISTORY_STORAGE_ADDRESS), U256::ZERO)
             .unwrap()
             .is_zero());
 
@@ -1202,14 +1213,14 @@ mod tests {
             );
 
         // the block hash of genesis should now be in storage, but not block 1
-        assert!(executor.state_mut().basic(HISTORY_STORAGE_ADDRESS).unwrap().is_some());
+        assert!(executor.state_mut().basic(ChainAddress(chain_id, HISTORY_STORAGE_ADDRESS)).unwrap().is_some());
         assert_ne!(
-            executor.state_mut().storage(HISTORY_STORAGE_ADDRESS, U256::ZERO).unwrap(),
+            executor.state_mut().storage(ChainAddress(chain_id, HISTORY_STORAGE_ADDRESS), U256::ZERO).unwrap(),
             U256::ZERO
         );
         assert!(executor
             .state_mut()
-            .storage(HISTORY_STORAGE_ADDRESS, U256::from(1))
+            .storage(ChainAddress(chain_id, HISTORY_STORAGE_ADDRESS), U256::from(1))
             .unwrap()
             .is_zero());
 
@@ -1244,18 +1255,18 @@ mod tests {
             );
 
         // the block hash of genesis and block 1 should now be in storage, but not block 2
-        assert!(executor.state_mut().basic(HISTORY_STORAGE_ADDRESS).unwrap().is_some());
+        assert!(executor.state_mut().basic(ChainAddress(chain_id, HISTORY_STORAGE_ADDRESS)).unwrap().is_some());
         assert_ne!(
-            executor.state_mut().storage(HISTORY_STORAGE_ADDRESS, U256::ZERO).unwrap(),
+            executor.state_mut().storage(ChainAddress(chain_id, HISTORY_STORAGE_ADDRESS), U256::ZERO).unwrap(),
             U256::ZERO
         );
         assert_ne!(
-            executor.state_mut().storage(HISTORY_STORAGE_ADDRESS, U256::from(1)).unwrap(),
+            executor.state_mut().storage(ChainAddress(chain_id, HISTORY_STORAGE_ADDRESS), U256::from(1)).unwrap(),
             U256::ZERO
         );
         assert!(executor
             .state_mut()
-            .storage(HISTORY_STORAGE_ADDRESS, U256::from(2))
+            .storage(ChainAddress(chain_id, HISTORY_STORAGE_ADDRESS), U256::from(2))
             .unwrap()
             .is_zero());
     }
@@ -1268,6 +1279,7 @@ mod tests {
                 .with_fork(EthereumHardfork::Prague, ForkCondition::Timestamp(0))
                 .build(),
         );
+        let chain_id = chain_spec.chain().id();
 
         let mut db = create_state_provider_with_withdrawal_requests_contract();
 
@@ -1310,7 +1322,7 @@ mod tests {
 
         let provider = executor_provider(chain_spec);
 
-        let executor = provider.executor(StateProviderDatabase::new(&db));
+        let executor = provider.executor(get_sync_db(chain_id, &db));
 
         let BlockExecutionOutput { receipts, requests, .. } = executor
             .execute(
@@ -1349,6 +1361,7 @@ mod tests {
                 .with_fork(EthereumHardfork::Prague, ForkCondition::Timestamp(0))
                 .build(),
         );
+        let chain_id = chain_spec.chain().id();
 
         // Create a state provider with the withdrawal requests contract pre-deployed
         let mut db = create_state_provider_with_withdrawal_requests_contract();
@@ -1398,7 +1411,7 @@ mod tests {
         );
 
         // Create an executor from the state provider
-        let executor = executor_provider(chain_spec).executor(StateProviderDatabase::new(&db));
+        let executor = executor_provider(chain_spec).executor(get_sync_db(chain_id, &db));
 
         // Execute the block and capture the result
         let exec_result = executor.execute(

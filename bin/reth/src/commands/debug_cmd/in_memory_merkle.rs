@@ -20,7 +20,7 @@ use reth_provider::{
     HeaderProvider, LatestStateProviderRef, OriginalValuesKnown, ProviderFactory,
     StageCheckpointReader, StateWriter, StaticFileProviderFactory, StorageReader,
 };
-use reth_revm::database::StateProviderDatabase;
+use reth_revm::database::{StateProviderDatabase, SyncStateProviderDatabase};
 use reth_stages::StageId;
 use reth_tasks::TaskExecutor;
 use reth_trie::StateRoot;
@@ -121,6 +121,7 @@ impl Command {
 
         let client = fetch_client.clone();
         let chain = provider_factory.chain_spec();
+        let chain_id = chain.chain().id();
         let block = (move || get_single_body(client.clone(), Arc::clone(&chain), header.clone()))
             .retry(&backoff)
             .notify(
@@ -128,10 +129,13 @@ impl Command {
             )
             .await?;
 
-        let db = StateProviderDatabase::new(LatestStateProviderRef::new(
-            provider.tx_ref(),
-            provider_factory.static_file_provider(),
-        ));
+        let db = SyncStateProviderDatabase::new(
+            Some(chain_id),
+            StateProviderDatabase::new(LatestStateProviderRef::new(
+                provider.tx_ref(),
+                provider_factory.static_file_provider(),
+            ))
+        );
 
         let executor = block_executor!(provider_factory.chain_spec()).executor(db);
 
@@ -148,7 +152,7 @@ impl Command {
             )
                 .into(),
         )?;
-        let execution_outcome = ExecutionOutcome::from((block_execution_output, block.number));
+        let execution_outcome = ExecutionOutcome::from((block_execution_output, chain_id, block.number));
 
         // Unpacked `BundleState::state_root_slow` function
         let (in_memory_state_root, in_memory_updates) = StateRoot::overlay_root_with_updates(

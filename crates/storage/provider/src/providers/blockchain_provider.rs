@@ -1412,7 +1412,7 @@ where
                 .accounts
                 .into_iter()
                 .flatten()
-                .map(|(address, info)| AccountBeforeTx { address, info: info.map(Into::into) })
+                .map(|(address, info)| AccountBeforeTx { address: address.1, info: info.map(Into::into) })
                 .collect();
             Ok(changesets)
         } else {

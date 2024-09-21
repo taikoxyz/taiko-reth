@@ -8,7 +8,7 @@ use reth_execution_types::{BlockExecutionInput, BlockExecutionOutput, ExecutionO
 use reth_primitives::{BlockNumber, BlockWithSenders, Receipt};
 use reth_prune_types::PruneModes;
 use reth_storage_errors::provider::ProviderError;
-use revm_primitives::db::Database;
+use revm_primitives::db::SyncDatabase;
 
 // re-export Either
 pub use futures_util::future::Either;
@@ -18,15 +18,15 @@ where
     A: BlockExecutorProvider,
     B: BlockExecutorProvider,
 {
-    type Executor<DB: Database<Error: Into<ProviderError> + Display>> =
+    type Executor<DB: SyncDatabase<Error: Into<ProviderError> + Display>> =
         Either<A::Executor<DB>, B::Executor<DB>>;
 
-    type BatchExecutor<DB: Database<Error: Into<ProviderError> + Display>> =
+    type BatchExecutor<DB: SyncDatabase<Error: Into<ProviderError> + Display>> =
         Either<A::BatchExecutor<DB>, B::BatchExecutor<DB>>;
 
     fn executor<DB>(&self, db: DB) -> Self::Executor<DB>
     where
-        DB: Database<Error: Into<ProviderError> + Display>,
+        DB: SyncDatabase<Error: Into<ProviderError> + Display>,
     {
         match self {
             Self::Left(a) => Either::Left(a.executor(db)),
@@ -36,7 +36,7 @@ where
 
     fn batch_executor<DB>(&self, db: DB) -> Self::BatchExecutor<DB>
     where
-        DB: Database<Error: Into<ProviderError> + Display>,
+        DB: SyncDatabase<Error: Into<ProviderError> + Display>,
     {
         match self {
             Self::Left(a) => Either::Left(a.batch_executor(db)),
@@ -59,7 +59,7 @@ where
         Output = BlockExecutionOutput<Receipt>,
         Error = BlockExecutionError,
     >,
-    DB: Database<Error: Into<ProviderError> + Display>,
+    DB: SyncDatabase<Error: Into<ProviderError> + Display>,
 {
     type Input<'a> = BlockExecutionInput<'a, BlockWithSenders>;
     type Output = BlockExecutionOutput<Receipt>;
@@ -87,7 +87,7 @@ where
         Output = ExecutionOutcome,
         Error = BlockExecutionError,
     >,
-    DB: Database<Error: Into<ProviderError> + Display>,
+    DB: SyncDatabase<Error: Into<ProviderError> + Display>,
 {
     type Input<'a> = BlockExecutionInput<'a, BlockWithSenders>;
     type Output = ExecutionOutcome;

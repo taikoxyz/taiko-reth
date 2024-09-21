@@ -207,6 +207,7 @@ impl TestBlockBuilder {
             Arc::new(block_with_senders.block.clone()),
             Arc::new(block_with_senders.senders),
             Arc::new(ExecutionOutcome::new(
+                None,
                 BundleState::default(),
                 receipts,
                 block_number,
@@ -281,6 +282,7 @@ impl TestBlockBuilder {
         }
 
         let execution_outcome = ExecutionOutcome::new(
+            None,
             bundle_state_builder.build(),
             vec![vec![None]].into(),
             block.number,

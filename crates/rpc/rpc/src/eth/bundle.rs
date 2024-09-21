@@ -9,13 +9,13 @@ use reth_primitives::{
     revm_primitives::db::{DatabaseCommit, DatabaseRef},
     PooledTransactionsElement, U256,
 };
-use reth_revm::database::StateProviderDatabase;
+use reth_revm::database::{StateProviderDatabase, SyncStateProviderDatabase};
 use reth_rpc_eth_api::{FromEthApiError, FromEvmError};
 use reth_rpc_types::mev::{EthCallBundle, EthCallBundleResponse, EthCallBundleTransactionResult};
 use reth_tasks::pool::BlockingTaskGuard;
 use revm::{
     db::CacheDB,
-    primitives::{ResultAndState, TxEnv},
+    primitives::{ResultAndState, TxEnv}, SyncDatabaseRef,
 };
 use revm_primitives::{EnvKzgSettings, EnvWithHandlerCfg, SpecId, MAX_BLOB_GAS_PER_BLOCK};
 
@@ -149,10 +149,13 @@ where
             .spawn_with_state_at_block(at, move |state| {
                 let coinbase = block_env.coinbase;
                 let basefee = Some(block_env.basefee.to::<u64>());
+                let chain_id = cfg.chain_id;
                 let env = EnvWithHandlerCfg::new_with_cfg_env(cfg, block_env, TxEnv::default());
-                let db = CacheDB::new(StateProviderDatabase::new(state));
+                let db = CacheDB::new(
+                    SyncStateProviderDatabase::new(Some(chain_id), StateProviderDatabase::new(state))
+                );
 
-                let initial_coinbase = DatabaseRef::basic_ref(&db, coinbase)
+                let initial_coinbase = SyncDatabaseRef::basic_ref(&db, coinbase)
                     .map_err(Eth::Error::from_eth_err)?
                     .map(|acc| acc.balance)
                     .unwrap_or_default();
@@ -231,7 +234,7 @@ where
                     if transactions.peek().is_some() {
                         // need to apply the state changes of this call before executing
                         // the next call
-                        evm.context.evm.db.commit(state)
+                        evm.context.evm.inner.db.commit(state)
                     }
                 }
 

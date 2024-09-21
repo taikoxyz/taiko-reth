@@ -14,7 +14,7 @@ use reth::{
         handler::register::EvmHandler,
         inspector_handle_register,
         precompile::{Precompile, PrecompileOutput, PrecompileSpecId},
-        ContextPrecompiles, Database, Evm, EvmBuilder, GetInspector,
+        ContextPrecompiles, SyncDatabase, Evm, EvmBuilder, GetInspector,
     },
     tasks::TaskManager,
 };
@@ -47,7 +47,7 @@ impl MyEvmConfig {
     /// This will use the default mainnet precompiles and add additional precompiles.
     pub fn set_precompiles<EXT, DB>(handler: &mut EvmHandler<EXT, DB>)
     where
-        DB: Database,
+        DB: SyncDatabase,
     {
         // first we need the evm spec id, which determines the precompiles
         let spec_id = handler.cfg.spec_id;
@@ -112,7 +112,7 @@ impl ConfigureEvmEnv for MyEvmConfig {
 impl ConfigureEvm for MyEvmConfig {
     type DefaultExternalContext<'a> = ();
 
-    fn evm<DB: Database>(&self, db: DB) -> Evm<'_, Self::DefaultExternalContext<'_>, DB> {
+    fn evm<DB: SyncDatabase>(&self, db: DB) -> Evm<'_, Self::DefaultExternalContext<'_>, DB> {
         EvmBuilder::default()
             .with_db(db)
             // add additional precompiles
@@ -122,7 +122,7 @@ impl ConfigureEvm for MyEvmConfig {
 
     fn evm_with_inspector<DB, I>(&self, db: DB, inspector: I) -> Evm<'_, I, DB>
     where
-        DB: Database,
+        DB: SyncDatabase,
         I: GetInspector<DB>,
     {
         EvmBuilder::default()

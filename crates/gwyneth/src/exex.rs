@@ -142,7 +142,7 @@ impl<Node: reth_node_api::FullNodeComponents> Rollup<Node> {
 
                 let mut builder_attrs =
                     GwynethPayloadBuilderAttributes::try_new(B256::ZERO, attrs).unwrap();
-                builder_attrs.l1_provider = Some(Arc::new(l1_state_provider));
+                builder_attrs.l1_provider = Some((self.ctx.config.chain.chain().id(), Arc::new(l1_state_provider)));
 
                 let payload_id = builder_attrs.inner.payload_id();
                 let parrent_beacon_block_root =

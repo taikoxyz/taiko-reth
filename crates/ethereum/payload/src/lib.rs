@@ -25,7 +25,7 @@ use reth_evm::{
 use reth_evm_ethereum::{eip6110::parse_deposits_from_receipts, EthEvmConfig};
 use reth_execution_types::ExecutionOutcome;
 use reth_payload_builder::{
-    error::PayloadBuilderError, EthBuiltPayload, EthPayloadBuilderAttributes,
+    database::to_sync_cached_reads, error::PayloadBuilderError, EthBuiltPayload, EthPayloadBuilderAttributes
 };
 use reth_primitives::{
     constants::{
@@ -37,13 +37,13 @@ use reth_primitives::{
     U256,
 };
 use reth_provider::StateProviderFactory;
-use reth_revm::database::StateProviderDatabase;
+use reth_revm::database::{StateProviderDatabase, SyncStateProviderDatabase};
 use reth_transaction_pool::{BestTransactionsAttributes, TransactionPool};
 use reth_trie::HashedPostState;
 use revm::{
-    db::states::bundle_state::BundleRetention,
+    db::{states::bundle_state::BundleRetention, State},
     primitives::{EVMError, EnvWithHandlerCfg, InvalidTransaction, ResultAndState},
-    DatabaseCommit, State,
+    DatabaseCommit,
 };
 use tracing::{debug, trace, warn};
 
@@ -110,7 +110,7 @@ where
             err
         })?;
         let mut db = State::builder()
-            .with_database(StateProviderDatabase::new(state))
+            .with_database((SyncStateProviderDatabase::new(Some(chain_spec.chain.id()), StateProviderDatabase::new(state))))
             .with_bundle_update()
             .build();
 
@@ -173,6 +173,8 @@ where
         let bundle_state = db.take_bundle();
         let state_root = db
             .database
+            .get_db(chain_spec.chain.id())
+            .unwrap()
             .state_root(HashedPostState::from_bundle_state(&bundle_state.state))
             .map_err(|err| {
                 warn!(target: "payload_builder",
@@ -230,7 +232,7 @@ where
         let header = Header {
             parent_hash: parent_block.hash(),
             ommers_hash: EMPTY_OMMER_ROOT_HASH,
-            beneficiary: initialized_block_env.coinbase,
+            beneficiary: initialized_block_env.coinbase.1,
             state_root,
             transactions_root: EMPTY_TRANSACTIONS,
             withdrawals_root,
@@ -276,11 +278,6 @@ where
     // Brecht: ethereum payload builder
 
     let BuildArguments { client, pool, mut cached_reads, config, cancel, best_payload } = args;
-
-    let state_provider = client.state_by_block_hash(config.parent_block.hash())?;
-    let state = StateProviderDatabase::new(state_provider);
-    let mut db =
-        State::builder().with_database_ref(cached_reads.as_db(state)).with_bundle_update().build();
     let extra_data = config.extra_data();
     let PayloadConfig {
         initialized_block_env,
@@ -290,6 +287,12 @@ where
         chain_spec,
         ..
     } = config;
+
+    let state_provider = client.state_by_block_hash(parent_block.hash())?;
+    let state = SyncStateProviderDatabase::new(None, StateProviderDatabase::new(state_provider));
+    let mut sync_cached_reads = to_sync_cached_reads(cached_reads, chain_spec.chain.id());
+    let mut db =
+        State::builder().with_database_ref(sync_cached_reads.as_db(state)).with_bundle_update().build();
 
     debug!(target: "payload_builder", id=%attributes.id, parent_hash = ?parent_block.hash(), parent_number = parent_block.number, "building new payload");
     let mut cumulative_gas_used = 0;
@@ -454,7 +457,7 @@ where
     // check if we have a better block
     if !is_better_payload(best_payload.as_ref(), total_fees) {
         // can skip building the block
-        return Ok(BuildOutcome::Aborted { fees: total_fees, cached_reads })
+        return Ok(BuildOutcome::Aborted { fees: total_fees, cached_reads: sync_cached_reads.into() })
     }
 
     // calculate the requests and the requests root
@@ -493,6 +496,7 @@ where
     db.merge_transitions(BundleRetention::PlainState);
 
     let execution_outcome = ExecutionOutcome::new(
+        None,
         db.take_bundle(),
         vec![receipts].into(),
         block_number,
@@ -507,7 +511,9 @@ where
         let state_provider = db.database.0.inner.borrow_mut();
         state_provider
             .db
-            .state_root(HashedPostState::from_bundle_state(&execution_outcome.state().state))?
+            .get_db(chain_spec.chain.id())
+            .unwrap()
+            .state_root(HashedPostState::from_bundle_state(&execution_outcome.all_states().state))?
     };
 
     // create the block header
@@ -541,7 +547,7 @@ where
     let header = Header {
         parent_hash: parent_block.hash(),
         ommers_hash: EMPTY_OMMER_ROOT_HASH,
-        beneficiary: initialized_block_env.coinbase,
+        beneficiary: initialized_block_env.coinbase.1,
         state_root,
         transactions_root,
         receipts_root,
@@ -573,5 +579,5 @@ where
     // extend the payload with the blob sidecars from the executed txs
     payload.extend_sidecars(blob_sidecars);
 
-    Ok(BuildOutcome::Better { payload, cached_reads })
+    Ok(BuildOutcome::Better { payload, cached_reads: sync_cached_reads.into() })
 }

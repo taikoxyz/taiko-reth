@@ -1,12 +1,11 @@
-use crate::BlockExecutionOutput;
+use crate::{chain, BlockExecutionOutput};
 use reth_primitives::{
-    logs_bloom, Account, Address, BlockNumber, Bloom, Bytecode, Log, Receipt, Receipts, Requests,
-    StorageEntry, B256, U256,
+    constants::ETHEREUM_CHAIN_ID, logs_bloom, Account, Address, BlockNumber, Bloom, Bytecode, Log, Receipt, Receipts, Requests, StorageEntry, B256, MAINNET_GENESIS_HASH, U256
 };
 use reth_trie::HashedPostState;
 use revm::{
     db::{states::BundleState, BundleAccount},
-    primitives::AccountInfo,
+    primitives::{AccountInfo, ChainAddress},
 };
 use std::collections::HashMap;
 
@@ -35,8 +34,11 @@ impl ChangedAccount {
 #[derive(Default, Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ExecutionOutcome {
+    /// Chain id of this execution outcome.
+    pub chain_id: Option<u64>,
     /// Bundle state with reverts.
     pub bundle: BundleState,
+    // FIX(Cecilia): Add (chain_id, Reciepts)
     /// The collection of receipts.
     /// Outer vector stores receipts for each block sequentially.
     /// The inner vector stores receipts ordered by transaction number.
@@ -45,6 +47,7 @@ pub struct ExecutionOutcome {
     pub receipts: Receipts,
     /// First block of bundle state.
     pub first_block: BlockNumber,
+    // FIX(Cecilia): Add (chain_id, Request)
     /// The collection of EIP-7685 requests.
     /// Outer vector stores requests for each block sequentially.
     /// The inner vector stores requests ordered by transaction number.
@@ -65,17 +68,21 @@ pub type AccountRevertInit = (Option<Option<Account>>, Vec<StorageEntry>);
 pub type RevertsInit = HashMap<BlockNumber, HashMap<Address, AccountRevertInit>>;
 
 impl ExecutionOutcome {
+
+    // FIX(Cecilia): new(chain_id: u64, ...) -> Self
+
     /// Creates a new `ExecutionOutcome`.
     ///
     /// This constructor initializes a new `ExecutionOutcome` instance with the provided
     /// bundle state, receipts, first block number, and EIP-7685 requests.
     pub const fn new(
+        chain_id: Option<u64>,
         bundle: BundleState,
         receipts: Receipts,
         first_block: BlockNumber,
         requests: Vec<Requests>,
     ) -> Self {
-        Self { bundle, receipts, first_block, requests }
+        Self { chain_id, bundle, receipts, first_block, requests }
     }
 
     /// Creates a new `ExecutionOutcome` from initialization parameters.
@@ -83,6 +90,7 @@ impl ExecutionOutcome {
     /// This constructor initializes a new `ExecutionOutcome` instance using detailed
     /// initialization parameters.
     pub fn new_init(
+        chain_id: Option<u64>,
         state_init: BundleStateInit,
         revert_init: RevertsInit,
         contracts_init: Vec<(B256, Bytecode)>,
@@ -90,6 +98,7 @@ impl ExecutionOutcome {
         first_block: BlockNumber,
         requests: Vec<Requests>,
     ) -> Self {
+        let chain_id_inner = chain_id.unwrap_or(ETHEREUM_CHAIN_ID);
         // sort reverts by block number
         let mut reverts = revert_init.into_iter().collect::<Vec<_>>();
         reverts.sort_unstable_by_key(|a| a.0);
@@ -98,7 +107,7 @@ impl ExecutionOutcome {
         let bundle = BundleState::new(
             state_init.into_iter().map(|(address, (original, present, storage))| {
                 (
-                    address,
+                    ChainAddress(chain_id_inner, address),
                     original.map(Into::into),
                     present.map(Into::into),
                     storage.into_iter().map(|(k, s)| (k.into(), s)).collect(),
@@ -108,26 +117,63 @@ impl ExecutionOutcome {
                 // does not needs to be sorted, it is done when taking reverts.
                 reverts.into_iter().map(|(address, (original, storage))| {
                     (
-                        address,
+                        ChainAddress(chain_id_inner, address),
                         original.map(|i| i.map(Into::into)),
                         storage.into_iter().map(|entry| (entry.key.into(), entry.value)),
                     )
                 })
             }),
-            contracts_init.into_iter().map(|(code_hash, bytecode)| (code_hash, bytecode.0)),
+            contracts_init.into_iter().map(|(code_hash, bytecode)| ((chain_id_inner, code_hash), bytecode.0)),
         );
 
-        Self { bundle, receipts, first_block, requests }
+        Self { chain_id, bundle, receipts, first_block, requests }
+    }
+
+    /// Reture the ExecutionOutcome for a speicific chain.
+    pub fn filter_chain(&self, chain_id: u64) -> Self {
+        Self {
+            chain_id: Some(chain_id),
+            bundle: self.bundle.filter_for_chain(chain_id),
+            // FIX(Cecilia): with (chain_id, Reciepts) & (chain_id, Requests)
+            // we can filter out the right ones
+            receipts: self.receipts.clone(),
+            first_block: self.first_block,
+            requests: self.requests.clone(),
+        }
+    }
+
+    /// Filter the ExecutionOutcome for the current chain 
+    /// if chain_id is not set, default to Ethereum.
+    pub fn filter_current_chain(&self) -> Self {
+        Self {
+            chain_id: self.chain_id,
+            bundle: self.current_state(),
+            // FIX(Cecilia): with (chain_id, Reciepts) & (chain_id, Requests)
+            // we can filter out the right ones
+            receipts: self.receipts.clone(),
+            first_block: self.first_block,
+            requests: self.requests.clone(),
+        }
     }
 
     /// Return revm bundle state.
-    pub const fn state(&self) -> &BundleState {
+    pub const fn all_states(&self) -> &BundleState {
         &self.bundle
     }
 
     /// Returns mutable revm bundle state.
-    pub fn state_mut(&mut self) -> &mut BundleState {
+    pub fn all_states_mut(&mut self) -> &mut BundleState {
         &mut self.bundle
+    }
+
+    /// Reture states for a speicific chain.
+    pub fn state(&self, chain_id: u64) -> BundleState {
+        self.bundle.filter_for_chain(chain_id)
+    }
+
+    /// Reture states for a speicific chain.
+    pub fn current_state(&self) -> BundleState {
+        self.bundle.filter_for_chain(self.chain_id.unwrap_or(ETHEREUM_CHAIN_ID))
     }
 
     /// Set first block.
@@ -137,35 +183,39 @@ impl ExecutionOutcome {
 
     /// Return iterator over all accounts
     pub fn accounts_iter(&self) -> impl Iterator<Item = (Address, Option<&AccountInfo>)> {
-        self.bundle.state().iter().map(|(a, acc)| (*a, acc.info.as_ref()))
+        self.bundle.state().iter().map(|(a, acc)| (a.1, acc.info.as_ref()))
     }
 
     /// Return iterator over all [`BundleAccount`]s in the bundle
     pub fn bundle_accounts_iter(&self) -> impl Iterator<Item = (Address, &BundleAccount)> {
-        self.bundle.state().iter().map(|(a, acc)| (*a, acc))
+        self.bundle.state().iter().map(|(a, acc)| (a.1, acc))
     }
 
     /// Get account if account is known.
+    /// Only support the account of current chain, or default to Ethereum.
     pub fn account(&self, address: &Address) -> Option<Option<Account>> {
-        self.bundle.account(address).map(|a| a.info.clone().map(Into::into))
+        let chain_id = self.chain_id.unwrap_or(ETHEREUM_CHAIN_ID);
+        self.bundle.account(&ChainAddress(chain_id, *address)).map(|a| a.info.clone().map(Into::into))
     }
 
     /// Get storage if value is known.
     ///
     /// This means that depending on status we can potentially return `U256::ZERO`.
     pub fn storage(&self, address: &Address, storage_key: U256) -> Option<U256> {
-        self.bundle.account(address).and_then(|a| a.storage_slot(storage_key))
+        let chain_id = self.chain_id.unwrap_or(ETHEREUM_CHAIN_ID);
+        self.bundle.account(&ChainAddress(chain_id, *address)).and_then(|a| a.storage_slot(storage_key))
     }
 
     /// Return bytecode if known.
     pub fn bytecode(&self, code_hash: &B256) -> Option<Bytecode> {
-        self.bundle.bytecode(code_hash).map(Bytecode)
+        let chain_id = self.chain_id.unwrap_or(ETHEREUM_CHAIN_ID);
+        self.bundle.bytecode(chain_id, code_hash).map(Bytecode)
     }
 
     /// Returns [`HashedPostState`] for this execution outcome.
     /// See [`HashedPostState::from_bundle_state`] for more info.
     pub fn hash_state_slow(&self) -> HashedPostState {
-        HashedPostState::from_bundle_state(&self.bundle.state)
+        HashedPostState::from_bundle_state(self.current_state().state())
     }
 
     /// Transform block number to the index of block.
@@ -356,9 +406,22 @@ impl ExecutionOutcome {
     }
 }
 
+impl From<(BlockExecutionOutput<Receipt>, u64, BlockNumber)> for ExecutionOutcome {
+    fn from(value: (BlockExecutionOutput<Receipt>, u64, BlockNumber)) -> Self {
+        Self {
+            chain_id: Some(value.1),
+            bundle: value.0.state,
+            receipts: Receipts::from(value.0.receipts),
+            first_block: value.2,
+            requests: vec![Requests::from(value.0.requests)],
+        }
+    }
+}
+
 impl From<(BlockExecutionOutput<Receipt>, BlockNumber)> for ExecutionOutcome {
     fn from(value: (BlockExecutionOutput<Receipt>, BlockNumber)) -> Self {
         Self {
+            chain_id: None,
             bundle: value.0.state,
             receipts: Receipts::from(value.0.receipts),
             first_block: value.1,
@@ -375,12 +438,14 @@ mod tests {
     use reth_primitives::{Address, Receipts, Request, Requests, TxType, B256};
     use std::collections::HashMap;
 
+    const CHAIN_ID: u64 = 1u64;
+
     #[test]
     fn test_initialisation() {
         // Create a new BundleState object with initial data
         let bundle = BundleState::new(
-            vec![(Address::new([2; 20]), None, Some(AccountInfo::default()), HashMap::default())],
-            vec![vec![(Address::new([2; 20]), None, vec![])]],
+            vec![(ChainAddress(CHAIN_ID, Address::new([2; 20])), None, Some(AccountInfo::default()), HashMap::default())],
+            vec![vec![(ChainAddress(CHAIN_ID, Address::new([2; 20])), None, vec![])]],
             vec![],
         );
 
@@ -428,6 +493,7 @@ mod tests {
         // Create a ExecutionOutcome object with the created bundle, receipts, requests, and
         // first_block
         let exec_res = ExecutionOutcome {
+            chain_id: Some(CHAIN_ID),
             bundle: bundle.clone(),
             receipts: receipts.clone(),
             requests: requests.clone(),
@@ -436,7 +502,7 @@ mod tests {
 
         // Assert that creating a new ExecutionOutcome using the constructor matches exec_res
         assert_eq!(
-            ExecutionOutcome::new(bundle, receipts.clone(), first_block, requests.clone()),
+            ExecutionOutcome::new(Some(CHAIN_ID), bundle, receipts.clone(), first_block, requests.clone()),
             exec_res
         );
 
@@ -457,6 +523,7 @@ mod tests {
         // exec_res
         assert_eq!(
             ExecutionOutcome::new_init(
+                Some(CHAIN_ID),
                 state_init,
                 revert_init,
                 vec![],
@@ -490,6 +557,7 @@ mod tests {
         // Create a ExecutionOutcome object with the created bundle, receipts, requests, and
         // first_block
         let exec_res = ExecutionOutcome {
+            chain_id: Some(CHAIN_ID),
             bundle: Default::default(),
             receipts,
             requests: vec![],
@@ -528,6 +596,7 @@ mod tests {
         // Create a ExecutionOutcome object with the created bundle, receipts, requests, and
         // first_block
         let exec_res = ExecutionOutcome {
+            chain_id: Some(CHAIN_ID),
             bundle: Default::default(),
             receipts,
             requests: vec![],
@@ -563,6 +632,7 @@ mod tests {
         // Create a ExecutionOutcome object with the created bundle, receipts, requests, and
         // first_block
         let exec_res = ExecutionOutcome {
+            chain_id: Some(CHAIN_ID),
             bundle: Default::default(), // Default value for bundle
             receipts,                   // Include the created receipts
             requests: vec![],           // Empty vector for requests
@@ -613,6 +683,7 @@ mod tests {
         // Create a ExecutionOutcome object with the created bundle, receipts, requests, and
         // first_block
         let exec_res = ExecutionOutcome {
+            chain_id: Some(CHAIN_ID),
             bundle: Default::default(), // Default value for bundle
             receipts,                   // Include the created receipts
             requests: vec![],           // Empty vector for requests
@@ -627,6 +698,7 @@ mod tests {
 
         // Create a ExecutionOutcome object with an empty Receipts object
         let exec_res_empty_receipts = ExecutionOutcome {
+            chain_id: Some(CHAIN_ID),
             bundle: Default::default(), // Default value for bundle
             receipts: receipts_empty,   // Include the empty receipts
             requests: vec![],           // Empty vector for requests
@@ -677,7 +749,7 @@ mod tests {
         // Create a ExecutionOutcome object with the created bundle, receipts, requests, and
         // first_block
         let mut exec_res =
-            ExecutionOutcome { bundle: Default::default(), receipts, requests, first_block };
+            ExecutionOutcome { chain_id: Some(CHAIN_ID), bundle: Default::default(), receipts, requests, first_block };
 
         // Assert that the revert_to method returns true when reverting to the initial block number.
         assert!(exec_res.revert_to(123));
@@ -731,7 +803,7 @@ mod tests {
 
         // Create an ExecutionOutcome object.
         let mut exec_res =
-            ExecutionOutcome { bundle: Default::default(), receipts, requests, first_block };
+            ExecutionOutcome { chain_id: Some(CHAIN_ID), bundle: Default::default(), receipts, requests, first_block };
 
         // Extend the ExecutionOutcome object by itself.
         exec_res.extend(exec_res.clone());
@@ -740,6 +812,7 @@ mod tests {
         assert_eq!(
             exec_res,
             ExecutionOutcome {
+                chain_id: Some(CHAIN_ID),
                 bundle: Default::default(),
                 receipts: Receipts {
                     receipt_vec: vec![vec![Some(receipt.clone())], vec![Some(receipt)]]
@@ -792,13 +865,14 @@ mod tests {
         // Create a ExecutionOutcome object with the created bundle, receipts, requests, and
         // first_block
         let exec_res =
-            ExecutionOutcome { bundle: Default::default(), receipts, requests, first_block };
+            ExecutionOutcome { chain_id: Some(CHAIN_ID), bundle: Default::default(), receipts, requests, first_block };
 
         // Split the ExecutionOutcome at block number 124
         let result = exec_res.clone().split_at(124);
 
         // Define the expected lower ExecutionOutcome after splitting
         let lower_execution_outcome = ExecutionOutcome {
+            chain_id: Some(CHAIN_ID),
             bundle: Default::default(),
             receipts: Receipts { receipt_vec: vec![vec![Some(receipt.clone())]] },
             requests: vec![Requests(vec![request])],
@@ -807,6 +881,7 @@ mod tests {
 
         // Define the expected higher ExecutionOutcome after splitting
         let higher_execution_outcome = ExecutionOutcome {
+            chain_id: Some(CHAIN_ID),
             bundle: Default::default(),
             receipts: Receipts {
                 receipt_vec: vec![vec![Some(receipt.clone())], vec![Some(receipt)]],
@@ -839,7 +914,7 @@ mod tests {
         // Set up the bundle state with these accounts
         let mut bundle_state = BundleState::default();
         bundle_state.state.insert(
-            address1,
+            ChainAddress(CHAIN_ID, address1),
             BundleAccount {
                 info: Some(account_info1),
                 storage: Default::default(),
@@ -848,7 +923,7 @@ mod tests {
             },
         );
         bundle_state.state.insert(
-            address2,
+            ChainAddress(CHAIN_ID, address2),
             BundleAccount {
                 info: Some(account_info2),
                 storage: Default::default(),
@@ -859,7 +934,7 @@ mod tests {
 
         // Unchanged account
         bundle_state.state.insert(
-            address3,
+            ChainAddress(CHAIN_ID, address3),
             BundleAccount {
                 info: None,
                 storage: Default::default(),
@@ -869,6 +944,7 @@ mod tests {
         );
 
         let execution_outcome = ExecutionOutcome {
+            chain_id: Some(CHAIN_ID),
             bundle: bundle_state,
             receipts: Receipts::default(),
             first_block: 0,

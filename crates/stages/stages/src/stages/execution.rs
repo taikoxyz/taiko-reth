@@ -15,7 +15,7 @@ use reth_provider::{
     ProviderError, StateWriter, StatsReader, TransactionVariant,
 };
 use reth_prune_types::PruneModes;
-use reth_revm::database::StateProviderDatabase;
+use reth_revm::database::{StateProviderDatabase, SyncStateProviderDatabase};
 use reth_stages_api::{
     BlockErrorKind, CheckpointBlockRange, EntitiesCheckpoint, ExecInput, ExecOutput,
     ExecutionCheckpoint, ExecutionStageThresholds, MetricEvent, MetricEventsSender, Stage,
@@ -224,7 +224,8 @@ where
             provider.tx_ref(),
             provider.static_file_provider().clone(),
         ));
-        let mut executor = self.executor_provider.batch_executor(db);
+        // TODO(Cecilia): risk of wrong chain id
+        let mut executor = self.executor_provider.batch_executor(SyncStateProviderDatabase::new(None, db));
         executor.set_tip(max_block);
         executor.set_prune_modes(prune_modes);
 
@@ -324,8 +325,11 @@ where
 
         // prepare execution output for writing
         let time = Instant::now();
-        let ExecutionOutcome { bundle, receipts, requests, first_block } = executor.finalize();
-        let state = ExecutionOutcome::new(bundle, receipts, first_block, requests);
+        let ExecutionOutcome { chain_id, bundle, receipts, requests, first_block } = executor.finalize();
+        let state = ExecutionOutcome::new(chain_id, bundle, receipts, first_block, requests)
+            .filter_current_chain();
+        // TODO(Cecilia): If building for other chains, get the ExecutionOutcome of other chains by doing this:
+        //      let other_states = state.filter_chain(other_chain_id);
         let write_preparation_duration = time.elapsed();
 
         // log the gas per second for the range we just executed

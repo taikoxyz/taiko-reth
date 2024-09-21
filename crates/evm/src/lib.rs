@@ -17,9 +17,9 @@ use core::ops::Deref;
 use crate::builder::RethEvmBuilder;
 use reth_chainspec::ChainSpec;
 use reth_primitives::{Address, Header, TransactionSigned, TransactionSignedEcRecovered, U256};
-use revm::{Database, Evm, GetInspector};
+use revm::{SyncDatabase, Evm, GetInspector};
 use revm_primitives::{
-    BlockEnv, Bytes, CfgEnvWithHandlerCfg, Env, EnvWithHandlerCfg, SpecId, TxEnv,
+    BlockEnv, Bytes, CfgEnvWithHandlerCfg, ChainAddress, Env, EnvWithHandlerCfg, SpecId, TxEnv
 };
 
 pub mod builder;
@@ -44,7 +44,7 @@ pub trait ConfigureEvm: ConfigureEvmEnv {
     /// This does not automatically configure the EVM with [`ConfigureEvmEnv`] methods. It is up to
     /// the caller to call an appropriate method to fill the transaction and block environment
     /// before executing any transactions using the provided EVM.
-    fn evm<DB: Database>(&self, db: DB) -> Evm<'_, Self::DefaultExternalContext<'_>, DB> {
+    fn evm<DB: SyncDatabase>(&self, db: DB) -> Evm<'_, Self::DefaultExternalContext<'_>, DB> {
         RethEvmBuilder::new(db, self.default_external_context()).build()
     }
 
@@ -52,7 +52,7 @@ pub trait ConfigureEvm: ConfigureEvmEnv {
     /// including the spec id.
     ///
     /// This will preserve any handler modifications
-    fn evm_with_env<DB: Database>(
+    fn evm_with_env<DB: SyncDatabase>(
         &self,
         db: DB,
         env: EnvWithHandlerCfg,
@@ -76,7 +76,7 @@ pub trait ConfigureEvm: ConfigureEvmEnv {
         inspector: I,
     ) -> Evm<'_, I, DB>
     where
-        DB: Database,
+        DB: SyncDatabase,
         I: GetInspector<DB>,
     {
         let mut evm = self.evm_with_inspector(db, inspector);
@@ -92,7 +92,7 @@ pub trait ConfigureEvm: ConfigureEvmEnv {
     /// environment before executing any transactions using the provided EVM.
     fn evm_with_inspector<DB, I>(&self, db: DB, inspector: I) -> Evm<'_, I, DB>
     where
-        DB: Database,
+        DB: SyncDatabase,
         I: GetInspector<DB>,
     {
         RethEvmBuilder::new(db, self.default_external_context()).build_with_inspector(inspector)
@@ -137,9 +137,9 @@ pub trait ConfigureEvmEnv: Send + Sync + Unpin + Clone + 'static {
     );
 
     /// Fill [`BlockEnv`] field according to the chain spec and given header
-    fn fill_block_env(&self, block_env: &mut BlockEnv, header: &Header, after_merge: bool) {
+    fn fill_block_env(&self, chain_id: u64, block_env: &mut BlockEnv, header: &Header, after_merge: bool) {
         block_env.number = U256::from(header.number);
-        block_env.coinbase = header.beneficiary;
+        block_env.coinbase = ChainAddress(block_env.coinbase.0, header.beneficiary);
         block_env.timestamp = U256::from(header.timestamp);
         if after_merge {
             block_env.prevrandao = Some(header.mix_hash);
@@ -169,6 +169,6 @@ pub trait ConfigureEvmEnv: Send + Sync + Unpin + Clone + 'static {
     ) {
         self.fill_cfg_env(cfg, chain_spec, header, total_difficulty);
         let after_merge = cfg.handler_cfg.spec_id >= SpecId::MERGE;
-        self.fill_block_env(block_env, header, after_merge);
+        self.fill_block_env(chain_spec.chain().id(), block_env, header, after_merge);
     }
 }

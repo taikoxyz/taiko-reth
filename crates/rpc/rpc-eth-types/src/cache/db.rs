@@ -2,15 +2,16 @@
 //! <https://github.com/rust-lang/rust/issues/100013> in default implementation of
 //! `reth_rpc_eth_api::helpers::Call`.
 
+use reth_chainspec::Chain;
 use reth_errors::ProviderResult;
 use reth_primitives::{Address, B256, U256};
-use reth_revm::{database::StateProviderDatabase, db::CacheDB, DatabaseRef};
+use reth_revm::{database::SyncStateProviderDatabase, db::CacheDB, DatabaseRef, Database, SyncDatabaseRef, SyncDatabase};
 use reth_storage_api::StateProvider;
 use reth_trie::HashedStorage;
-use revm::Database;
+use revm_primitives::ChainAddress;
 
 /// Helper alias type for the state's [`CacheDB`]
-pub type StateCacheDb<'a> = CacheDB<StateProviderDatabase<StateProviderTraitObjWrapper<'a>>>;
+pub type StateCacheDb<'a> = CacheDB<SyncStateProviderDatabase<StateProviderTraitObjWrapper<'a>>>;
 
 /// Hack to get around 'higher-ranked lifetime error', see
 /// <https://github.com/rust-lang/rust/issues/100013>
@@ -156,55 +157,108 @@ impl<'a> StateProvider for StateProviderTraitObjWrapper<'a> {
 #[allow(missing_debug_implementations)]
 pub struct StateCacheDbRefMutWrapper<'a, 'b>(pub &'b mut StateCacheDb<'a>);
 
-impl<'a, 'b> Database for StateCacheDbRefMutWrapper<'a, 'b> {
-    type Error = <StateCacheDb<'a> as Database>::Error;
+impl<'a, 'b> SyncDatabase for StateCacheDbRefMutWrapper<'a, 'b> {
+    type Error = <StateCacheDb<'a> as SyncDatabase>::Error;
     fn basic(
         &mut self,
-        address: revm_primitives::Address,
+        address: ChainAddress,
     ) -> Result<Option<revm_primitives::AccountInfo>, Self::Error> {
         self.0.basic(address)
     }
 
-    fn code_by_hash(&mut self, code_hash: B256) -> Result<revm_primitives::Bytecode, Self::Error> {
-        self.0.code_by_hash(code_hash)
+    fn code_by_hash(&mut self, chain_id: u64, code_hash: B256) -> Result<revm_primitives::Bytecode, Self::Error> {
+        self.0.code_by_hash(chain_id, code_hash)
     }
 
     fn storage(
         &mut self,
-        address: revm_primitives::Address,
+        address: ChainAddress,
         index: U256,
     ) -> Result<U256, Self::Error> {
         self.0.storage(address, index)
     }
 
-    fn block_hash(&mut self, number: u64) -> Result<B256, Self::Error> {
-        self.0.block_hash(number)
+    fn block_hash(&mut self, chain_id: u64, number: u64) -> Result<B256, Self::Error> {
+        self.0.block_hash(chain_id, number)
     }
 }
 
-impl<'a, 'b> DatabaseRef for StateCacheDbRefMutWrapper<'a, 'b> {
-    type Error = <StateCacheDb<'a> as Database>::Error;
+impl<'a, 'b> SyncDatabaseRef for StateCacheDbRefMutWrapper<'a, 'b> {
+    type Error = <StateCacheDb<'a> as SyncDatabase>::Error;
 
     fn basic_ref(
         &self,
-        address: revm_primitives::Address,
+        address: ChainAddress,
     ) -> Result<Option<revm_primitives::AccountInfo>, Self::Error> {
         self.0.basic_ref(address)
     }
 
-    fn code_by_hash_ref(&self, code_hash: B256) -> Result<revm_primitives::Bytecode, Self::Error> {
-        self.0.code_by_hash_ref(code_hash)
+    fn code_by_hash_ref(&self, chain_id: u64, code_hash: B256) -> Result<revm_primitives::Bytecode, Self::Error> {
+        self.0.code_by_hash_ref(chain_id, code_hash)
     }
 
     fn storage_ref(
         &self,
-        address: revm_primitives::Address,
+        address: ChainAddress,
         index: U256,
     ) -> Result<U256, Self::Error> {
         self.0.storage_ref(address, index)
     }
 
-    fn block_hash_ref(&self, number: u64) -> Result<B256, Self::Error> {
-        self.0.block_hash_ref(number)
+    fn block_hash_ref(&self,chain_id: u64, number: u64) -> Result<B256, Self::Error> {
+        self.0.block_hash_ref(chain_id, number)
     }
 }
+
+// impl<'a, 'b> Database for StateCacheDbRefMutWrapper<'a, 'b> {
+//     type Error = <StateCacheDb<'a> as Database>::Error;
+//     fn basic(
+//         &mut self,
+//         address: revm_primitives::Address,
+//     ) -> Result<Option<revm_primitives::AccountInfo>, Self::Error> {
+//         self.0.basic(address)
+//     }
+
+//     fn code_by_hash(&mut self, code_hash: B256) -> Result<revm_primitives::Bytecode, Self::Error> {
+//         self.0.code_by_hash(code_hash)
+//     }
+
+//     fn storage(
+//         &mut self,
+//         address: revm_primitives::Address,
+//         index: U256,
+//     ) -> Result<U256, Self::Error> {
+//         self.0.storage(address, index)
+//     }
+
+//     fn block_hash(&mut self, number: u64) -> Result<B256, Self::Error> {
+//         self.0.block_hash(number)
+//     }
+// }
+
+// impl<'a, 'b> DatabaseRef for StateCacheDbRefMutWrapper<'a, 'b> {
+//     type Error = <StateCacheDb<'a> as Database>::Error;
+
+//     fn basic_ref(
+//         &self,
+//         address: revm_primitives::Address,
+//     ) -> Result<Option<revm_primitives::AccountInfo>, Self::Error> {
+//         self.0.basic_ref(address)
+//     }
+
+//     fn code_by_hash_ref(&self, code_hash: B256) -> Result<revm_primitives::Bytecode, Self::Error> {
+//         self.0.code_by_hash_ref(code_hash)
+//     }
+
+//     fn storage_ref(
+//         &self,
+//         address: revm_primitives::Address,
+//         index: U256,
+//     ) -> Result<U256, Self::Error> {
+//         self.0.storage_ref(address, index)
+//     }
+
+//     fn block_hash_ref(&self, number: u64) -> Result<B256, Self::Error> {
+//         self.0.block_hash_ref(number)
+//     }
+// }

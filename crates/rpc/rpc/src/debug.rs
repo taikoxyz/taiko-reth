@@ -13,7 +13,7 @@ use reth_provider::{
     BlockReaderIdExt, ChainSpecProvider, EvmEnvProvider, HeaderProvider, StateProofProvider,
     StateProviderFactory, TransactionVariant,
 };
-use reth_revm::database::StateProviderDatabase;
+use reth_revm::database::{StateProviderDatabase, SyncStateProviderDatabase};
 use reth_rpc_api::DebugApiServer;
 use reth_rpc_eth_api::{
     helpers::{Call, EthApiSpec, EthTransactions, TraceExt},
@@ -102,7 +102,9 @@ where
             .spawn_with_state_at_block(at, move |state| {
                 let block_hash = at.as_block_hash();
                 let mut results = Vec::with_capacity(transactions.len());
-                let mut db = CacheDB::new(StateProviderDatabase::new(state));
+                let mut db = CacheDB::new(
+                    SyncStateProviderDatabase::new(Some(cfg.chain_id), StateProviderDatabase::new(state))
+                );
                 let mut transactions = transactions.into_iter().enumerate().peekable();
                 while let Some((index, tx)) = transactions.next() {
                     let tx_hash = tx.hash;
@@ -244,7 +246,9 @@ where
                 // configure env for the target transaction
                 let tx = transaction.into_recovered();
 
-                let mut db = CacheDB::new(StateProviderDatabase::new(state));
+                let mut db = CacheDB::new(
+                    SyncStateProviderDatabase::new(Some(cfg.chain_id), StateProviderDatabase::new(state))
+                );
                 // replay all transactions prior to the targeted transaction
                 let index = this.eth_api().replay_transactions_until(
                     &mut db,
@@ -355,7 +359,7 @@ where
                                 let frame = inspector
                                     .with_transaction_gas_limit(env.tx.gas_limit)
                                     .into_geth_builder()
-                                    .geth_prestate_traces(&res, prestate_config, db)
+                                    .geth_prestate_traces(&res, &prestate_config, db)
                                     .map_err(Eth::Error::from_eth_err)?;
                                 Ok(frame)
                             })
@@ -389,6 +393,8 @@ where
                             .await?;
                         return Ok(frame)
                     }
+                    // FIX(Cecilia)
+                    GethDebugBuiltInTracerType::FlatCallTracer => todo!(),
                 },
                 #[cfg(not(feature = "js-tracer"))]
                 GethDebugTracerType::JsTracer(_) => {
@@ -494,7 +500,9 @@ where
             .spawn_with_state_at_block(at.into(), move |state| {
                 // the outer vec for the bundles
                 let mut all_bundles = Vec::with_capacity(bundles.len());
-                let mut db = CacheDB::new(StateProviderDatabase::new(state));
+                let mut db = CacheDB::new(
+                    SyncStateProviderDatabase::new(Some(cfg.chain_id), StateProviderDatabase::new(state))
+                );
 
                 if replay_block_txs {
                     // only need to replay the transactions in the block if not all transactions are
@@ -581,7 +589,7 @@ where
             .spawn_with_state_at_block(block.parent_hash.into(), move |state| {
                 let evm_config = Call::evm_config(this.eth_api()).clone();
                 let mut db = StateBuilder::new()
-                    .with_database(StateProviderDatabase::new(state))
+                    .with_database(SyncStateProviderDatabase::new(None, StateProviderDatabase::new(state)))
                     .with_bundle_update()
                     .build();
 
@@ -634,7 +642,7 @@ where
                 // referenced accounts + storage slots.
                 let mut hashed_state = HashedPostState::from_bundle_state(&bundle_state.state);
                 for (address, account) in db.cache.accounts {
-                    let hashed_address = keccak256(address);
+                    let hashed_address = keccak256(address.1);
                     hashed_state.accounts.insert(
                         hashed_address,
                         account.account.as_ref().map(|a| a.info.clone().into()),
@@ -655,7 +663,7 @@ where
 
                 // Generate an execution witness for the aggregated state of accessed accounts.
                 // Destruct the cache database to retrieve the state provider.
-                let state_provider = db.database.into_inner();
+                let state_provider = db.database.get_default_db().unwrap();
                 let witness = state_provider
                     .witness(HashedPostState::default(), hashed_state)
                     .map_err(Into::into)?;
@@ -720,7 +728,7 @@ where
                         let frame = inspector
                             .with_transaction_gas_limit(env.tx.gas_limit)
                             .into_geth_builder()
-                            .geth_prestate_traces(&res, prestate_config, db)
+                            .geth_prestate_traces(&res, &prestate_config, db)
                             .map_err(Eth::Error::from_eth_err)?;
 
                         return Ok((frame.into(), res.state))
@@ -742,6 +750,8 @@ where
                             .map_err(Eth::Error::from_eth_err)?;
                         return Ok((frame.into(), res.state))
                     }
+                    // FIX(Cecilia): fucking alloy
+                    _ => unimplemented!()
                 },
                 #[cfg(not(feature = "js-tracer"))]
                 GethDebugTracerType::JsTracer(_) => {

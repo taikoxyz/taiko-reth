@@ -6,6 +6,7 @@ use std::time::{Duration, Instant};
 use crate::{EthApiTypes, FromEthApiError, FromEvmError};
 use futures::Future;
 use reth_chainspec::{ChainSpec, EthereumHardforks};
+use reth_errors::{DatabaseError, RethError};
 use reth_evm::{
     system_calls::{pre_block_beacon_root_contract_call, pre_block_blockhashes_contract_call},
     ConfigureEvm, ConfigureEvmEnv,
@@ -27,12 +28,13 @@ use reth_provider::{
     ReceiptProvider, StateProviderFactory,
 };
 use reth_revm::{
-    database::StateProviderDatabase, state_change::post_block_withdrawals_balance_increments,
+    database::{StateProviderDatabase, SyncStateProviderDatabase}, state_change::post_block_withdrawals_balance_increments,
 };
 use reth_rpc_eth_types::{EthApiError, PendingBlock, PendingBlockEnv, PendingBlockEnvOrigin};
 use reth_transaction_pool::{BestTransactionsAttributes, TransactionPool};
 use reth_trie::HashedPostState;
-use revm::{db::states::bundle_state::BundleRetention, DatabaseCommit, State};
+use revm::{db::{states::bundle_state::BundleRetention, State}, DatabaseCommit};
+use revm_primitives::ChainAddress;
 use tokio::sync::Mutex;
 use tracing::debug;
 
@@ -235,9 +237,10 @@ pub trait LoadPendingBlock: EthApiTypes {
             .provider()
             .history_by_block_hash(parent_hash)
             .map_err(Self::Error::from_eth_err)?;
-        let state = StateProviderDatabase::new(state_provider);
+        let state = SyncStateProviderDatabase::new(Some(cfg.chain_id), StateProviderDatabase::new(state_provider));
         let mut db = State::builder().with_database(state).with_bundle_update().build();
 
+        let chain_id = cfg.chain_id;
         let mut cumulative_gas_used = 0;
         let mut sum_blob_gas_used = 0;
         let block_gas_limit: u64 = block_env.gas_limit.to::<u64>();
@@ -286,7 +289,6 @@ pub trait LoadPendingBlock: EthApiTypes {
             origin.header().hash(),
         )
         .map_err(|err| EthApiError::Internal(err.into()))?;
-
         let mut receipts = Vec::new();
 
         while let Some(pool_tx) = best_txs.next() {
@@ -392,18 +394,21 @@ pub trait LoadPendingBlock: EthApiTypes {
         );
 
         // increment account balances for withdrawals
-        db.increment_balances(balance_increments).map_err(Self::Error::from_eth_err)?;
+        db.increment_balances(
+            balance_increments.iter().map_while(|(acc, bal)| Some((ChainAddress(chain_id, *acc), *bal)))
+        ).map_err(Self::Error::from_eth_err)?;
 
         // merge all transitions into bundle state.
         db.merge_transitions(BundleRetention::PlainState);
 
         let execution_outcome = ExecutionOutcome::new(
+            Some(chain_spec.chain().id()),
             db.take_bundle(),
             vec![receipts.clone()].into(),
             block_number,
             Vec::new(),
-        );
-        let hashed_state = HashedPostState::from_bundle_state(&execution_outcome.state().state);
+        ).filter_current_chain();
+        let hashed_state = HashedPostState::from_bundle_state(&execution_outcome.current_state().state);
 
         let receipts_root = self.receipts_root(&block_env, &execution_outcome, block_number);
 
@@ -413,7 +418,11 @@ pub trait LoadPendingBlock: EthApiTypes {
         // calculate the state root
         let state_provider = &db.database;
         let state_root =
-            state_provider.state_root(hashed_state).map_err(Self::Error::from_eth_err)?;
+            state_provider
+                .get_db(chain_spec.chain().id())
+                .ok_or(ProviderError::Database(DatabaseError::Other("Database not found".to_string())).into())?
+                .state_root(hashed_state)
+                .map_err(Self::Error::from_eth_err)?;
 
         // create the block header
         let transactions_root = calculate_transaction_root(&executed_txs);
@@ -434,7 +443,7 @@ pub trait LoadPendingBlock: EthApiTypes {
         let header = Header {
             parent_hash,
             ommers_hash: EMPTY_OMMER_ROOT_HASH,
-            beneficiary: block_env.coinbase,
+            beneficiary: block_env.coinbase.1,
             state_root,
             transactions_root,
             receipts_root,
