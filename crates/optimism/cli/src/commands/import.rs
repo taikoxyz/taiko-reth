@@ -69,7 +69,7 @@ impl ImportOpCommand {
                 "Importing chain file chunk"
             );
 
-            let tip = file_client.tip().ok_or(eyre::eyre!("file client has no tip"))?;
+            let tip = file_client.tip().ok_or_else(|| eyre::eyre!("file client has no tip"))?;
             info!(target: "reth::cli", "Chain file chunk read");
 
             total_decoded_blocks += file_client.headers_len();
@@ -103,12 +103,7 @@ impl ImportOpCommand {
 
             let latest_block_number =
                 provider.get_stage_checkpoint(StageId::Finish)?.map(|ch| ch.block_number);
-            tokio::spawn(reth_node_events::node::handle_events(
-                None,
-                latest_block_number,
-                events,
-                provider_factory.db_ref().clone(),
-            ));
+            tokio::spawn(reth_node_events::node::handle_events(None, latest_block_number, events));
 
             // Run pipeline
             info!(target: "reth::cli", "Starting sync pipeline");

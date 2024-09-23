@@ -15,7 +15,7 @@ use reth_cli_runner::CliContext;
 use reth_consensus::Consensus;
 use reth_db::DatabaseEnv;
 use reth_errors::RethResult;
-use reth_evm::execute::{BlockExecutionOutput, BlockExecutorProvider, Executor};
+use reth_evm::execute::{BlockExecutorProvider, Executor};
 use reth_execution_types::ExecutionOutcome;
 use reth_fs_util as fs;
 use reth_node_api::PayloadBuilderAttributes;
@@ -38,6 +38,8 @@ use reth_transaction_pool::{
     blobstore::InMemoryBlobStore, BlobStore, EthPooledTransaction, PoolConfig, TransactionOrigin,
     TransactionPool, TransactionValidationTaskExecutor,
 };
+use reth_trie::StateRoot;
+use reth_trie_db::DatabaseStateRoot;
 use std::{path::PathBuf, str::FromStr, sync::Arc};
 use tracing::*;
 
@@ -172,13 +174,13 @@ impl Command {
             debug!(target: "reth::cli", bytes = ?tx_bytes, "Decoding transaction");
             let transaction = TransactionSigned::decode(&mut &Bytes::from_str(tx_bytes)?[..])?
                 .into_ecrecovered()
-                .ok_or(eyre::eyre!("failed to recover tx"))?;
+                .ok_or_else(|| eyre::eyre!("failed to recover tx"))?;
 
             let encoded_length = match &transaction.transaction {
                 Transaction::Eip4844(TxEip4844 { blob_versioned_hashes, .. }) => {
-                    let blobs_bundle = blobs_bundle.as_mut().ok_or(eyre::eyre!(
-                        "encountered a blob tx. `--blobs-bundle-path` must be provided"
-                    ))?;
+                    let blobs_bundle = blobs_bundle.as_mut().ok_or_else(|| {
+                        eyre::eyre!("encountered a blob tx. `--blobs-bundle-path` must be provided")
+                    })?;
 
                     let sidecar: BlobTransactionSidecar =
                         blobs_bundle.pop_sidecar(blob_versioned_hashes.len());
@@ -224,7 +226,7 @@ impl Command {
             #[cfg(feature = "optimism")]
             reth_node_optimism::OptimismPayloadBuilderAttributes::try_new(
                 best_block.hash(),
-                reth_rpc_types::engine::OptimismPayloadAttributes {
+                reth_rpc_types::optimism::OptimismPayloadAttributes {
                     payload_attributes: payload_attrs,
                     transactions: None,
                     no_tx_pool: None,
@@ -275,20 +277,17 @@ impl Command {
                 let db = StateProviderDatabase::new(blockchain_db.latest()?);
                 let executor = block_executor!(provider_factory.chain_spec()).executor(db);
 
-                let BlockExecutionOutput { state, receipts, requests, .. } =
+                let block_execution_output =
                     executor.execute((&block_with_senders.clone().unseal(), U256::MAX).into())?;
-                let execution_outcome = ExecutionOutcome::new(
-                    state,
-                    receipts.into(),
-                    block.number,
-                    vec![requests.into()],
-                );
-
+                let execution_outcome =
+                    ExecutionOutcome::from((block_execution_output, block.number));
                 debug!(target: "reth::cli", ?execution_outcome, "Executed block");
 
                 let hashed_post_state = execution_outcome.hash_state_slow();
-                let (state_root, trie_updates) = hashed_post_state
-                    .state_root_with_updates(provider_factory.provider()?.tx_ref())?;
+                let (state_root, trie_updates) = StateRoot::overlay_root_with_updates(
+                    provider_factory.provider()?.tx_ref(),
+                    hashed_post_state.clone(),
+                )?;
 
                 if state_root != block_with_senders.state_root {
                     eyre::bail!(

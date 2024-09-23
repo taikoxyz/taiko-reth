@@ -66,7 +66,8 @@ impl EnvironmentArgs {
         }
 
         let config_path = self.config.clone().unwrap_or_else(|| data_dir.config());
-        let mut config: Config = confy::load_path(config_path)
+
+        let mut config = Config::from_path(config_path)
             .inspect_err(
                 |err| warn!(target: "reth::cli", %err, "Failed to load config file, using default"),
             )
@@ -114,8 +115,6 @@ impl EnvironmentArgs {
             config.prune.as_ref().map(|prune| prune.segments.clone()).unwrap_or_default();
         let factory = ProviderFactory::new(db, self.chain.clone(), static_file_provider)
             .with_prune_modes(prune_modes.clone());
-
-        info!(target: "reth::cli", "Verifying storage consistency.");
 
         // Check for consistency between database and static files.
         if let Some(unwind_target) = factory

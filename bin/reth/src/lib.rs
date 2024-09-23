@@ -59,9 +59,9 @@ pub mod core {
     pub use reth_node_core::*;
 }
 
-/// Re-exported from `reth_node_core`.
+/// Re-exported from `reth_node_metrics`.
 pub mod prometheus_exporter {
-    pub use reth_node_core::prometheus_exporter::*;
+    pub use reth_node_metrics::recorder::*;
 }
 
 /// Re-export of the `reth_node_core` types specifically in the `args` module.
@@ -88,6 +88,11 @@ pub mod builder {
 /// the `reth_node_core::args` re-export for more details.
 pub mod dirs {
     pub use reth_node_core::dirs::*;
+}
+
+/// Re-exported from `reth_chainspec`
+pub mod chainspec {
+    pub use reth_chainspec::*;
 }
 
 /// Re-exported from `reth_provider`.
@@ -127,7 +132,9 @@ pub mod tasks {
 /// Re-exported from `reth_network`.
 pub mod network {
     pub use reth_network::*;
-    pub use reth_network_api::{noop, reputation, NetworkInfo, PeerKind, Peers, PeersInfo};
+    pub use reth_network_api::{
+        noop, test_utils::PeersHandleProvider, NetworkInfo, Peers, PeersInfo,
+    };
 }
 
 /// Re-exported from `reth_transaction_pool`.

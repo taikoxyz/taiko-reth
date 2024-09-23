@@ -17,7 +17,6 @@ workspace = true
 # reth
 reth-payload-builder = { workspace = true, features = ["gwyneth"]}
 reth-ethereum-engine-primitives = { workspace = true, features = ["gwyneth"]}
-reth-ethereum-engine = { workspace = true, features = ["gwyneth"]}
 reth-basic-payload-builder = { workspace = true, features = ["gwyneth"]}
 reth-ethereum-payload-builder ={ workspace = true, features = ["gwyneth"]}
 reth-node-builder = { workspace = true, features = ["gwyneth"]}
@@ -47,6 +46,7 @@ reth-errors.workspace = true
 reth-rpc-api.workspace = true
 reth-rpc-layer.workspace = true
 reth-db.workspace = true
+reth-trie.workspace = true
 
 # ethereum
 reth-node-ethereum.workspace = true

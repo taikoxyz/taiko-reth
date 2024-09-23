@@ -214,6 +214,8 @@ impl NodeTypes for GwynethNode {
     type Primitives = ();
     // use the Gwyneth engine types
     type Engine = GwynethEngineTypes;
+    // use ethereum chain spec
+    type ChainSpec = ChainSpec;
 }
 
 /// Implement the Node trait for the Gwyneth node
@@ -338,7 +340,7 @@ async fn main() -> eyre::Result<()> {
 
     let tasks = TaskManager::current();
 
-    // create optimism genesis with canyon at block 2
+    // create gwyneth genesis with canyon at block 2
     let spec = ChainSpec::builder()
         .chain(Chain::mainnet())
         .genesis(Genesis::default())
