@@ -566,14 +566,14 @@ tempfile = "3.8"
 test-fuzz = "5" 
 
 [patch.crates-io]
-revm = { path = "../revm/crates/revm", features = [
+revm = { git = "https://github.com/taikoxyz/revm.git", branch = "v43-gwyneth", features = [
     "std",
     "secp256k1",
     "blst",
 ], default-features = false }
-revm-primitives = { path = "../revm/crates/primitives", features = [
+revm-primitives = { git = "https://github.com/taikoxyz/revm.git", branch = "v43-gwyneth",  features = [
     "std",
 ], default-features = false }
-revm-interpreter = { path = "../revm/crates/interpreter" }
-revm-precompile = { path = "../revm/crates/precompile" }
-revm-inspectors = { path = "../revm-inspectors" }
+revm-interpreter = { git = "https://github.com/taikoxyz/revm.git", branch = "v43-gwyneth" }
+revm-precompile = { git = "https://github.com/taikoxyz/revm.git", branch = "v43-gwyneth" }
+revm-inspectors = { git = "https://github.com/taikoxyz/revm-inspectors.git", branch = "sync-database" }
