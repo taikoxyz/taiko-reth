@@ -69,8 +69,6 @@ pub type AccountRevertInit = (Option<Option<Account>>, Vec<StorageEntry>);
 pub type RevertsInit = HashMap<BlockNumber, HashMap<Address, AccountRevertInit>>;
 
 impl ExecutionOutcome {
-    // FIX(Cecilia): new(chain_id: u64, ...) -> Self
-
     /// Creates a new `ExecutionOutcome`.
     ///
     /// This constructor initializes a new `ExecutionOutcome` instance with the provided

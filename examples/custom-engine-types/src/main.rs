@@ -170,6 +170,8 @@ impl PayloadTypes for CustomEngineTypes {
     type BuiltPayload = EthBuiltPayload;
     type PayloadAttributes = CustomPayloadAttributes;
     type PayloadBuilderAttributes = CustomPayloadBuilderAttributes;
+    // #[cfg(feature = "gwyneth")]
+    type SyncProvider = ();
 }
 
 impl EngineTypes for CustomEngineTypes {

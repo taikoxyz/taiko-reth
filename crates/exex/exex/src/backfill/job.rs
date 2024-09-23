@@ -17,6 +17,7 @@ use reth_revm::database::{StateProviderDatabase, SyncStateProviderDatabase};
 use reth_stages_api::ExecutionStageThresholds;
 use reth_tracing::tracing::{debug, trace};
 
+
 /// Backfill job started for a specific range.
 ///
 /// It implements [`Iterator`] that executes blocks in batches according to the provided thresholds
@@ -236,7 +237,7 @@ mod tests {
     use std::sync::Arc;
 
     use crate::{
-        backfill::test_utils::{blocks_and_execution_outputs, chain_spec, to_execution_outcome},
+        backfill::test_utils::{blocks_and_execution_outputs, chain_spec},
         BackfillJobFactory,
     };
     use reth_blockchain_tree::noop::NoopBlockchainTree;
@@ -259,6 +260,7 @@ mod tests {
         let address = public_key_to_address(key_pair.public_key());
 
         let chain_spec = chain_spec(address);
+        let chain_id = chain_spec.chain.id();
 
         let executor = EthExecutorProvider::ethereum(chain_spec.clone());
         let provider_factory = create_test_provider_factory_with_chain_spec(chain_spec.clone());
@@ -272,7 +274,7 @@ mod tests {
             blocks_and_execution_outputs(provider_factory, chain_spec, key_pair)?;
         let (block, block_execution_output) = blocks_and_execution_outputs.first().unwrap();
         let execution_outcome =
-            ExecutionOutcome::from((block_execution_output, chain_spec.chain.id(), block.number));
+            ExecutionOutcome::from((block_execution_output.clone(), chain_id, block.number));
         // Backfill the first block
         let factory = BackfillJobFactory::new(executor, blockchain_db);
         let job = factory.backfill(1..=1);

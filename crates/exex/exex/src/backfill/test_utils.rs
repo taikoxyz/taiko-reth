@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use eyre::OptionExt;
+use reth_blockchain_tree::chain;
 use reth_chainspec::{ChainSpec, ChainSpecBuilder, EthereumHardfork, MAINNET};
 use reth_evm::execute::{
     BatchExecutor, BlockExecutionInput, BlockExecutionOutput, BlockExecutorProvider, Executor,
@@ -11,7 +12,7 @@ use reth_primitives::{
     Receipt, Requests, SealedBlockWithSenders, Transaction, TxEip2930, TxKind, U256,
 };
 use reth_provider::{BlockWriter as _, ExecutionOutcome, LatestStateProviderRef, ProviderFactory};
-use reth_revm::database::StateProviderDatabase;
+use reth_revm::database::{StateProviderDatabase, SyncStateProviderDatabase};
 use reth_testing_utils::generators::sign_tx_with_key_pair;
 use secp256k1::Keypair;
 
@@ -45,18 +46,22 @@ where
 {
     println!("execute_block_and_commit_to_database");
     let provider = provider_factory.provider()?;
+    let db = SyncStateProviderDatabase::new(
+        Some(chain_spec.chain.id()), 
+        StateProviderDatabase::new(LatestStateProviderRef::new(
+            provider.tx_ref(),
+            provider.static_file_provider().clone(),
+        ))
+    );
 
     // Execute the block to produce a block execution output
     let mut block_execution_output = EthExecutorProvider::ethereum(chain_spec)
-        .executor(StateProviderDatabase::new(LatestStateProviderRef::new(
-            provider.tx_ref(),
-            provider.static_file_provider().clone(),
-        )))
+        .executor(db)
         .execute(BlockExecutionInput { block, total_difficulty: U256::ZERO })?;
     block_execution_output.state.reverts.sort();
 
     // Convert the block execution output to an execution outcome for committing to the database
-    let execution_outcome = ExecutionOutcome::from((&block_execution_output, block.number));
+    let execution_outcome = ExecutionOutcome::from((block_execution_output.clone(), block.number));
 
     // Commit the block's execution outcome to the database
     let provider_rw = provider_factory.provider_rw()?;
@@ -172,16 +177,20 @@ where
 
     let provider = provider_factory.provider()?;
 
-    let executor =
-        EthExecutorProvider::ethereum(chain_spec).batch_executor(StateProviderDatabase::new(
-            LatestStateProviderRef::new(provider.tx_ref(), provider.static_file_provider().clone()),
-        ));
+    let db = SyncStateProviderDatabase::new(
+        Some(chain_spec.chain.id()), 
+        StateProviderDatabase::new(LatestStateProviderRef::new(
+            provider.tx_ref(),
+            provider.static_file_provider().clone(),
+        ))
+    );
+    let executor = EthExecutorProvider::ethereum(chain_spec).batch_executor(db);
 
     let mut execution_outcome = executor.execute_and_verify_batch(vec![
         (&block1, U256::ZERO).into(),
         (&block2, U256::ZERO).into(),
     ])?;
-    execution_outcome.state_mut().reverts.sort();
+    execution_outcome.filter_current_chain().all_states_mut().reverts.sort();
 
     let block1 = block1.seal_slow();
     let block2 = block2.seal_slow();
