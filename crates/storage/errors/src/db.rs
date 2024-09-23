@@ -50,7 +50,7 @@ pub enum DatabaseError {
     /// Failed to use the specified log level, as it's not available.
     #[display("log level {_0:?} is not available")]
     LogLevelUnavailable(LogLevel),
-    /// Failed to get sync database given chain_id
+    /// Failed to get sync database given `chain_id`
     #[display("failed to get sync database with chain_id: {_0}")]
     GetSyncDatabase(u64),
     /// Other unspecified error.

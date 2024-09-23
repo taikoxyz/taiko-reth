@@ -1,4 +1,4 @@
-use crate::{Address, Transaction, TransactionSigned, TxKind, U256};
+use crate::{Address, Transaction, TransactionSigned, U256};
 use revm_primitives::{AuthorizationList, ChainAddress, TransactTo, TxEnv};
 
 #[cfg(all(not(feature = "std"), feature = "optimism"))]
@@ -70,7 +70,7 @@ impl FillTxEnv for TransactionSigned {
                 tx_env.gas_limit = tx.gas_limit;
                 tx_env.gas_price = U256::from(tx.max_fee_per_gas);
                 tx_env.gas_priority_fee = Some(U256::from(tx.max_priority_fee_per_gas));
-                tx_env.transact_to = TransactTo::Call(ChainAddress(tx.chain_id, tx.to.clone()));
+                tx_env.transact_to = TransactTo::Call(ChainAddress(tx.chain_id, tx.to));
                 tx_env.value = tx.value;
                 tx_env.data = tx.input.clone();
                 tx_env.chain_id = Some(tx.chain_id);

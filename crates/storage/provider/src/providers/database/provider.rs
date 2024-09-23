@@ -2641,7 +2641,7 @@ impl<TX: DbTx> StorageReader for DatabaseProvider<TX> {
 impl<TX: DbTxMut + DbTx> StateChangeWriter for DatabaseProvider<TX> {
     fn write_state_reverts(
         &self,
-        mut reverts: PlainStateReverts,
+        reverts: PlainStateReverts,
         first_block: BlockNumber,
     ) -> ProviderResult<()> {
         // Write storage changes
@@ -2711,8 +2711,7 @@ impl<TX: DbTxMut + DbTx> StateChangeWriter for DatabaseProvider<TX> {
     }
 
     fn write_state_changes(&self, mut changes: StateChangeset) -> ProviderResult<()> {
-        // FIX(Cecilia): should filter?
-        // filter out changes for this chain.
+        // FIX(Cecilia): should filter? filter out changes for this chain.
         changes.filter_for_chain(self.chain_spec.chain().id());
         // sort all entries so they can be written to database in more performant way.
         // and take smaller memory footprint.

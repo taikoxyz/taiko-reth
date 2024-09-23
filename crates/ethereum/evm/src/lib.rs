@@ -16,7 +16,7 @@ use reth_chainspec::{ChainSpec, Head};
 use reth_evm::{ConfigureEvm, ConfigureEvmEnv};
 use reth_primitives::{transaction::FillTxEnv, Address, Header, TransactionSigned, U256};
 use revm_primitives::{
-    AnalysisKind, Bytes, CfgEnvWithHandlerCfg, ChainAddress, Env, TransactTo, TxEnv, TxKind,
+    AnalysisKind, Bytes, CfgEnvWithHandlerCfg, ChainAddress, Env, TransactTo, TxEnv,
 };
 
 #[cfg(not(feature = "std"))]

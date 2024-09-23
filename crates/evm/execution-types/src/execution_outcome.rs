@@ -1,7 +1,7 @@
-use crate::{chain, BlockExecutionOutput};
+use crate::BlockExecutionOutput;
 use reth_primitives::{
     constants::ETHEREUM_CHAIN_ID, logs_bloom, Account, Address, BlockNumber, Bloom, Bytecode, Log,
-    Receipt, Receipts, Requests, StorageEntry, B256, MAINNET_GENESIS_HASH, U256,
+    Receipt, Receipts, Requests, StorageEntry, B256, U256,
 };
 use reth_trie::HashedPostState;
 use revm::{
@@ -131,7 +131,7 @@ impl ExecutionOutcome {
         Self { chain_id, bundle, receipts, first_block, requests }
     }
 
-    /// Reture the ExecutionOutcome for a speicific chain.
+    /// Reture the `ExecutionOutcome` for a speicific chain.
     pub fn filter_chain(&self, chain_id: u64) -> Self {
         Self {
             chain_id: Some(chain_id),
@@ -144,8 +144,8 @@ impl ExecutionOutcome {
         }
     }
 
-    /// Filter the ExecutionOutcome for the current chain
-    /// if chain_id is not set, default to Ethereum.
+    /// Filter the `ExecutionOutcome` for the current chain
+    /// if `chain_id` is not set, default to Ethereum.
     pub fn filter_current_chain(&self) -> Self {
         Self {
             chain_id: self.chain_id,

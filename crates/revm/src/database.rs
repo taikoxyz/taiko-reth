@@ -1,9 +1,5 @@
 use crate::primitives::alloy_primitives::{BlockNumber, StorageKey, StorageValue};
-use core::{
-    fmt::Error,
-    ops::{Deref, DerefMut},
-};
-use reth_chainspec::Chain;
+use core::ops::{Deref, DerefMut};
 use reth_primitives::{constants::ETHEREUM_CHAIN_ID, Account, Address, B256, U256};
 use reth_storage_api::StateProvider;
 use reth_storage_errors::provider::{ProviderError, ProviderResult};
