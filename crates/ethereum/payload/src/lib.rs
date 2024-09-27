@@ -519,7 +519,7 @@ where
     db.merge_transitions(BundleRetention::PlainState);
 
     let execution_outcome = ExecutionOutcome::new(
-        None,
+        Some(chain_spec.chain.id()),
         db.take_bundle(),
         vec![receipts].into(),
         block_number,
@@ -536,7 +536,7 @@ where
             .db
             .get_db(chain_spec.chain.id())
             .ok_or(ProviderError::Database(DatabaseError::GetSyncDatabase(chain_spec.chain.id())))?
-            .state_root(HashedPostState::from_bundle_state(&execution_outcome.all_states().state))?
+            .state_root(HashedPostState::from_bundle_state(&execution_outcome.current_state().state))?
     };
 
     // create the block header

@@ -225,16 +225,16 @@ impl AppendableChain {
         let chain_id = externals.provider_factory.chain_spec().chain.id();
         let initial_execution_outcome = ExecutionOutcome::from((state, chain_id, block.number));
 
-        println!("initial_execution_outcome: {:?}", initial_execution_outcome.chain_id);
-
         // check state root if the block extends the canonical chain __and__ if state root
         // validation was requested.
         if block_validation_kind.is_exhaustive() {
             // calculate and check state root
             let start = Instant::now();
             let (state_root, trie_updates) = if block_attachment.is_canonical() {
+                // TODO(Cecilie): refactor the bundle state provider for cross-chain bundles 
                 let mut execution_outcome =
                     provider.block_execution_data_provider.execution_outcome().clone();
+                execution_outcome.chain_id = Some(chain_id);
                 execution_outcome.extend(initial_execution_outcome.clone());
                 let hashed_state = execution_outcome.hash_state_slow();
                 ParallelStateRoot::new(consistent_view, hashed_state)
@@ -243,7 +243,7 @@ impl AppendableChain {
                     .map_err(ProviderError::from)?
             } else {
                 let hashed_state = HashedPostState::from_bundle_state(
-                    &initial_execution_outcome.all_states().state,
+                    &initial_execution_outcome.current_state().state,
                 );
                 let state_root = provider.state_root(hashed_state)?;
                 (state_root, None)

@@ -147,7 +147,7 @@ impl ExecutionOutcome {
     pub fn filter_current_chain(&self) -> Self {
         Self {
             chain_id: self.chain_id,
-            bundle: self.all_states().clone(),
+            bundle: self.current_state().clone(),
             // FIX(Cecilia): with (chain_id, Reciepts) & (chain_id, Requests)
             // we can filter out the right ones
             receipts: self.receipts.clone(),
@@ -219,7 +219,8 @@ impl ExecutionOutcome {
     /// Returns [`HashedPostState`] for this execution outcome.
     /// See [`HashedPostState::from_bundle_state`] for more info.
     pub fn hash_state_slow(&self) -> HashedPostState {
-        HashedPostState::from_bundle_state(self.all_states().state())
+        println!("hash_state_slow");
+        HashedPostState::from_bundle_state(self.current_state().state())
     }
 
     /// Transform block number to the index of block.
