@@ -373,7 +373,7 @@ where
         reorg_target.number,
         Default::default(),
     );
-    let hashed_state = HashedPostState::from_bundle_state(&outcome.current_state().state);
+    let hashed_state = HashedPostState::from_bundle_state(&outcome.all_states().state);
 
     let (blob_gas_used, excess_blob_gas) =
         if chain_spec.is_cancun_active_at_timestamp(reorg_target.timestamp) {

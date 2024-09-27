@@ -222,7 +222,10 @@ impl AppendableChain {
             PostExecutionInput::new(&state.receipts, &state.requests),
         )?;
 
-        let initial_execution_outcome = ExecutionOutcome::from((state, block.number));
+        let chain_id = externals.provider_factory.chain_spec().chain.id();
+        let initial_execution_outcome = ExecutionOutcome::from((state, chain_id, block.number));
+
+        println!("initial_execution_outcome: {:?}", initial_execution_outcome.chain_id);
 
         // check state root if the block extends the canonical chain __and__ if state root
         // validation was requested.
@@ -240,7 +243,7 @@ impl AppendableChain {
                     .map_err(ProviderError::from)?
             } else {
                 let hashed_state = HashedPostState::from_bundle_state(
-                    &initial_execution_outcome.current_state().state,
+                    &initial_execution_outcome.all_states().state,
                 );
                 let state_root = provider.state_root(hashed_state)?;
                 (state_root, None)

@@ -166,7 +166,7 @@ impl<SP: StateProvider, EDP: ExecutionDataProvider> StateProofProvider
         address: Address,
         slots: &[B256],
     ) -> ProviderResult<AccountProof> {
-        let bundle_state = self.block_execution_data_provider.execution_outcome().current_state();
+        let bundle_state = self.block_execution_data_provider.execution_outcome().all_states().clone();
         let mut state = HashedPostState::from_bundle_state(&bundle_state.state);
         state.extend(hashed_state);
         self.state_provider.proof(state, address, slots)

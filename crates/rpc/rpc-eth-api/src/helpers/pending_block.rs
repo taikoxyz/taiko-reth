@@ -415,7 +415,7 @@ pub trait LoadPendingBlock: EthApiTypes {
         )
         .filter_current_chain();
         let hashed_state =
-            HashedPostState::from_bundle_state(&execution_outcome.current_state().state);
+            HashedPostState::from_bundle_state(&execution_outcome.all_states().state);
 
         let receipts_root = self.receipts_root(&block_env, &execution_outcome, block_number);
 

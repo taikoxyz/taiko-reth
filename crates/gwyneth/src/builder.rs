@@ -299,6 +299,8 @@ where
     let receipts_root =
         execution_outcome.receipts_root_slow(block_number).expect("Number is in range");
     let logs_bloom = execution_outcome.block_logs_bloom(block_number).expect("Number is in range");
+    
+    println!("execution_outcome: {:?}", execution_outcome.all_states());
 
     // calculate the state root
     let state_root =
