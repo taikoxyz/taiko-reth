@@ -1082,6 +1082,7 @@ where
         payload: ExecutionPayload,
         cancun_fields: Option<CancunPayloadFields>,
     ) -> Result<Either<PayloadStatus, SealedBlock>, BeaconOnNewPayloadError> {
+        println!("BeaconConsensusEngine:on_new_payload");
         self.metrics.new_payload_messages.increment(1);
 
         // Ensures that the given payload does not violate any consensus rules that concern the

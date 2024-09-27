@@ -148,6 +148,7 @@ where
         DB: SyncDatabase,
         DB::Error: Into<ProviderError> + Display,
     {
+        print!("execute_state_transitions");
         // apply pre execution changes
         apply_beacon_root_contract_call(
             &self.evm_config,
@@ -308,7 +309,7 @@ where
         block: &BlockWithSenders,
         total_difficulty: U256,
     ) -> Result<EthExecuteOutput, BlockExecutionError> {
-        println!("execute_without_verification");
+        println!("EthBlockExecutor::execute_without_verification");
 
         // 1. prepare state on new block
         self.on_new_block(&block.header);
@@ -318,8 +319,8 @@ where
         let env = self.evm_env_for_block(&block.header, total_difficulty);
         println!("evm_env_for_block");
         let output = {
-            let evm = self.executor.evm_config.evm_with_env(&mut self.state, env);
-            println!("evm_config.evm_with_env");
+            let evm = self.executor.evm_config.evm_with_env(&mut self.state, env.clone());
+            println!("evm_config.evm_with_env -- env: {:?}", env);
             self.executor.execute_state_transitions(block, evm)
         }?;
 

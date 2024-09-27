@@ -99,6 +99,7 @@ where
             initialized_cfg,
             ..
         } = config;
+        println!("build_empty_payload");
 
         debug!(target: "payload_builder", parent_hash = ?parent_block.hash(), parent_number = parent_block.number, "building empty payload");
 
@@ -262,6 +263,7 @@ where
         let block = Block { header, body: vec![], ommers: vec![], withdrawals, requests };
         let sealed_block = block.seal_slow();
 
+        println!("END build_empty_payload {:?}", sealed_block.header.state_root);
         Ok(EthBuiltPayload::new(attributes.payload_id(), sealed_block, U256::ZERO))
     }
 }
@@ -293,9 +295,13 @@ where
         chain_spec,
         ..
     } = config;
+    println!("default_ethereum_payload_builder \n{:?}", initialized_cfg);
 
     let state_provider = client.state_by_block_hash(parent_block.hash())?;
-    let state = SyncStateProviderDatabase::new(None, StateProviderDatabase::new(state_provider));
+    let state = SyncStateProviderDatabase::new(
+        Some(chain_spec.chain.id()),
+        StateProviderDatabase::new(state_provider),
+    );
     let mut sync_cached_reads = to_sync_cached_reads(cached_reads, chain_spec.chain.id());
     let mut db = State::builder()
         .with_database_ref(sync_cached_reads.as_db(state))
@@ -354,6 +360,12 @@ where
         PayloadBuilderError::Internal(err.into())
     })?;
 
+    println!("while let Some(pool_tx) = best_txs.next(): {:?}", 
+        pool.best_transactions_with_attributes(BestTransactionsAttributes::new(
+            base_fee,
+            initialized_block_env.get_blob_gasprice().map(|gasprice| gasprice as u64),
+        )).count()
+    );
     let mut receipts = Vec::new();
     while let Some(pool_tx) = best_txs.next() {
         // ensure we still have capacity for this transaction
@@ -362,12 +374,12 @@ where
             // which also removes all dependent transaction from the iterator before we can
             // continue
             best_txs.mark_invalid(&pool_tx);
-            continue
+            continue;
         }
 
         // check if the job was cancelled, if so we can exit early
         if cancel.is_cancelled() {
-            return Ok(BuildOutcome::Cancelled)
+            return Ok(BuildOutcome::Cancelled);
         }
 
         // convert tx to a signed transaction
@@ -384,7 +396,7 @@ where
                 // for regular transactions above.
                 trace!(target: "payload_builder", tx=?tx.hash, ?sum_blob_gas_used, ?tx_blob_gas, "skipping blob transaction because it would exceed the max data gas per block");
                 best_txs.mark_invalid(&pool_tx);
-                continue
+                continue;
             }
         }
 
@@ -412,11 +424,11 @@ where
                             best_txs.mark_invalid(&pool_tx);
                         }
 
-                        continue
+                        continue;
                     }
                     err => {
                         // this is an error that we should treat as fatal for this attempt
-                        return Err(PayloadBuilderError::EvmExecutionError(err))
+                        return Err(PayloadBuilderError::EvmExecutionError(err));
                     }
                 }
             }
@@ -468,7 +480,7 @@ where
         return Ok(BuildOutcome::Aborted {
             fees: total_fees,
             cached_reads: sync_cached_reads.into(),
-        })
+        });
     }
 
     // calculate the requests and the requests root
@@ -507,7 +519,7 @@ where
     db.merge_transitions(BundleRetention::PlainState);
 
     let execution_outcome = ExecutionOutcome::new(
-        None,
+        Some(chain_spec.chain.id()),
         db.take_bundle(),
         vec![receipts].into(),
         block_number,
@@ -524,7 +536,7 @@ where
             .db
             .get_db(chain_spec.chain.id())
             .ok_or(ProviderError::Database(DatabaseError::GetSyncDatabase(chain_spec.chain.id())))?
-            .state_root(HashedPostState::from_bundle_state(&execution_outcome.all_states().state))?
+            .state_root(HashedPostState::from_bundle_state(&execution_outcome.current_state().state))?
     };
 
     // create the block header
@@ -585,6 +597,7 @@ where
     let sealed_block = block.seal_slow();
     debug!(target: "payload_builder", ?sealed_block, "sealed built block");
 
+    println!("END default_ethereum_payload_builder {:?}", sealed_block.header.state_root);
     let mut payload = EthBuiltPayload::new(attributes.id, sealed_block, total_fees);
 
     // extend the payload with the blob sidecars from the executed txs

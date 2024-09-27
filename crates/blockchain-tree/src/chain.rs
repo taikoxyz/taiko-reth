@@ -18,8 +18,7 @@ use reth_primitives::{
     BlockHash, BlockNumber, ForkBlock, GotExpected, SealedBlockWithSenders, SealedHeader, U256,
 };
 use reth_provider::{
-    providers::{BundleStateProvider, ConsistentDbView},
-    FullExecutionDataProvider, ProviderError, StateRootProvider,
+    providers::{BundleStateProvider, ConsistentDbView}, ChainSpecProvider, FullExecutionDataProvider, ProviderError, StateRootProvider
 };
 use reth_revm::database::{StateProviderDatabase, SyncStateProviderDatabase};
 use reth_trie::{updates::TrieUpdates, HashedPostState};
@@ -79,6 +78,7 @@ impl AppendableChain {
         DB: Database + Clone,
         E: BlockExecutorProvider,
     {
+        println!("AppendableChain::new_canonical_fork");
         let execution_outcome = ExecutionOutcome::default();
         let empty = BTreeMap::new();
 
@@ -117,6 +117,7 @@ impl AppendableChain {
         DB: Database + Clone,
         E: BlockExecutorProvider,
     {
+        println!("AppendableChain::new_chain_fork");
         let parent_number =
             block.number.checked_sub(1).ok_or(BlockchainTreeError::GenesisBlockHasNoParent)?;
         let parent = self.blocks().get(&parent_number).ok_or(
@@ -182,7 +183,8 @@ impl AppendableChain {
         DB: Database + Clone,
         E: BlockExecutorProvider,
     {
-        println!("validate_and_execute");
+        println!("AppendableChain::validate_and_execute");
+        println!("sealed block: {:?}", block.header.state_root);
         // some checks are done before blocks comes here.
         externals.consensus.validate_header_against_parent(&block, parent_block)?;
 
@@ -207,7 +209,9 @@ impl AppendableChain {
 
         let provider = BundleStateProvider::new(state_provider, bundle_state_data_provider);
 
-        let db = SyncStateProviderDatabase::new(None, StateProviderDatabase::new(&provider));
+        let db = SyncStateProviderDatabase::new(
+            Some(externals.provider_factory.chain_spec().chain.id()), 
+            StateProviderDatabase::new(&provider));
         let executor = externals.executor_factory.executor(db);
         let block_hash = block.hash();
         let block = block.unseal();
@@ -218,7 +222,8 @@ impl AppendableChain {
             PostExecutionInput::new(&state.receipts, &state.requests),
         )?;
 
-        let initial_execution_outcome = ExecutionOutcome::from((state, block.number));
+        let chain_id = externals.provider_factory.chain_spec().chain.id();
+        let initial_execution_outcome = ExecutionOutcome::from((state, chain_id, block.number));
 
         // check state root if the block extends the canonical chain __and__ if state root
         // validation was requested.
@@ -226,8 +231,10 @@ impl AppendableChain {
             // calculate and check state root
             let start = Instant::now();
             let (state_root, trie_updates) = if block_attachment.is_canonical() {
+                // TODO(Cecilie): refactor the bundle state provider for cross-chain bundles 
                 let mut execution_outcome =
                     provider.block_execution_data_provider.execution_outcome().clone();
+                execution_outcome.chain_id = Some(chain_id);
                 execution_outcome.extend(initial_execution_outcome.clone());
                 let hashed_state = execution_outcome.hash_state_slow();
                 ParallelStateRoot::new(consistent_view, hashed_state)
@@ -289,6 +296,7 @@ impl AppendableChain {
         DB: Database + Clone,
         E: BlockExecutorProvider,
     {
+        println!("AppendableChain::append_block");
         let parent_block = self.chain.tip();
 
         let bundle_state_data = BundleStateDataRef {

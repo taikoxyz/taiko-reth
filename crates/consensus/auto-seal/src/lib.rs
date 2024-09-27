@@ -387,8 +387,9 @@ impl StorageInner {
         let execution_outcome =
             ExecutionOutcome::from((block_execution_output, chain_id, block.number))
                 .filter_current_chain();
+        
         let hashed_state =
-            HashedPostState::from_bundle_state(&execution_outcome.all_states().state);
+            HashedPostState::from_bundle_state(&execution_outcome.current_state().state);
 
         // todo(onbjerg): we should not pass requests around as this is building a block, which
         // means we need to extract the requests from the execution output and compute the requests

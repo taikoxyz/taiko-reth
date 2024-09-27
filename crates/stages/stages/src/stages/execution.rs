@@ -200,6 +200,7 @@ where
         if input.target_reached() {
             return Ok(ExecOutput::done(input.checkpoint()))
         }
+        println!("ExecutionStage::execute");
 
         let start_block = input.next_block();
         let max_block = input.target();
@@ -225,8 +226,9 @@ where
             provider.static_file_provider().clone(),
         ));
         // TODO(Cecilia): risk of wrong chain id
+        println!("ExecutionStage::execute: ~~None");
         let mut executor =
-            self.executor_provider.batch_executor(SyncStateProviderDatabase::new(None, db));
+            self.executor_provider.batch_executor(SyncStateProviderDatabase::new(Some(999), db));
         executor.set_tip(max_block);
         executor.set_prune_modes(prune_modes);
 

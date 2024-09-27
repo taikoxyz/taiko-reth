@@ -64,6 +64,8 @@ where
     }
 
     fn execute_range(&mut self) -> Result<Chain, BlockExecutionError> {
+        println!("BackfillJob::execute_range");
+        println!("~~None");
         let db = SyncStateProviderDatabase::new(
             None,
             StateProviderDatabase::new(
@@ -206,6 +208,7 @@ where
             .ok_or_else(|| ProviderError::HeaderNotFound(block_number.into()))?;
 
         // Configure the executor to use the previous block's state.
+        println!("~~None");
         let executor = self.executor.executor(SyncStateProviderDatabase::new(
             None,
             StateProviderDatabase::new(

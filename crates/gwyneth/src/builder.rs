@@ -67,6 +67,7 @@ where
     SyncProvider: StateProvider,
 {
     // Brecht: ethereum payload builder
+    println!("Cecilia: default_gwyneth_payload_builder");
 
     let BuildArguments { client, pool, mut cached_reads, config, cancel, best_payload } = args;
     let PayloadConfig {
@@ -85,6 +86,7 @@ where
 
     let (l1_id, l1_provider) = attributes.l1_provider.unwrap();
     let l1_box: Box<dyn StateProvider> = Box::new(l1_provider);
+    println!("Cecilia: sync_state.add_db l1_id: {:?}", l1_id);
     let l1_state = StateProviderDatabase::new(l1_box);
     sync_state.add_db(l1_id, l1_state);
 
@@ -297,13 +299,13 @@ where
     let receipts_root =
         execution_outcome.receipts_root_slow(block_number).expect("Number is in range");
     let logs_bloom = execution_outcome.block_logs_bloom(block_number).expect("Number is in range");
-
+    
     // calculate the state root
     let state_root =
         {
             let state_provider = sync_db.database.0.inner.borrow_mut();
             state_provider.db.get_db(chain_spec.chain().id()).unwrap().state_root(
-                HashedPostState::from_bundle_state(&execution_outcome.all_states().state),
+                HashedPostState::from_bundle_state(&execution_outcome.current_state().state),
             )?
         };
 

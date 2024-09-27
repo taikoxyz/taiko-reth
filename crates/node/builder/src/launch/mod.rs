@@ -379,6 +379,7 @@ where
         let (tx, rx) = oneshot::channel();
         info!(target: "reth::cli", "Starting consensus engine");
         ctx.task_executor().spawn_critical_blocking("consensus engine", async move {
+            println!("Cecilia: Starting consensus engine");
             let res = beacon_consensus_engine.await;
             let _ = tx.send(res);
         });

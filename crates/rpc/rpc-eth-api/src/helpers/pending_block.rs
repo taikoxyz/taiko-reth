@@ -412,8 +412,7 @@ pub trait LoadPendingBlock: EthApiTypes {
             vec![receipts.clone()].into(),
             block_number,
             Vec::new(),
-        )
-        .filter_current_chain();
+        );
         let hashed_state =
             HashedPostState::from_bundle_state(&execution_outcome.current_state().state);
 
