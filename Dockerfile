@@ -16,7 +16,7 @@ FROM chef AS builder
 COPY --from=planner /app/recipe.json recipe.json
 
 # Build profile, release by default
-ARG BUILD_PROFILE=release
+ARG BUILD_PROFILE=profiling
 ENV BUILD_PROFILE=$BUILD_PROFILE
 
 # Extra Cargo flags
@@ -27,12 +27,16 @@ ENV RUSTFLAGS="$RUSTFLAGS"
 ARG FEATURES=""
 ENV FEATURES=$FEATURES
 
+# Extra Cargo features
+ARG RUST_BACKTRACE=1
+ENV RUST_BACKTRACE=$RUST_BACKTRACE
+
 # Builds dependencies
-RUN cargo chef cook --profile $BUILD_PROFILE --features "$FEATURES" --recipe-path recipe.json
+RUN RUST_BACKTRACE=1 cargo chef cook --profile $BUILD_PROFILE --features "$FEATURES" --recipe-path recipe.json
 
 # Build application
 COPY . .
-RUN cargo build --profile $BUILD_PROFILE --features "$FEATURES" --locked --bin reth
+RUN RUST_BACKTRACE=1 cargo build --profile $BUILD_PROFILE --features "$FEATURES" --locked --bin reth
 
 # ARG is not resolved in COPY so we have to hack around it by copying the
 # binary to a temporary location

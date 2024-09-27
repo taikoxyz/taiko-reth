@@ -48,10 +48,7 @@ where
     let provider = provider_factory.provider()?;
     let db = SyncStateProviderDatabase::new(
         Some(chain_spec.chain.id()), 
-        StateProviderDatabase::new(LatestStateProviderRef::new(
-            provider.tx_ref(),
-            provider.static_file_provider().clone(),
-        ))
+        StateProviderDatabase::new(LatestStateProviderRef::new(provider.tx_ref(),provider.static_file_provider().clone()))
     );
 
     // Execute the block to produce a block execution output

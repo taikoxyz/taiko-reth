@@ -266,6 +266,7 @@ codegen-units = 8
 inherits = "release"
 debug = 2
 strip = false
+panic = "unwind"
 
 # Make sure debug symbols are in the bench profile
 [profile.bench]

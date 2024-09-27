@@ -67,6 +67,7 @@ where
     SyncProvider: StateProvider,
 {
     // Brecht: ethereum payload builder
+    println!("Cecilia: default_gwyneth_payload_builder");
 
     let BuildArguments { client, pool, mut cached_reads, config, cancel, best_payload } = args;
     let PayloadConfig {
@@ -85,6 +86,7 @@ where
 
     let (l1_id, l1_provider) = attributes.l1_provider.unwrap();
     let l1_box: Box<dyn StateProvider> = Box::new(l1_provider);
+    println!("Cecilia: sync_state.add_db l1_id: {:?}", l1_id);
     let l1_state = StateProviderDatabase::new(l1_box);
     sync_state.add_db(l1_id, l1_state);
 

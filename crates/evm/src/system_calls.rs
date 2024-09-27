@@ -44,6 +44,7 @@ where
     DB::Error: Display,
     EvmConfig: ConfigureEvm,
 {
+    println!("pre_block_blockhashes_contract_call");
     // Apply the pre-block EIP-2935 contract call
     let mut evm_pre_block = Evm::builder()
         .with_db(db)
@@ -145,6 +146,7 @@ where
     DB::Error: Display,
     EvmConfig: ConfigureEvm,
 {
+    println!("pre_block_beacon_root_contract_call");
     // apply pre-block EIP-4788 contract call
     let mut evm_pre_block = Evm::builder()
         .with_db(db)
@@ -187,6 +189,7 @@ where
     DB::Error: core::fmt::Display,
     EvmConfig: ConfigureEvm,
 {
+    println!("is_cancun_active_at_timestamp");
     if !chain_spec.is_cancun_active_at_timestamp(block_timestamp) {
         return Ok(())
     }
@@ -216,6 +219,7 @@ where
         BEACON_ROOTS_ADDRESS,
         parent_beacon_block_root.0.into(),
     );
+    println!("fill_tx_env_system_contract_call");
 
     let mut state = match evm.transact() {
         Ok(res) => res.state,

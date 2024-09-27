@@ -129,7 +129,7 @@ libc = "0.2"
 reth-discv4.workspace = true
 
 [features]
-default = ["jemalloc"]
+default = ["jemalloc", "min-debug-logs"]
 
 dev = ["reth-cli-commands/dev"]
 

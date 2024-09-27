@@ -18,8 +18,7 @@ use reth_primitives::{
     BlockHash, BlockNumber, ForkBlock, GotExpected, SealedBlockWithSenders, SealedHeader, U256,
 };
 use reth_provider::{
-    providers::{BundleStateProvider, ConsistentDbView},
-    FullExecutionDataProvider, ProviderError, StateRootProvider,
+    providers::{BundleStateProvider, ConsistentDbView}, ChainSpecProvider, FullExecutionDataProvider, ProviderError, StateRootProvider
 };
 use reth_revm::database::{StateProviderDatabase, SyncStateProviderDatabase};
 use reth_trie::{updates::TrieUpdates, HashedPostState};
@@ -79,6 +78,7 @@ impl AppendableChain {
         DB: Database + Clone,
         E: BlockExecutorProvider,
     {
+        println!("AppendableChain::new_canonical_fork");
         let execution_outcome = ExecutionOutcome::default();
         let empty = BTreeMap::new();
 
@@ -117,6 +117,7 @@ impl AppendableChain {
         DB: Database + Clone,
         E: BlockExecutorProvider,
     {
+        println!("AppendableChain::new_chain_fork");
         let parent_number =
             block.number.checked_sub(1).ok_or(BlockchainTreeError::GenesisBlockHasNoParent)?;
         let parent = self.blocks().get(&parent_number).ok_or(
@@ -182,7 +183,8 @@ impl AppendableChain {
         DB: Database + Clone,
         E: BlockExecutorProvider,
     {
-        println!("validate_and_execute");
+        println!("AppendableChain::validate_and_execute");
+        println!("sealed block: {:?}", block.header.state_root);
         // some checks are done before blocks comes here.
         externals.consensus.validate_header_against_parent(&block, parent_block)?;
 
@@ -207,7 +209,9 @@ impl AppendableChain {
 
         let provider = BundleStateProvider::new(state_provider, bundle_state_data_provider);
 
-        let db = SyncStateProviderDatabase::new(None, StateProviderDatabase::new(&provider));
+        let db = SyncStateProviderDatabase::new(
+            Some(externals.provider_factory.chain_spec().chain.id()), 
+            StateProviderDatabase::new(&provider));
         let executor = externals.executor_factory.executor(db);
         let block_hash = block.hash();
         let block = block.unseal();
@@ -289,6 +293,7 @@ impl AppendableChain {
         DB: Database + Clone,
         E: BlockExecutorProvider,
     {
+        println!("AppendableChain::append_block");
         let parent_block = self.chain.tip();
 
         let bundle_state_data = BundleStateDataRef {
