@@ -148,7 +148,7 @@ where
         DB: SyncDatabase,
         DB::Error: Into<ProviderError> + Display,
     {
-        print!("execute_state_transitions");
+        print!("EthEvmExecutor::execute_state_transitions");
         // apply pre execution changes
         apply_beacon_root_contract_call(
             &self.evm_config,

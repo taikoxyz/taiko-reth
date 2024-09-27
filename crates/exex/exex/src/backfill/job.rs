@@ -64,8 +64,6 @@ where
     }
 
     fn execute_range(&mut self) -> Result<Chain, BlockExecutionError> {
-        println!("BackfillJob::execute_range");
-        println!("~~None");
         let db = SyncStateProviderDatabase::new(
             None,
             StateProviderDatabase::new(

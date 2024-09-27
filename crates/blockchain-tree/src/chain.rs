@@ -296,7 +296,6 @@ impl AppendableChain {
         DB: Database + Clone,
         E: BlockExecutorProvider,
     {
-        println!("AppendableChain::append_block");
         let parent_block = self.chain.tip();
 
         let bundle_state_data = BundleStateDataRef {

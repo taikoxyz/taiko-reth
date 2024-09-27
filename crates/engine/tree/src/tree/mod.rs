@@ -1712,7 +1712,6 @@ where
         &mut self,
         block: SealedBlockWithSenders,
     ) -> Result<InsertPayloadOk2, InsertBlockErrorKindTwo> {
-        println!("insert_block_inner");
         if self.block_by_hash(block.hash())?.is_some() {
             return Ok(InsertPayloadOk2::AlreadySeen(BlockStatus2::Valid))
         }

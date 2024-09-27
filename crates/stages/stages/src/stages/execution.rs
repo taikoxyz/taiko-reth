@@ -226,7 +226,6 @@ where
             provider.static_file_provider().clone(),
         ));
         // TODO(Cecilia): risk of wrong chain id
-        println!("ExecutionStage::execute: ~~None");
         let mut executor =
             self.executor_provider.batch_executor(SyncStateProviderDatabase::new(Some(999), db));
         executor.set_tip(max_block);

@@ -118,7 +118,6 @@ impl ExecutionPayloadValidator {
         // First parse the block
         let sealed_block =
             try_into_block(payload, cancun_fields.parent_beacon_block_root())?.seal_slow();
-        println!("ensure_well_formed_payload Seal Block: {:?} {:?}", sealed_block.header.state_root, sealed_block.body.len());
 
         // Ensure the hash included in the payload matches the block hash
         if expected_hash != sealed_block.hash() {

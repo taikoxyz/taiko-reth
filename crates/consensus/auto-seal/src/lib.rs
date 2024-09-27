@@ -386,8 +386,7 @@ impl StorageInner {
         let gas_used = block_execution_output.gas_used;
         let execution_outcome =
             ExecutionOutcome::from((block_execution_output, chain_id, block.number))
-                .filter_current_chain();
-        
+                .filter_current_chain();        
         let hashed_state =
             HashedPostState::from_bundle_state(&execution_outcome.current_state().state);
 
