@@ -593,7 +593,7 @@ where
                 let evm_config = Call::evm_config(this.eth_api()).clone();
                 let mut db = StateBuilder::new()
                     .with_database(SyncStateProviderDatabase::new(
-                        None,
+                        Some(cfg.chain_id),
                         StateProviderDatabase::new(state),
                     ))
                     .with_bundle_update()

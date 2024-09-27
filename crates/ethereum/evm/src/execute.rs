@@ -24,8 +24,8 @@ use reth_primitives::{
 };
 use reth_prune_types::PruneModes;
 use reth_revm::{
-    batch::BlockBatchRecord, db::states::bundle_state::BundleRetention,
-    state_change::post_block_balance_increments, Evm, State,
+    batch::BlockBatchRecord, db::{states::bundle_state::BundleRetention, State},
+    state_change::post_block_balance_increments, Evm,
 };
 use revm_primitives::{
     db::{DatabaseCommit, SyncDatabase},
@@ -312,11 +312,14 @@ where
 
         // 1. prepare state on new block
         self.on_new_block(&block.header);
+        println!("on_new_block");
 
         // 2. configure the evm and execute
         let env = self.evm_env_for_block(&block.header, total_difficulty);
+        println!("evm_env_for_block");
         let output = {
             let evm = self.executor.evm_config.evm_with_env(&mut self.state, env);
+            println!("evm_config.evm_with_env");
             self.executor.execute_state_transitions(block, evm)
         }?;
 
@@ -426,6 +429,7 @@ where
     type Error = BlockExecutionError;
 
     fn execute_and_verify_one(&mut self, input: Self::Input<'_>) -> Result<(), Self::Error> {
+        println!("execute_and_verify_one");
         let BlockExecutionInput { block, total_difficulty } = input;
 
         if self.batch_record.first_block().is_none() {

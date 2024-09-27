@@ -1,5 +1,5 @@
 use crate::{Address, Transaction, TransactionSigned, U256};
-use revm_primitives::{AuthorizationList, ChainAddress, TransactTo, TxEnv};
+use revm_primitives::{AuthorizationList, ChainAddress, TransactTo, TxEnv, TxKind};
 
 #[cfg(all(not(feature = "std"), feature = "optimism"))]
 use alloc::vec::Vec;
@@ -19,14 +19,15 @@ impl FillTxEnv for TransactionSigned {
             envelope
         };
 
-        tx_env.caller = ChainAddress(self.chain_id().unwrap(), sender);
+        let chain_id = self.chain_id()
+            .expect(format!("chain_id is None for Tx {:?}", &self).as_str());
+        tx_env.caller = ChainAddress(chain_id, sender);
         match self.as_ref() {
             Transaction::Legacy(tx) => {
                 tx_env.gas_limit = tx.gas_limit;
                 tx_env.gas_price = U256::from(tx.gas_price);
                 tx_env.gas_priority_fee = None;
-                tx_env.transact_to =
-                    TransactTo::Call(ChainAddress(tx.chain_id.unwrap(), *tx.to.to().unwrap()));
+                tx_env.transact_to = convert_tx_kind(chain_id, tx.to);
                 tx_env.value = tx.value;
                 tx_env.data = tx.input.clone();
                 tx_env.chain_id = tx.chain_id;
@@ -40,8 +41,7 @@ impl FillTxEnv for TransactionSigned {
                 tx_env.gas_limit = tx.gas_limit;
                 tx_env.gas_price = U256::from(tx.gas_price);
                 tx_env.gas_priority_fee = None;
-                tx_env.transact_to =
-                    TransactTo::Call(ChainAddress(tx.chain_id, *tx.to.to().unwrap()));
+                tx_env.transact_to = convert_tx_kind(chain_id, tx.to);
                 tx_env.value = tx.value;
                 tx_env.data = tx.input.clone();
                 tx_env.chain_id = Some(tx.chain_id);
@@ -55,8 +55,7 @@ impl FillTxEnv for TransactionSigned {
                 tx_env.gas_limit = tx.gas_limit;
                 tx_env.gas_price = U256::from(tx.max_fee_per_gas);
                 tx_env.gas_priority_fee = Some(U256::from(tx.max_priority_fee_per_gas));
-                tx_env.transact_to =
-                    TransactTo::Call(ChainAddress(tx.chain_id, *tx.to.to().unwrap()));
+                tx_env.transact_to = convert_tx_kind(chain_id, tx.to);
                 tx_env.value = tx.value;
                 tx_env.data = tx.input.clone();
                 tx_env.chain_id = Some(tx.chain_id);
@@ -70,7 +69,7 @@ impl FillTxEnv for TransactionSigned {
                 tx_env.gas_limit = tx.gas_limit;
                 tx_env.gas_price = U256::from(tx.max_fee_per_gas);
                 tx_env.gas_priority_fee = Some(U256::from(tx.max_priority_fee_per_gas));
-                tx_env.transact_to = TransactTo::Call(ChainAddress(tx.chain_id, tx.to));
+                tx_env.transact_to = TransactTo::Call(ChainAddress(chain_id, tx.to));
                 tx_env.value = tx.value;
                 tx_env.data = tx.input.clone();
                 tx_env.chain_id = Some(tx.chain_id);
@@ -84,8 +83,7 @@ impl FillTxEnv for TransactionSigned {
                 tx_env.gas_limit = tx.gas_limit;
                 tx_env.gas_price = U256::from(tx.max_fee_per_gas);
                 tx_env.gas_priority_fee = Some(U256::from(tx.max_priority_fee_per_gas));
-                tx_env.transact_to =
-                    TransactTo::Call(ChainAddress(tx.chain_id, *tx.to.to().unwrap()));
+                tx_env.transact_to = convert_tx_kind(chain_id, tx.to);
                 tx_env.value = tx.value;
                 tx_env.data = tx.input.clone();
                 tx_env.chain_id = Some(tx.chain_id);
@@ -102,8 +100,7 @@ impl FillTxEnv for TransactionSigned {
                 tx_env.gas_limit = tx.gas_limit;
                 tx_env.gas_price = U256::ZERO;
                 tx_env.gas_priority_fee = None;
-                tx_env.transact_to =
-                    TransactTo::Call(ChainAddress(tx.chain_id, *tx.to.to().unwrap()));
+                tx_env.transact_to = convert_tx_kind(chain_id, tx.to);
                 tx_env.value = tx.value;
                 tx_env.data = tx.input.clone();
                 tx_env.chain_id = None;
@@ -129,5 +126,12 @@ impl FillTxEnv for TransactionSigned {
                 enveloped_tx: Some(envelope.into()),
             }
         }
+    }
+}
+
+fn convert_tx_kind(chain_id: u64, tx: TxKind) -> TransactTo {
+    match tx {
+        TxKind::Create => TransactTo::Create,
+        TxKind::Call(address) => TransactTo::Call(ChainAddress(chain_id, address)),
     }
 }

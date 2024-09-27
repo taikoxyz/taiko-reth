@@ -1750,7 +1750,8 @@ where
             return Err(e.into())
         }
 
-        let db = SyncStateProviderDatabase::new(None, StateProviderDatabase::new(&state_provider));
+        let chain_id = self.payload_validator.chain_spec().chain.id();
+        let db = SyncStateProviderDatabase::new(Some(chain_id), StateProviderDatabase::new(&state_provider));
         let executor = self.executor_provider.executor(db);
 
         let block_number = block.number;
