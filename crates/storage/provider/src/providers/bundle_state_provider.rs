@@ -36,11 +36,7 @@ impl<SP: StateProvider, EDP: ExecutionDataProvider> BundleStateProvider<SP, EDP>
     }
 
     pub fn filter_bundle_state(&self) -> HashMap<ChainAddress, BundleAccount> {
-        let chain_id = self
-            .block_execution_data_provider
-            .execution_outcome()
-            .chain_id
-            .unwrap_or(ETHEREUM_CHAIN_ID);
+        let chain_id = self.block_execution_data_provider.execution_outcome().chain_id;
         self.block_execution_data_provider
             .execution_outcome()
             .current_state()
@@ -134,11 +130,7 @@ impl<SP: StateProvider, EDP: ExecutionDataProvider> StorageRootProvider
         address: Address,
         hashed_storage: HashedStorage,
     ) -> ProviderResult<B256> {
-        let chain_id = self
-            .block_execution_data_provider
-            .execution_outcome()
-            .chain_id
-            .unwrap_or(ETHEREUM_CHAIN_ID);
+        let chain_id = self.block_execution_data_provider.execution_outcome().chain_id;
         let bundle_state = self.block_execution_data_provider.execution_outcome().current_state();
         let mut storage = bundle_state
             .account(&ChainAddress(chain_id, address))

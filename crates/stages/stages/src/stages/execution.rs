@@ -327,10 +327,7 @@ where
 
         // prepare execution output for writing
         let time = Instant::now();
-        let ExecutionOutcome { chain_id, bundle, receipts, requests, first_block } =
-            executor.finalize();
-        let state = ExecutionOutcome::new(chain_id, bundle, receipts, first_block, requests)
-            .filter_current_chain();
+        let state = executor.finalize().filter_current_chain();
         // TODO(Cecilia): If building for other chains, get the ExecutionOutcome of other chains by
         // doing this:      let other_states = state.filter_chain(other_chain_id);
         let write_preparation_duration = time.elapsed();

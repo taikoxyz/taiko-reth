@@ -234,7 +234,7 @@ impl AppendableChain {
                 // TODO(Cecilie): refactor the bundle state provider for cross-chain bundles 
                 let mut execution_outcome =
                     provider.block_execution_data_provider.execution_outcome().clone();
-                execution_outcome.chain_id = Some(chain_id);
+                execution_outcome.chain_id = chain_id;
                 execution_outcome.extend(initial_execution_outcome.clone());
                 let hashed_state = execution_outcome.hash_state_slow();
                 ParallelStateRoot::new(consistent_view, hashed_state)

@@ -686,7 +686,7 @@ mod tests {
         // Create an ExecutionOutcome object with the created bundle, receipts, an empty requests
         // vector, and first_block set to 10
         let execution_outcome = ExecutionOutcome {
-            chain_id: None,
+            chain_id: ETHEREUM_CHAIN_ID,
             bundle: Default::default(),
             receipts,
             requests: vec![],
@@ -706,7 +706,7 @@ mod tests {
 
         // Create an ExecutionOutcome object with a single receipt vector containing receipt1
         let execution_outcome1 = ExecutionOutcome {
-            chain_id: None,
+            chain_id: ETHEREUM_CHAIN_ID,
             bundle: Default::default(),
             receipts: Receipts { receipt_vec: vec![vec![Some(receipt1)]] },
             requests: vec![],
