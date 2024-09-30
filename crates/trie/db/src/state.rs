@@ -283,7 +283,9 @@ mod tests {
     use super::*;
     use reth_db::test_utils::create_test_rw_db;
     use reth_db_api::database::Database;
-    use reth_primitives::{constants::ETHEREUM_CHAIN_ID, hex, revm_primitives::AccountInfo, Address, U256};
+    use reth_primitives::{
+        constants::ETHEREUM_CHAIN_ID, hex, revm_primitives::AccountInfo, Address, U256,
+    };
     use revm::{db::BundleState, primitives::ChainAddress};
     use std::collections::HashMap;
 

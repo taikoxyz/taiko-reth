@@ -47,8 +47,11 @@ where
     println!("execute_block_and_commit_to_database");
     let provider = provider_factory.provider()?;
     let db = SyncStateProviderDatabase::new(
-        Some(chain_spec.chain.id()), 
-        StateProviderDatabase::new(LatestStateProviderRef::new(provider.tx_ref(),provider.static_file_provider().clone()))
+        Some(chain_spec.chain.id()),
+        StateProviderDatabase::new(LatestStateProviderRef::new(
+            provider.tx_ref(),
+            provider.static_file_provider().clone(),
+        )),
     );
 
     // Execute the block to produce a block execution output
@@ -175,11 +178,11 @@ where
     let provider = provider_factory.provider()?;
 
     let db = SyncStateProviderDatabase::new(
-        Some(chain_spec.chain.id()), 
+        Some(chain_spec.chain.id()),
         StateProviderDatabase::new(LatestStateProviderRef::new(
             provider.tx_ref(),
             provider.static_file_provider().clone(),
-        ))
+        )),
     );
     let executor = EthExecutorProvider::ethereum(chain_spec).batch_executor(db);
 

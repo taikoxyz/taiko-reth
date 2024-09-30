@@ -19,8 +19,8 @@ impl FillTxEnv for TransactionSigned {
             envelope
         };
 
-        let chain_id = self.chain_id()
-            .expect(format!("chain_id is None for Tx {:?}", &self).as_str());
+        let chain_id =
+            self.chain_id().expect(format!("chain_id is None for Tx {:?}", &self).as_str());
         tx_env.caller = ChainAddress(chain_id, sender);
         match self.as_ref() {
             Transaction::Legacy(tx) => {

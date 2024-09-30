@@ -24,8 +24,10 @@ use reth_primitives::{
 };
 use reth_prune_types::PruneModes;
 use reth_revm::{
-    batch::BlockBatchRecord, db::{states::bundle_state::BundleRetention, State},
-    state_change::post_block_balance_increments, Evm,
+    batch::BlockBatchRecord,
+    db::{states::bundle_state::BundleRetention, State},
+    state_change::post_block_balance_increments,
+    Evm,
 };
 use revm_primitives::{
     db::{DatabaseCommit, SyncDatabase},
@@ -486,7 +488,7 @@ mod tests {
         eip4788::{BEACON_ROOTS_ADDRESS, BEACON_ROOTS_CODE, SYSTEM_ADDRESS},
         eip7002::{WITHDRAWAL_REQUEST_PREDEPLOY_ADDRESS, WITHDRAWAL_REQUEST_PREDEPLOY_CODE},
     };
-    
+
     use reth_chainspec::{ChainSpecBuilder, ForkCondition};
     use reth_primitives::{
         constants::{EMPTY_ROOT_HASH, ETH_TO_WEI},

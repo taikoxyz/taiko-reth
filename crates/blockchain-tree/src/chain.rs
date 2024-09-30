@@ -18,7 +18,8 @@ use reth_primitives::{
     BlockHash, BlockNumber, ForkBlock, GotExpected, SealedBlockWithSenders, SealedHeader, U256,
 };
 use reth_provider::{
-    providers::{BundleStateProvider, ConsistentDbView}, ChainSpecProvider, FullExecutionDataProvider, ProviderError, StateRootProvider
+    providers::{BundleStateProvider, ConsistentDbView},
+    ChainSpecProvider, FullExecutionDataProvider, ProviderError, StateRootProvider,
 };
 use reth_revm::database::{StateProviderDatabase, SyncStateProviderDatabase};
 use reth_trie::{updates::TrieUpdates, HashedPostState};
@@ -210,8 +211,9 @@ impl AppendableChain {
         let provider = BundleStateProvider::new(state_provider, bundle_state_data_provider);
 
         let db = SyncStateProviderDatabase::new(
-            Some(externals.provider_factory.chain_spec().chain.id()), 
-            StateProviderDatabase::new(&provider));
+            Some(externals.provider_factory.chain_spec().chain.id()),
+            StateProviderDatabase::new(&provider),
+        );
         let executor = externals.executor_factory.executor(db);
         let block_hash = block.hash();
         let block = block.unseal();
@@ -231,7 +233,7 @@ impl AppendableChain {
             // calculate and check state root
             let start = Instant::now();
             let (state_root, trie_updates) = if block_attachment.is_canonical() {
-                // TODO(Cecilie): refactor the bundle state provider for cross-chain bundles 
+                // TODO(Cecilie): refactor the bundle state provider for cross-chain bundles
                 let mut execution_outcome =
                     provider.block_execution_data_provider.execution_outcome().clone();
                 execution_outcome.chain_id = chain_id;

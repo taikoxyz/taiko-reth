@@ -390,7 +390,11 @@ where
         block: SealedBlockWithSenders,
         block_validation_kind: BlockValidationKind,
     ) -> Result<BlockStatus, InsertBlockErrorKind> {
-        println!("BlockchainTree: try_append_canonical_chain {:?} \n    tx {:?}", block.state_root, block.transactions().count());
+        println!(
+            "BlockchainTree: try_append_canonical_chain {:?} \n    tx {:?}",
+            block.state_root,
+            block.transactions().count()
+        );
         let parent = block.parent_num_hash();
         let block_num_hash = block.num_hash();
         debug!(target: "blockchain_tree", head = ?block_num_hash.hash, ?parent, "Appending block to canonical chain");

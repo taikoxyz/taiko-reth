@@ -360,11 +360,13 @@ where
         PayloadBuilderError::Internal(err.into())
     })?;
 
-    println!("while let Some(pool_tx) = best_txs.next(): {:?}", 
+    println!(
+        "while let Some(pool_tx) = best_txs.next(): {:?}",
         pool.best_transactions_with_attributes(BestTransactionsAttributes::new(
             base_fee,
             initialized_block_env.get_blob_gasprice().map(|gasprice| gasprice as u64),
-        )).count()
+        ))
+        .count()
     );
     let mut receipts = Vec::new();
     while let Some(pool_tx) = best_txs.next() {
@@ -536,7 +538,9 @@ where
             .db
             .get_db(chain_spec.chain.id())
             .ok_or(ProviderError::Database(DatabaseError::GetSyncDatabase(chain_spec.chain.id())))?
-            .state_root(HashedPostState::from_bundle_state(&execution_outcome.current_state().state))?
+            .state_root(HashedPostState::from_bundle_state(
+                &execution_outcome.current_state().state,
+            ))?
     };
 
     // create the block header

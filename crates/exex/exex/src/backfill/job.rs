@@ -17,7 +17,6 @@ use reth_revm::database::{StateProviderDatabase, SyncStateProviderDatabase};
 use reth_stages_api::ExecutionStageThresholds;
 use reth_tracing::tracing::{debug, trace};
 
-
 /// Backfill job started for a specific range.
 ///
 /// It implements [`Iterator`] that executes blocks in batches according to the provided thresholds

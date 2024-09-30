@@ -133,7 +133,7 @@ impl ExecutionOutcome {
     /// Reture the `ExecutionOutcome` for a speicific chain.
     pub fn filter_chain(&self, chain_id: u64) -> Self {
         Self {
-            chain_id: chain_id,
+            chain_id,
             bundle: self.bundle.filter_for_chain(chain_id),
             // FIX(Cecilia): with (chain_id, Reciepts) & (chain_id, Requests)
             // we can filter out the right ones

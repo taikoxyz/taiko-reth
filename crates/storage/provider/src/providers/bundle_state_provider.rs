@@ -37,10 +37,7 @@ impl<SP: StateProvider, EDP: ExecutionDataProvider> BundleStateProvider<SP, EDP>
 
     pub fn filter_bundle_state(&self) -> HashMap<ChainAddress, BundleAccount> {
         let chain_id = self.block_execution_data_provider.execution_outcome().chain_id;
-        self.block_execution_data_provider
-            .execution_outcome()
-            .current_state()
-            .state
+        self.block_execution_data_provider.execution_outcome().current_state().state
     }
 }
 
@@ -155,7 +152,8 @@ impl<SP: StateProvider, EDP: ExecutionDataProvider> StateProofProvider
         address: Address,
         slots: &[B256],
     ) -> ProviderResult<AccountProof> {
-        let bundle_state = self.block_execution_data_provider.execution_outcome().current_state().clone();
+        let bundle_state =
+            self.block_execution_data_provider.execution_outcome().current_state().clone();
         let mut state = HashedPostState::from_bundle_state(&bundle_state.state);
         state.extend(hashed_state);
         self.state_provider.proof(state, address, slots)
