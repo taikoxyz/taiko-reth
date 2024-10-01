@@ -6,7 +6,7 @@ use reth_db_api::{
 use reth_db_common::DbTool;
 use reth_evm::{execute::BlockExecutorProvider, noop::NoopBlockExecutorProvider};
 use reth_node_core::dirs::{ChainPath, DataDirPath};
-use reth_provider::{providers::StaticFileProvider, ProviderFactory};
+use reth_provider::{providers::StaticFileProvider, ProviderFactory, StateProofProvider};
 use reth_stages::{stages::ExecutionStage, Stage, StageCheckpoint, UnwindInput};
 use tracing::info;
 

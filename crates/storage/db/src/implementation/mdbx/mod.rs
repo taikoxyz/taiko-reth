@@ -419,7 +419,6 @@ impl DatabaseEnv {
 
     /// Creates all the defined tables, if necessary.
     pub fn create_tables(&self) -> Result<(), DatabaseError> {
-        println!("create_tables");
         let tx = self.inner.begin_rw_txn().map_err(|e| DatabaseError::InitTx(e.into()))?;
 
         for table in Tables::ALL {
