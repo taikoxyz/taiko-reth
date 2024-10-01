@@ -256,7 +256,7 @@ pub struct EthBlockExecutor<EvmConfig, DB> {
 
 impl<EvmConfig, DB> EthBlockExecutor<EvmConfig, DB> {
     /// Creates a new Ethereum block executor.
-    pub fn new(chain_spec: Arc<ChainSpec>, evm_config: EvmConfig, state: State<DB>) -> Self {
+    pub const fn new(chain_spec: Arc<ChainSpec>, evm_config: EvmConfig, state: State<DB>) -> Self {
         Self { executor: EthEvmExecutor { chain_spec, evm_config }, state }
     }
 
@@ -315,7 +315,7 @@ where
         // 2. configure the evm and execute
         let env = self.evm_env_for_block(&block.header, total_difficulty);
         let output = {
-            let evm = self.executor.evm_config.evm_with_env(&mut self.state, env.clone());
+            let evm = self.executor.evm_config.evm_with_env(&mut self.state, env);
             self.executor.execute_state_transitions(block, evm)
         }?;
 

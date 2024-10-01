@@ -92,7 +92,7 @@ mod tests {
     use super::*;
     use reth_ethereum_forks::{ChainHardforks, EthereumHardfork, ForkCondition};
     use reth_primitives::{
-        constants::{ETHEREUM_CHAIN_ID, GWEI_TO_WEI},
+        constants::GWEI_TO_WEI,
         Address,
     };
 

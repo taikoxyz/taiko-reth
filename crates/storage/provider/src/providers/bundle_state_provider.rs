@@ -2,7 +2,7 @@ use crate::{
     AccountReader, BlockHashReader, ExecutionDataProvider, StateProvider, StateRootProvider,
 };
 use reth_primitives::{
-    constants::ETHEREUM_CHAIN_ID, Account, Address, BlockNumber, Bytecode, Bytes, B256,
+    Account, Address, BlockNumber, Bytecode, Bytes, B256,
 };
 use reth_storage_api::{StateProofProvider, StorageRootProvider};
 use reth_storage_errors::provider::ProviderResult;
@@ -151,7 +151,7 @@ impl<SP: StateProvider, EDP: ExecutionDataProvider> StateProofProvider
         slots: &[B256],
     ) -> ProviderResult<AccountProof> {
         let bundle_state =
-            self.block_execution_data_provider.execution_outcome().current_state().clone();
+            self.block_execution_data_provider.execution_outcome().current_state();
         let mut state = HashedPostState::from_bundle_state(&bundle_state.state);
         state.extend(hashed_state);
         self.state_provider.proof(state, address, slots)

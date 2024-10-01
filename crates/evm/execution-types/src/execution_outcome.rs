@@ -148,7 +148,7 @@ impl ExecutionOutcome {
     pub fn filter_current_chain(&self) -> Self {
         Self {
             chain_id: self.chain_id,
-            bundle: self.current_state().clone(),
+            bundle: self.current_state(),
             // FIX(Cecilia): with (chain_id, Reciepts) & (chain_id, Requests)
             // we can filter out the right ones
             receipts: self.receipts.clone(),

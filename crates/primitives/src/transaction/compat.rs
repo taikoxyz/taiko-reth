@@ -20,7 +20,7 @@ impl FillTxEnv for TransactionSigned {
         };
 
         let chain_id =
-            self.chain_id().expect(format!("chain_id is None for Tx {:?}", &self).as_str());
+            self.chain_id().unwrap_or_else(|| panic!("chain_id is None for Tx {:?}", &self));
         tx_env.caller = ChainAddress(chain_id, sender);
         match self.as_ref() {
             Transaction::Legacy(tx) => {
@@ -129,7 +129,7 @@ impl FillTxEnv for TransactionSigned {
     }
 }
 
-fn convert_tx_kind(chain_id: u64, tx: TxKind) -> TransactTo {
+const fn convert_tx_kind(chain_id: u64, tx: TxKind) -> TransactTo {
     match tx {
         TxKind::Create => TransactTo::Create,
         TxKind::Call(address) => TransactTo::Call(ChainAddress(chain_id, address)),

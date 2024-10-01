@@ -1361,7 +1361,7 @@ mod tests {
     #[test]
     fn revert_to_indices() {
         let base = ExecutionOutcome {
-            chain_id: None,
+            chain_id: ETHEREUM_CHAIN_ID,
             bundle: BundleState::default(),
             receipts: vec![vec![Some(Receipt::default()); 2]; 7].into(),
             first_block: 10,
@@ -1580,7 +1580,7 @@ mod tests {
         assert_eq!(previous_state.reverts.len(), 1);
 
         let mut test = ExecutionOutcome {
-            chain_id: None,
+            chain_id: ETHEREUM_CHAIN_ID,
             bundle: present_state,
             receipts: vec![vec![Some(Receipt::default()); 2]; 1].into(),
             first_block: 2,
