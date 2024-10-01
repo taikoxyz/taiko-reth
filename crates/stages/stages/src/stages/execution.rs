@@ -227,7 +227,7 @@ where
         ));
         // TODO(Cecilia): risk of wrong chain id
         let mut executor =
-            self.executor_provider.batch_executor(SyncStateProviderDatabase::new(Some(999), db));
+            self.executor_provider.batch_executor(SyncStateProviderDatabase::new(None, db));
         executor.set_tip(max_block);
         executor.set_prune_modes(prune_modes);
 

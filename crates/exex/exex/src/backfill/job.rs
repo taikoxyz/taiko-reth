@@ -191,8 +191,9 @@ where
         &self,
         block_number: u64,
     ) -> Result<(BlockWithSenders, BlockExecutionOutput<Receipt>), BlockExecutionError> {
-        println!("SingleBlockBackfillJob::execute_block");
 
+
+        
         let td = self
             .provider
             .header_td_by_number(block_number)?
@@ -205,7 +206,6 @@ where
             .ok_or_else(|| ProviderError::HeaderNotFound(block_number.into()))?;
 
         // Configure the executor to use the previous block's state.
-        println!("~~None");
         let executor = self.executor.executor(SyncStateProviderDatabase::new(
             None,
             StateProviderDatabase::new(

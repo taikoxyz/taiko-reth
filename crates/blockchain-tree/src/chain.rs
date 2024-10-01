@@ -79,7 +79,6 @@ impl AppendableChain {
         DB: Database + Clone,
         E: BlockExecutorProvider,
     {
-        println!("AppendableChain::new_canonical_fork");
         let execution_outcome = ExecutionOutcome::default();
         let empty = BTreeMap::new();
 
@@ -184,8 +183,6 @@ impl AppendableChain {
         DB: Database + Clone,
         E: BlockExecutorProvider,
     {
-        println!("AppendableChain::validate_and_execute");
-        println!("sealed block: {:?}", block.header.state_root);
         // some checks are done before blocks comes here.
         externals.consensus.validate_header_against_parent(&block, parent_block)?;
 

@@ -66,9 +66,6 @@ where
     Pool: TransactionPool,
     SyncProvider: StateProvider,
 {
-    // Brecht: ethereum payload builder
-    println!("Cecilia: default_gwyneth_payload_builder");
-
     let BuildArguments { client, pool, mut cached_reads, config, cancel, best_payload } = args;
     let PayloadConfig {
         initialized_block_env,
@@ -86,7 +83,6 @@ where
 
     let (l1_id, l1_provider) = attributes.l1_provider.unwrap();
     let l1_box: Box<dyn StateProvider> = Box::new(l1_provider);
-    println!("Cecilia: sync_state.add_db l1_id: {:?}", l1_id);
     let l1_state = StateProviderDatabase::new(l1_box);
     sync_state.add_db(l1_id, l1_state);
 
@@ -113,8 +109,6 @@ where
     let mut total_fees = U256::ZERO;
 
     let block_number = initialized_block_env.number.to::<u64>();
-
-    println!("brecht: payload builder: {:?}", attributes.transactions);
 
     // apply eip-4788 pre block contract call
     pre_block_beacon_root_contract_call(

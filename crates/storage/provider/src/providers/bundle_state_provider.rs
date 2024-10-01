@@ -13,8 +13,6 @@ use reth_trie::{
 use revm::{db::BundleAccount, primitives::ChainAddress};
 use std::collections::HashMap;
 
-/// FIX(Cecilia): How should we provide post-execution state data? in bundle or seperately?
-
 /// A state provider that resolves to data from either a wrapped [`crate::ExecutionOutcome`]
 /// or an underlying state provider.
 ///

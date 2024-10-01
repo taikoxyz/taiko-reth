@@ -44,7 +44,6 @@ pub(crate) fn execute_block_and_commit_to_database<DB>(
 where
     DB: reth_db_api::database::Database,
 {
-    println!("execute_block_and_commit_to_database");
     let provider = provider_factory.provider()?;
     let db = SyncStateProviderDatabase::new(
         Some(chain_spec.chain.id()),

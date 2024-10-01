@@ -99,7 +99,6 @@ where
             initialized_cfg,
             ..
         } = config;
-        println!("build_empty_payload");
 
         debug!(target: "payload_builder", parent_hash = ?parent_block.hash(), parent_number = parent_block.number, "building empty payload");
 
@@ -263,7 +262,6 @@ where
         let block = Block { header, body: vec![], ommers: vec![], withdrawals, requests };
         let sealed_block = block.seal_slow();
 
-        println!("END build_empty_payload {:?}", sealed_block.header.state_root);
         Ok(EthBuiltPayload::new(attributes.payload_id(), sealed_block, U256::ZERO))
     }
 }
@@ -295,7 +293,6 @@ where
         chain_spec,
         ..
     } = config;
-    println!("default_ethereum_payload_builder \n{:?}", initialized_cfg);
 
     let state_provider = client.state_by_block_hash(parent_block.hash())?;
     let state = SyncStateProviderDatabase::new(
@@ -326,7 +323,6 @@ where
 
     let block_number = initialized_block_env.number.to::<u64>();
 
-    // println!("brecht: payload builder: {:?}", attributes.transactions);
 
     // apply eip-4788 pre block contract call
     pre_block_beacon_root_contract_call(
@@ -359,15 +355,6 @@ where
         warn!(target: "payload_builder", parent_hash=%parent_block.hash(), %err, "failed to update blockhashes for empty payload");
         PayloadBuilderError::Internal(err.into())
     })?;
-
-    println!(
-        "while let Some(pool_tx) = best_txs.next(): {:?}",
-        pool.best_transactions_with_attributes(BestTransactionsAttributes::new(
-            base_fee,
-            initialized_block_env.get_blob_gasprice().map(|gasprice| gasprice as u64),
-        ))
-        .count()
-    );
     let mut receipts = Vec::new();
     while let Some(pool_tx) = best_txs.next() {
         // ensure we still have capacity for this transaction
@@ -601,7 +588,6 @@ where
     let sealed_block = block.seal_slow();
     debug!(target: "payload_builder", ?sealed_block, "sealed built block");
 
-    println!("END default_ethereum_payload_builder {:?}", sealed_block.header.state_root);
     let mut payload = EthBuiltPayload::new(attributes.id, sealed_block, total_fees);
 
     // extend the payload with the blob sidecars from the executed txs

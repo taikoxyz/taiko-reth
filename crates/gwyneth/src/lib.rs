@@ -360,7 +360,5 @@ async fn main() -> eyre::Result<()> {
         .await
         .unwrap();
 
-    println!("Node started");
-
     handle.node_exit_future.await
 }

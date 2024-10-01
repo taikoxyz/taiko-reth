@@ -16,8 +16,7 @@ pub struct SyncStateProviderDatabase<DB>(pub HashMap<u64, StateProviderDatabase<
 impl<DB> SyncStateProviderDatabase<DB> {
     /// Create new State with generic `StateProvider`.
     pub fn new(chain_id: Option<u64>, db: StateProviderDatabase<DB>) -> Self {
-        println!("Cecilia: SyncStateProviderDatabase::new chain_id {:?}", chain_id);
-        assert!(chain_id.is_some());
+        // assert!(chain_id.is_some());
         let mut map = HashMap::new();
         map.insert(chain_id.unwrap_or(ETHEREUM_CHAIN_ID), db);
         Self(map)
@@ -90,7 +89,6 @@ pub trait SyncEvmStateProvider: Send + Sync {
 
 impl<DB: EvmStateProvider> SyncEvmStateProvider for SyncStateProviderDatabase<DB> {
     fn basic_account(&self, address: ChainAddress) -> ProviderResult<Option<Account>> {
-        println!("Cecilia: SyncEvmStateProvider::basic_account {:?} {:?}", address.0, address.1);
         if let Some(db) = self.get(&address.0) {
             db.0.basic_account(address.1)
         } else {
@@ -99,7 +97,6 @@ impl<DB: EvmStateProvider> SyncEvmStateProvider for SyncStateProviderDatabase<DB
     }
 
     fn block_hash(&self, chain_id: u64, number: BlockNumber) -> ProviderResult<Option<B256>> {
-        println!("Cecilia: SyncEvmStateProvider::block_hash {:?} {:?}", chain_id, number);
         if let Some(db) = self.get(&chain_id) {
             db.0.block_hash(number)
         } else {
@@ -112,7 +109,6 @@ impl<DB: EvmStateProvider> SyncEvmStateProvider for SyncStateProviderDatabase<DB
         chain_id: u64,
         code_hash: B256,
     ) -> ProviderResult<Option<reth_primitives::Bytecode>> {
-        println!("Cecilia: SyncEvmStateProvider::bytecode_by_hash {:?} {:?}", chain_id, code_hash);
         if let Some(db) = self.get(&chain_id) {
             db.0.bytecode_by_hash(code_hash)
         } else {
@@ -125,7 +121,6 @@ impl<DB: EvmStateProvider> SyncEvmStateProvider for SyncStateProviderDatabase<DB
         account: ChainAddress,
         storage_key: StorageKey,
     ) -> ProviderResult<Option<StorageValue>> {
-        println!("Cecilia: SyncEvmStateProvider::storage {:?} {:?}", account.0, account.1);
         if let Some(db) = self.get(&account.0) {
             db.0.storage(account.1, storage_key)
         } else {

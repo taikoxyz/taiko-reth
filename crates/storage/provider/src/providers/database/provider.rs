@@ -2649,8 +2649,6 @@ impl<TX: DbTxMut + DbTx> StateChangeWriter for DatabaseProvider<TX> {
         let mut storages_cursor = self.tx_ref().cursor_dup_write::<tables::PlainStorageState>()?;
         let mut storage_changeset_cursor =
             self.tx_ref().cursor_dup_write::<tables::StorageChangeSets>()?;
-        // FIX(Cecilia): should filter?
-        // reverts.filter_for_chain(self.chain_spec.chain().id());
 
         for (block_index, mut storage_changes) in reverts.storage.into_iter().enumerate() {
             let block_number = first_block + block_index as BlockNumber;
@@ -2711,7 +2709,6 @@ impl<TX: DbTxMut + DbTx> StateChangeWriter for DatabaseProvider<TX> {
     }
 
     fn write_state_changes(&self, mut changes: StateChangeset) -> ProviderResult<()> {
-        // FIX(Cecilia): should filter? filter out changes for this chain.
         changes.filter_for_chain(self.chain_spec.chain().id());
         // sort all entries so they can be written to database in more performant way.
         // and take smaller memory footprint.

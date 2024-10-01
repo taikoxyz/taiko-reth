@@ -104,7 +104,6 @@ impl<Node: reth_node_api::FullNodeComponents> Rollup<Node> {
     /// corresponding actions and inserts the results into the database.
     pub async fn commit(&mut self, chain: &Chain) -> eyre::Result<()> {
         let events = decode_chain_into_rollup_events(chain);
-        println!("Found {:?} events", events.len());
         for (block, _, event) in events {
             // TODO: Don't emit ProposeBlock event but directely
             //  read the function call RollupContractCalls to extract Txs
@@ -116,9 +115,7 @@ impl<Node: reth_node_api::FullNodeComponents> Rollup<Node> {
                 txList: tx_list,
             }) = event
             {
-                println!("block_number: {:?}", block_number);
                 let transactions: Vec<TransactionSigned> = decode_transactions(&tx_list);
-                println!("transactions: {:?}", transactions);
 
                 let attrs = GwynethPayloadAttributes {
                     inner: EthPayloadAttributes {
@@ -177,9 +174,6 @@ impl<Node: reth_node_api::FullNodeComponents> Rollup<Node> {
 
                 // trigger forkchoice update via engine api to commit the block to the blockchain
                 self.engine_api.update_forkchoice(block_hash, block_hash).await?;
-
-                println!("block_hash: {:?}", block_hash);
-                println!("block_number: {:?}", payload.block().number);
             }
         }
 
@@ -213,7 +207,6 @@ fn decode_chain_into_rollup_events(
                 .logs
                 .iter()
                 .filter(|log| {
-                    println!("log: {:?}", log);
                     log.address == ROLLUP_CONTRACT_ADDRESS
                 })
                 .map(move |log| (block, tx, log))

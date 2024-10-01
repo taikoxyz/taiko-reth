@@ -217,7 +217,6 @@ impl ExecutionOutcome {
     /// Returns [`HashedPostState`] for this execution outcome.
     /// See [`HashedPostState::from_bundle_state`] for more info.
     pub fn hash_state_slow(&self) -> HashedPostState {
-        println!("hash_state_slow");
         HashedPostState::from_bundle_state(self.current_state().state())
     }
 

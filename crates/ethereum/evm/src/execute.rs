@@ -73,7 +73,6 @@ where
     where
         DB: SyncDatabase<Error: Into<ProviderError>>,
     {
-        println!("eth_executor");
         EthBlockExecutor::new(
             self.chain_spec.clone(),
             self.evm_config.clone(),
@@ -96,7 +95,6 @@ where
     where
         DB: SyncDatabase<Error: Into<ProviderError> + Display>,
     {
-        println!("executor");
         self.eth_executor(db)
     }
 
@@ -104,7 +102,6 @@ where
     where
         DB: SyncDatabase<Error: Into<ProviderError> + Display>,
     {
-        println!("batch_executor");
         let executor = self.eth_executor(db);
         EthBatchExecutor { executor, batch_record: BlockBatchRecord::default() }
     }
@@ -260,7 +257,6 @@ pub struct EthBlockExecutor<EvmConfig, DB> {
 impl<EvmConfig, DB> EthBlockExecutor<EvmConfig, DB> {
     /// Creates a new Ethereum block executor.
     pub fn new(chain_spec: Arc<ChainSpec>, evm_config: EvmConfig, state: State<DB>) -> Self {
-        println!("EthBlockExecutor::new");
         Self { executor: EthEvmExecutor { chain_spec, evm_config }, state }
     }
 
@@ -315,14 +311,11 @@ where
 
         // 1. prepare state on new block
         self.on_new_block(&block.header);
-        println!("on_new_block");
 
         // 2. configure the evm and execute
         let env = self.evm_env_for_block(&block.header, total_difficulty);
-        println!("evm_env_for_block");
         let output = {
             let evm = self.executor.evm_config.evm_with_env(&mut self.state, env.clone());
-            println!("evm_config.evm_with_env -- env: {:?}", env);
             self.executor.execute_state_transitions(block, evm)
         }?;
 
@@ -432,7 +425,6 @@ where
     type Error = BlockExecutionError;
 
     fn execute_and_verify_one(&mut self, input: Self::Input<'_>) -> Result<(), Self::Error> {
-        println!("execute_and_verify_one");
         let BlockExecutionInput { block, total_difficulty } = input;
 
         if self.batch_record.first_block().is_none() {
