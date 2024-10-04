@@ -70,11 +70,4 @@ mod tests {
         #[command(flatten)]
         args: T,
     }
-
-    // #[test]
-    // fn test_parse_engine_args() {
-    //     let default_args = EngineArgs::default();
-    //     let args = CommandParser::<EngineArgs>::parse_from(["reth"]).args;
-    //     assert_eq!(args, default_args);
-    // }
 }
