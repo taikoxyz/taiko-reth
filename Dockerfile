@@ -39,10 +39,10 @@ RUN cargo build --profile $BUILD_PROFILE --features "$FEATURES" --locked --bin r
 # with each build, Docker will consider this 
 # layer (and all subsequent layers) as modified,
 # forcing a re-execution of the following steps.
-ADD https://worldtimeapi.org/api/ip /tmp/bustcache
+# ADD https://worldtimeapi.org/api/ip /tmp/bustcache
 
 # Clone and build rbuilder (gwyneth branch)
-RUN git clone -b gwyneth_get_layer2_info https://github.com/taikoxyz/rbuilder.git /app/rbuilder
+RUN git clone -b gwyneth https://github.com/taikoxyz/rbuilder.git /app/rbuilder
 WORKDIR /app/rbuilder
 RUN cargo build --release
 
