@@ -20,7 +20,7 @@ impl FillTxEnv for TransactionSigned {
         };
 
         let chain_id =
-            self.chain_id().unwrap_or_else(|| panic!("chain_id is None for Tx {:?}", &self));
+            tx_env.chain_id.unwrap_or_else(|| panic!("chain_id is None for Tx {:?}", &self));
         tx_env.caller = ChainAddress(chain_id, sender);
         match self.as_ref() {
             Transaction::Legacy(tx) => {

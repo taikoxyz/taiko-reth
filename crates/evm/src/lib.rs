@@ -60,6 +60,8 @@ pub trait ConfigureEvm: ConfigureEvmEnv {
         let mut evm = self.evm(db);
         evm.modify_spec_id(env.spec_id());
         evm.context.evm.env = env.env;
+        evm.tx_mut().chain_id = Some(evm.cfg().chain_id);
+
         evm
     }
 
