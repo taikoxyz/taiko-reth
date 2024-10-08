@@ -86,6 +86,16 @@ fi
 echo "Running Kurtosis command..."
 KURTOSIS_OUTPUT=$(kurtosis run github.com/adaki2004/ethereum-package --args-file ./scripts/confs/network_params.yaml)
 
+# Extract the Blockscout port
+BLOCKSCOUT_PORT=$(echo "$KURTOSIS_OUTPUT" | grep -A 5 "^[a-f0-9]\+ *blockscout " | grep "http:" | sed -E 's/.*-> http:\/\/127\.0\.0\.1:([0-9]+).*/\1/' | head -n 1)
+
+if [ -z "$BLOCKSCOUT_PORT" ]; then
+    echo "Failed to extract Blockscout port."
+    exit 1
+fi
+
+echo "Extracted Blockscout port: $BLOCKSCOUT_PORT"
+echo "$BLOCKSCOUT_PORT" > /tmp/kurtosis_blockscout_port
 # # Print the entire Kurtosis output for debugging
 # echo "Kurtosis Output:"
 # echo "$KURTOSIS_OUTPUT"
@@ -139,7 +149,6 @@ fi
 # Update the cl_node_url in the file, regardless of its current content
 ESCAPED_URL=$(echo "$BEACON_HTTP_URL" | sed 's/[\/&]/\\&/g')
 UPDATE_COMMAND="sed -i '/^cl_node_url[[:space:]]*=/c\cl_node_url = [\"$ESCAPED_URL\"]' $FILE_PATH"
-
 if docker exec "$CONTAINER_ID" sh -c "$UPDATE_COMMAND"; then
     echo "Successfully updated $FILE_PATH in the container."
 else
@@ -166,5 +175,14 @@ fi
 # Run the forge foundry script using the extracted RPC port and PRIVATE_KEY
 FORGE_COMMAND="forge script --rpc-url http://127.0.0.1:$RPC_PORT scripts/DeployL1Locally.s.sol -vvvv --broadcast --private-key $PRIVATE_KEY --legacy"
 echo "Running forge foundry script..."
-eval $FORGE_COMMAND
+FORGE_OUTPUT=$(eval $FORGE_COMMAND | tee /dev/tty)
 echo "Script execution completed."
+
+# Extract the path to run-latest.json
+RUN_LATEST_PATH=$(echo "$FORGE_OUTPUT" | grep "Transactions saved to:" | sed 's/Transactions saved to: //')
+
+# Run the verification script
+echo "Starting contract verification..."
+BLOCKSCOUT_PORT=$(cat /tmp/kurtosis_blockscout_port)
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
+"$SCRIPT_DIR/verify_contracts.sh" "$BLOCKSCOUT_PORT" "$RUN_LATEST_PATH"
