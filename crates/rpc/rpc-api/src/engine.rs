@@ -8,9 +8,9 @@ use reth_engine_primitives::EngineTypes;
 use reth_primitives::{Address, BlockHash, BlockId, BlockNumberOrTag, Bytes, B256, U256, U64};
 use reth_rpc_types::{
     engine::{
-        ClientVersionV1, ExecutionPayloadBodiesV1, ExecutionPayloadInputV2, ExecutionPayloadV1,
-        ExecutionPayloadV3, ExecutionPayloadV4, ForkchoiceState, ForkchoiceUpdated, PayloadId,
-        PayloadStatus, TransitionConfiguration,
+        ClientVersionV1, ExecutionPayloadBodiesV1, ExecutionPayloadV1, ExecutionPayloadV3,
+        ExecutionPayloadV4, ForkchoiceState, ForkchoiceUpdated, PayloadId, PayloadStatus,
+        TaikoExecutionPayloadInputV2, TransitionConfiguration,
     },
     state::StateOverride,
     BlockOverrides, Filter, Log, RichBlock, SyncStatus, TransactionRequest,
@@ -33,7 +33,10 @@ pub trait EngineApi<Engine: EngineTypes> {
 
     /// See also <https://github.com/ethereum/execution-apis/blob/584905270d8ad665718058060267061ecfd79ca5/src/engine/shanghai.md#engine_newpayloadv2>
     #[method(name = "newPayloadV2")]
-    async fn new_payload_v2(&self, payload: ExecutionPayloadInputV2) -> RpcResult<PayloadStatus>;
+    async fn new_payload_v2(
+        &self,
+        payload: TaikoExecutionPayloadInputV2,
+    ) -> RpcResult<PayloadStatus>;
 
     /// Post Cancun payload handler
     ///

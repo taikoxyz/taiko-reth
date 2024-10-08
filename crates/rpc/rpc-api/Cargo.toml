@@ -18,6 +18,9 @@ reth-rpc-types.workspace = true
 reth-engine-primitives.workspace = true
 reth-network-peers.workspace = true
 
+# taiko
+taiko-reth-primitives = { workspace = true, optional = true }
+
 # misc
 alloy-dyn-abi = { workspace = true, features = ["eip712"] }
 jsonrpsee = { workspace = true, features = ["server", "macros"] }
@@ -28,3 +31,8 @@ serde_json.workspace = true
 
 [features]
 client = ["jsonrpsee/client", "jsonrpsee/async-client"]
+taiko = [
+    "reth-primitives/taiko",
+    "reth-engine-primitives/taiko",
+    "dep:taiko-reth-primitives",
+]

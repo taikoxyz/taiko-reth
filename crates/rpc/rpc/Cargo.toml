@@ -31,8 +31,15 @@ revm-inspectors = { workspace = true, features = ["js-tracer"] }
 reth-evm.workspace = true
 reth-network-peers.workspace = true
 reth-execution-types.workspace = true
+reth-beacon-consensus.workspace = true
+reth-engine-primitives.workspace = true
 
 reth-evm-optimism = { workspace = true, optional = true }
+
+# taiko
+taiko-reth-provider = { workspace = true, optional = true }
+taiko-reth-primitives = { workspace = true, optional = true }
+taiko-reth-proposer-consensus = { workspace = true, optional = true }
 
 # eth
 alloy-rlp.workspace = true
@@ -99,4 +106,14 @@ optimism = [
     "dep:reth-evm-optimism",
     "reth-evm-optimism/optimism",
     "reth-revm/optimism",
+]
+
+taiko = [
+    "reth-primitives/taiko",
+    "reth-revm/taiko",
+    "reth-rpc-api/taiko",
+    "reth-rpc-engine-api/taiko",
+    "dep:taiko-reth-provider",
+    "dep:taiko-reth-primitives",
+    "dep:taiko-reth-proposer-consensus",
 ]

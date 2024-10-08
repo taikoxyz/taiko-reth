@@ -207,9 +207,9 @@ impl AppendableChain {
         let db = StateProviderDatabase::new(&provider);
         let executor = externals.executor_factory.executor(db);
         let block_hash = block.hash();
-        let block = block.unseal();
+        let mut block = block.unseal();
 
-        let state = executor.execute((&block, U256::MAX).into())?;
+        let state = executor.execute((&mut block, U256::MAX).into())?;
         let BlockExecutionOutput { state, receipts, requests, .. } = state;
         externals
             .consensus
@@ -239,7 +239,7 @@ impl AppendableChain {
                 return Err(ConsensusError::BodyStateRootDiff(
                     GotExpected { got: state_root, expected: block.state_root }.into(),
                 )
-                .into())
+                .into());
             }
 
             tracing::debug!(

@@ -10,6 +10,8 @@ use crate::{
 use alloy_rlp::{Decodable, Encodable};
 use async_trait::async_trait;
 use jsonrpsee::core::RpcResult;
+use reth_beacon_consensus::BeaconConsensusEngineHandle;
+use reth_engine_primitives::{EngineApiMessageVersion, EngineTypes};
 use reth_primitives::{
     revm::env::tx_env_with_recovered, Address, Block, BlockId, BlockNumberOrTag, Bytes,
     TransactionSignedEcRecovered, Withdrawals, B256, U256,
@@ -20,6 +22,7 @@ use reth_provider::{
 use reth_revm::database::StateProviderDatabase;
 use reth_rpc_api::DebugApiServer;
 use reth_rpc_types::{
+    engine::ForkchoiceState,
     state::EvmOverrides,
     trace::geth::{
         BlockTraceResult, FourByteFrame, GethDebugBuiltInTracerType, GethDebugTracerType,
@@ -36,22 +39,41 @@ use revm_inspectors::tracing::{
     js::{JsInspector, TransactionContext},
     FourByteInspector, MuxInspector, TracingInspector, TracingInspectorConfig,
 };
-use std::sync::Arc;
-use tokio::sync::{AcquireError, OwnedSemaphorePermit};
+use std::{sync::Arc, time::Duration};
+use tokio::{
+    sync::{AcquireError, OwnedSemaphorePermit},
+    time::sleep,
+};
 
 /// `debug` API implementation.
 ///
 /// This type provides the functionality for handling `debug` related requests.
-pub struct DebugApi<Provider, Eth> {
-    inner: Arc<DebugApiInner<Provider, Eth>>,
+pub struct DebugApi<Provider, Eth, EngineT>
+where
+    EngineT: EngineTypes,
+{
+    inner: Arc<DebugApiInner<Provider, Eth, EngineT>>,
 }
 
 // === impl DebugApi ===
 
-impl<Provider, Eth> DebugApi<Provider, Eth> {
+impl<Provider, Eth, EngineT> DebugApi<Provider, Eth, EngineT>
+where
+    EngineT: EngineTypes,
+{
     /// Create a new instance of the [`DebugApi`]
-    pub fn new(provider: Provider, eth: Eth, blocking_task_guard: BlockingTaskGuard) -> Self {
-        let inner = Arc::new(DebugApiInner { provider, eth_api: eth, blocking_task_guard });
+    pub fn new(
+        provider: Provider,
+        eth: Eth,
+        blocking_task_guard: BlockingTaskGuard,
+        beacon_consensus: BeaconConsensusEngineHandle<EngineT>,
+    ) -> Self {
+        let inner = Arc::new(DebugApiInner {
+            provider,
+            eth_api: eth,
+            blocking_task_guard,
+            beacon_consensus,
+        });
         Self { inner }
     }
 
@@ -63,10 +85,11 @@ impl<Provider, Eth> DebugApi<Provider, Eth> {
 
 // === impl DebugApi ===
 
-impl<Provider, Eth> DebugApi<Provider, Eth>
+impl<Provider, Eth, EngineT> DebugApi<Provider, Eth, EngineT>
 where
     Provider: BlockReaderIdExt + HeaderProvider + ChainSpecProvider + 'static,
     Eth: EthTransactions + 'static,
+    EngineT: EngineTypes + 'static,
 {
     /// Acquires a permit to execute a tracing call.
     async fn acquire_trace_permit(&self) -> Result<OwnedSemaphorePermit, AcquireError> {
@@ -84,7 +107,7 @@ where
     ) -> EthResult<Vec<TraceResult>> {
         if transactions.is_empty() {
             // nothing to trace
-            return Ok(Vec::new())
+            return Ok(Vec::new());
         }
 
         // replay all transactions of the block
@@ -288,7 +311,7 @@ where
                                 Ok(inspector)
                             })
                             .await?;
-                        return Ok(FourByteFrame::from(inspector).into())
+                        return Ok(FourByteFrame::from(inspector).into());
                     }
                     GethDebugBuiltInTracerType::CallTracer => {
                         let call_config = tracer_config
@@ -310,7 +333,7 @@ where
                                 Ok(frame.into())
                             })
                             .await?;
-                        return Ok(frame)
+                        return Ok(frame);
                     }
                     GethDebugBuiltInTracerType::PreStateTracer => {
                         let prestate_config = tracer_config
@@ -332,7 +355,7 @@ where
                                     Ok(frame)
                                 })
                                 .await?;
-                        return Ok(frame.into())
+                        return Ok(frame.into());
                     }
                     GethDebugBuiltInTracerType::NoopTracer => Ok(NoopFrame::default().into()),
                     GethDebugBuiltInTracerType::MuxTracer => {
@@ -352,7 +375,7 @@ where
                                 Ok(frame.into())
                             })
                             .await?;
-                        return Ok(frame)
+                        return Ok(frame);
                     }
                 },
                 GethDebugTracerType::JsTracer(code) => {
@@ -373,7 +396,7 @@ where
 
                     Ok(GethTrace::JS(res))
                 }
-            }
+            };
         }
 
         // default structlog tracer
@@ -406,7 +429,7 @@ where
         opts: Option<GethDebugTracingCallOptions>,
     ) -> EthResult<Vec<Vec<GethTrace>>> {
         if bundles.is_empty() {
-            return Err(EthApiError::InvalidParams(String::from("bundles are empty.")))
+            return Err(EthApiError::InvalidParams(String::from("bundles are empty.")));
         }
 
         let StateContext { transaction_index, block_number } = state_context.unwrap_or_default();
@@ -529,7 +552,7 @@ where
                     GethDebugBuiltInTracerType::FourByteTracer => {
                         let mut inspector = FourByteInspector::default();
                         let (res, _) = self.eth_api().inspect(db, env, &mut inspector)?;
-                        return Ok((FourByteFrame::from(inspector).into(), res.state))
+                        return Ok((FourByteFrame::from(inspector).into(), res.state));
                     }
                     GethDebugBuiltInTracerType::CallTracer => {
                         let call_config = tracer_config
@@ -546,7 +569,7 @@ where
                             .into_geth_builder()
                             .geth_call_traces(call_config, res.result.gas_used());
 
-                        return Ok((frame.into(), res.state))
+                        return Ok((frame.into(), res.state));
                     }
                     GethDebugBuiltInTracerType::PreStateTracer => {
                         let prestate_config = tracer_config
@@ -564,7 +587,7 @@ where
                             db,
                         )?;
 
-                        return Ok((frame.into(), res.state))
+                        return Ok((frame.into(), res.state));
                     }
                     GethDebugBuiltInTracerType::NoopTracer => {
                         Ok((NoopFrame::default().into(), Default::default()))
@@ -578,7 +601,7 @@ where
 
                         let (res, _) = self.eth_api().inspect(&mut *db, env, &mut inspector)?;
                         let frame = inspector.try_into_mux_frame(&res, db)?;
-                        return Ok((frame.into(), res.state))
+                        return Ok((frame.into(), res.state));
                     }
                 },
                 GethDebugTracerType::JsTracer(code) => {
@@ -594,7 +617,7 @@ where
                     let result = inspector.json_result(res, &env, db)?;
                     Ok((GethTrace::JS(result), state))
                 }
-            }
+            };
         }
 
         // default structlog tracer
@@ -609,13 +632,40 @@ where
 
         Ok((frame.into(), res.state))
     }
+
+    // set the head to the given block and trace the block
+    async fn debug_set_head(&self, number: BlockNumberOrTag) -> EthResult<()> {
+        let block_hash = self
+            .inner
+            .provider
+            .block_hash_for_id(BlockId::Number(number))?
+            .ok_or_else(|| EthApiError::UnknownBlockNumber)?;
+
+        self.inner
+            .beacon_consensus
+            .debug_fork_choice_updated(
+                ForkchoiceState {
+                    head_block_hash: block_hash,
+                    safe_block_hash: block_hash,
+                    finalized_block_hash: block_hash,
+                },
+                None,
+                EngineApiMessageVersion::V2,
+            )
+            .await
+            .map_err(|op| internal_rpc_err(op.to_string()))
+            .map_err(EthApiError::other)?;
+        sleep(Duration::from_secs(1)).await;
+        Ok(())
+    }
 }
 
 #[async_trait]
-impl<Provider, Eth> DebugApiServer for DebugApi<Provider, Eth>
+impl<Provider, Eth, EngineT> DebugApiServer for DebugApi<Provider, Eth, EngineT>
 where
     Provider: BlockReaderIdExt + HeaderProvider + ChainSpecProvider + 'static,
     Eth: EthApiSpec + 'static,
+    EngineT: EngineTypes + 'static,
 {
     /// Handler for `debug_getRawHeader`
     async fn raw_header(&self, block_id: BlockId) -> RpcResult<Bytes> {
@@ -889,8 +939,8 @@ where
         Ok(())
     }
 
-    async fn debug_set_head(&self, _number: u64) -> RpcResult<()> {
-        Ok(())
+    async fn debug_set_head(&self, number: BlockNumberOrTag) -> RpcResult<()> {
+        Ok(Self::debug_set_head(self, number).await?)
     }
 
     async fn debug_set_mutex_profile_fraction(&self, _rate: i32) -> RpcResult<()> {
@@ -977,23 +1027,34 @@ where
     }
 }
 
-impl<Provider, Eth> std::fmt::Debug for DebugApi<Provider, Eth> {
+impl<Provider, Eth, EngineT> std::fmt::Debug for DebugApi<Provider, Eth, EngineT>
+where
+    EngineT: EngineTypes,
+{
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("DebugApi").finish_non_exhaustive()
     }
 }
 
-impl<Provider, Eth> Clone for DebugApi<Provider, Eth> {
+impl<Provider, Eth, EngineT> Clone for DebugApi<Provider, Eth, EngineT>
+where
+    EngineT: EngineTypes,
+{
     fn clone(&self) -> Self {
         Self { inner: Arc::clone(&self.inner) }
     }
 }
 
-struct DebugApiInner<Provider, Eth> {
+struct DebugApiInner<Provider, Eth, EngineT>
+where
+    EngineT: EngineTypes,
+{
     /// The provider that can interact with the chain.
     provider: Provider,
     /// The implementation of `eth` API
     eth_api: Eth,
     // restrict the number of concurrent calls to blocking calls
     blocking_task_guard: BlockingTaskGuard,
+
+    beacon_consensus: BeaconConsensusEngineHandle<EngineT>,
 }

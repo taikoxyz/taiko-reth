@@ -78,7 +78,7 @@ impl TreeState {
     /// Caution: This will not return blocks from the canonical chain.
     pub(crate) fn receipts_by_block_hash(&self, block_hash: BlockHash) -> Option<Vec<&Receipt>> {
         let id = self.block_indices.get_block_chain_id(&block_hash)?;
-        let chain = self.chains.get(&id)?;
+        let chain: &AppendableChain = self.chains.get(&id)?;
         chain.receipts_by_block_hash(block_hash)
     }
 
@@ -87,7 +87,7 @@ impl TreeState {
     /// Inserts a chain into the tree and builds the block indices.
     pub(crate) fn insert_chain(&mut self, chain: AppendableChain) -> Option<BlockchainId> {
         if chain.is_empty() {
-            return None
+            return None;
         }
         let chain_id = self.next_id();
 

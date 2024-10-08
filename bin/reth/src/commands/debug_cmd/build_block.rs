@@ -231,6 +231,7 @@ impl Command {
             reth_payload_builder::EthPayloadBuilderAttributes::try_new(
                 best_block.hash(),
                 payload_attrs,
+                Default::default(),
             )?,
             provider_factory.chain_spec(),
         );
@@ -270,8 +271,8 @@ impl Command {
                 let db = StateProviderDatabase::new(blockchain_db.latest()?);
                 let executor = block_executor!(provider_factory.chain_spec()).executor(db);
 
-                let BlockExecutionOutput { state, receipts, requests, .. } =
-                    executor.execute((&block_with_senders.clone().unseal(), U256::MAX).into())?;
+                let BlockExecutionOutput { state, receipts, requests, .. } = executor
+                    .execute((&mut block_with_senders.clone().unseal(), U256::MAX).into())?;
                 let execution_outcome = ExecutionOutcome::new(
                     state,
                     receipts.into(),

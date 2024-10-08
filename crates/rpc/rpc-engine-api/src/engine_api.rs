@@ -7,16 +7,15 @@ use reth_engine_primitives::EngineTypes;
 use reth_evm::provider::EvmEnvProvider;
 use reth_payload_builder::PayloadStore;
 use reth_payload_primitives::{
-    validate_payload_timestamp, EngineApiMessageVersion, PayloadAttributes,
+    validate_payload_id, validate_payload_timestamp, EngineApiMessageVersion, PayloadAttributes,
     PayloadBuilderAttributes, PayloadOrAttributes,
 };
 use reth_primitives::{BlockHash, BlockHashOrNumber, BlockNumber, Hardfork, B256, U64};
 use reth_rpc_api::EngineApiServer;
 use reth_rpc_types::engine::{
     CancunPayloadFields, ClientVersionV1, ExecutionPayload, ExecutionPayloadBodiesV1,
-    ExecutionPayloadInputV2, ExecutionPayloadV1, ExecutionPayloadV3, ExecutionPayloadV4,
-    ForkchoiceState, ForkchoiceUpdated, PayloadId, PayloadStatus, TransitionConfiguration,
-    CAPABILITIES,
+    ExecutionPayloadV1, ExecutionPayloadV3, ExecutionPayloadV4, ForkchoiceState, ForkchoiceUpdated,
+    PayloadId, PayloadStatus, TaikoExecutionPayloadInputV2, TransitionConfiguration, CAPABILITIES,
 };
 use reth_rpc_types_compat::engine::payload::{
     convert_payload_input_v2_to_payload, convert_to_payload_body_v1,
@@ -24,8 +23,10 @@ use reth_rpc_types_compat::engine::payload::{
 use reth_storage_api::{BlockReader, HeaderProvider, StateProviderFactory};
 use reth_tasks::TaskSpawner;
 use std::{sync::Arc, time::Instant};
+#[cfg(feature = "taiko")]
+use taiko_reth_engine_primitives::TaikoExecutionPayload;
 use tokio::sync::oneshot;
-use tracing::{trace, warn};
+use tracing::{debug, trace, warn};
 
 /// The Engine API response sender.
 pub type EngineApiSender<Ok> = oneshot::Sender<EngineApiResult<Ok>>;
@@ -35,6 +36,7 @@ const MAX_PAYLOAD_BODIES_LIMIT: u64 = 1024;
 
 /// The Engine API implementation that grants the Consensus layer access to data and
 /// functions in the Execution layer that are crucial for the consensus process.
+#[derive(Clone)]
 pub struct EngineApi<Provider, EngineT: EngineTypes> {
     inner: Arc<EngineApiInner<Provider, EngineT>>,
 }
@@ -118,15 +120,18 @@ where
             EngineApiMessageVersion::V1,
             payload_or_attrs,
         )?;
+        #[cfg(feature = "taiko")]
+        let payload = TaikoExecutionPayload::from(payload);
         Ok(self.inner.beacon_consensus.new_payload(payload, None).await?)
     }
 
     /// See also <https://github.com/ethereum/execution-apis/blob/584905270d8ad665718058060267061ecfd79ca5/src/engine/shanghai.md#engine_newpayloadv2>
     pub async fn new_payload_v2(
         &self,
-        payload: ExecutionPayloadInputV2,
+        payload: TaikoExecutionPayloadInputV2,
     ) -> EngineApiResult<PayloadStatus> {
-        let payload = convert_payload_input_v2_to_payload(payload);
+        let TaikoExecutionPayloadInputV2 { execution_payload, tx_hash, withdrawals_hash } = payload;
+        let payload = convert_payload_input_v2_to_payload(execution_payload);
         let payload_or_attrs =
             PayloadOrAttributes::<'_, EngineT::PayloadAttributes>::from_execution_payload(
                 &payload, None,
@@ -136,6 +141,8 @@ where
             EngineApiMessageVersion::V2,
             payload_or_attrs,
         )?;
+        #[cfg(feature = "taiko")]
+        let payload = TaikoExecutionPayload::from((payload, tx_hash, withdrawals_hash));
         Ok(self.inner.beacon_consensus.new_payload(payload, None).await?)
     }
 
@@ -160,6 +167,8 @@ where
 
         let cancun_fields = CancunPayloadFields { versioned_hashes, parent_beacon_block_root };
 
+        #[cfg(feature = "taiko")]
+        let payload = TaikoExecutionPayload::from(payload);
         Ok(self.inner.beacon_consensus.new_payload(payload, Some(cancun_fields)).await?)
     }
 
@@ -184,6 +193,8 @@ where
 
         let cancun_fields = CancunPayloadFields { versioned_hashes, parent_beacon_block_root };
 
+        #[cfg(feature = "taiko")]
+        let payload = TaikoExecutionPayload::from(payload);
         Ok(self.inner.beacon_consensus.new_payload(payload, Some(cancun_fields)).await?)
     }
 
@@ -241,6 +252,7 @@ where
         &self,
         payload_id: PayloadId,
     ) -> EngineApiResult<EngineT::ExecutionPayloadV1> {
+        validate_payload_id(payload_id, Some(EngineApiMessageVersion::V1))?;
         self.inner
             .payload_store
             .resolve(payload_id)
@@ -265,6 +277,10 @@ where
         &self,
         payload_id: PayloadId,
     ) -> EngineApiResult<EngineT::ExecutionPayloadV2> {
+        validate_payload_id(
+            payload_id,
+            [EngineApiMessageVersion::V1, EngineApiMessageVersion::V2],
+        )?;
         // First we fetch the payload attributes to check the timestamp
         let attributes = self.get_payload_attributes(payload_id).await?;
 
@@ -300,6 +316,7 @@ where
         &self,
         payload_id: PayloadId,
     ) -> EngineApiResult<EngineT::ExecutionPayloadV3> {
+        validate_payload_id(payload_id, Some(EngineApiMessageVersion::V3))?;
         // First we fetch the payload attributes to check the timestamp
         let attributes = self.get_payload_attributes(payload_id).await?;
 
@@ -426,7 +443,7 @@ where
     ) -> EngineApiResult<ExecutionPayloadBodiesV1> {
         let len = hashes.len() as u64;
         if len > MAX_PAYLOAD_BODIES_LIMIT {
-            return Err(EngineApiError::PayloadRequestTooLarge { len })
+            return Err(EngineApiError::PayloadRequestTooLarge { len });
         }
 
         let mut result = Vec::with_capacity(hashes.len());
@@ -466,7 +483,7 @@ where
             return Err(EngineApiError::TerminalTD {
                 execution: merge_terminal_td,
                 consensus: terminal_total_difficulty,
-            })
+            });
         }
 
         self.inner.beacon_consensus.transition_configuration_exchanged().await;
@@ -476,7 +493,7 @@ where
             return Ok(TransitionConfiguration {
                 terminal_total_difficulty: merge_terminal_td,
                 ..Default::default()
-            })
+            });
         }
 
         // Attempt to look up terminal block hash
@@ -523,6 +540,8 @@ where
             let attr_validation_res =
                 attrs.ensure_well_formed_attributes(&self.inner.chain_spec, version);
 
+            debug!(target: "rpc::engine", ?attr_validation_res, ?attrs, "Validating payload attributes");
+
             // From the engine API spec:
             //
             // Client software MUST ensure that payloadAttributes.timestamp is greater than
@@ -537,17 +556,18 @@ where
             // To do this, we set the payload attrs to `None` if attribute validation failed, but
             // we still apply the forkchoice update.
             if let Err(err) = attr_validation_res {
-                let fcu_res = self.inner.beacon_consensus.fork_choice_updated(state, None).await?;
+                let fcu_res =
+                    self.inner.beacon_consensus.fork_choice_updated(state, None, version).await?;
                 // TODO: decide if we want this branch - the FCU INVALID response might be more
                 // useful than the payload attributes INVALID response
                 if fcu_res.is_invalid() {
-                    return Ok(fcu_res)
+                    return Ok(fcu_res);
                 }
-                return Err(err.into())
+                return Err(err.into());
             }
         }
 
-        Ok(self.inner.beacon_consensus.fork_choice_updated(state, payload_attrs).await?)
+        Ok(self.inner.beacon_consensus.fork_choice_updated(state, payload_attrs, version).await?)
     }
 }
 
@@ -573,10 +593,13 @@ where
 
     /// Handler for `engine_newPayloadV2`
     /// See also <https://github.com/ethereum/execution-apis/blob/584905270d8ad665718058060267061ecfd79ca5/src/engine/shanghai.md#engine_newpayloadv2>
-    async fn new_payload_v2(&self, payload: ExecutionPayloadInputV2) -> RpcResult<PayloadStatus> {
+    async fn new_payload_v2(
+        &self,
+        payload: TaikoExecutionPayloadInputV2,
+    ) -> RpcResult<PayloadStatus> {
         trace!(target: "rpc::engine", "Serving engine_newPayloadV2");
         let start = Instant::now();
-        let gas_used = payload.execution_payload.gas_used;
+        let gas_used = payload.execution_payload.execution_payload.gas_used;
         let res = Self::new_payload_v2(self, payload).await;
         let elapsed = start.elapsed();
         self.inner.metrics.latency.new_payload_v2.record(elapsed);
@@ -979,8 +1002,8 @@ mod tests {
                 blocks
                     .iter()
                     .filter(|b| {
-                        !first_missing_range.contains(&b.number) &&
-                            !second_missing_range.contains(&b.number)
+                        !first_missing_range.contains(&b.number)
+                            && !second_missing_range.contains(&b.number)
                     })
                     .map(|b| (b.hash(), b.clone().unseal())),
             );
@@ -1009,8 +1032,8 @@ mod tests {
                 // ensure we still return trailing `None`s here because by-hash will not be aware
                 // of the missing block's number, and cannot compare it to the current best block
                 .map(|b| {
-                    if first_missing_range.contains(&b.number) ||
-                        second_missing_range.contains(&b.number)
+                    if first_missing_range.contains(&b.number)
+                        || second_missing_range.contains(&b.number)
                     {
                         None
                     } else {
@@ -1036,8 +1059,8 @@ mod tests {
             let (handle, api) = setup_engine_api();
 
             let transition_config = TransitionConfiguration {
-                terminal_total_difficulty: handle.chain_spec.fork(Hardfork::Paris).ttd().unwrap() +
-                    U256::from(1),
+                terminal_total_difficulty: handle.chain_spec.fork(Hardfork::Paris).ttd().unwrap()
+                    + U256::from(1),
                 ..Default::default()
             };
 

@@ -298,7 +298,7 @@ where
         let engine_api = EngineApi::new(
             ctx.blockchain_db().clone(),
             ctx.chain_spec(),
-            beacon_engine_handle,
+            beacon_engine_handle.clone(),
             ctx.components().payload_builder().clone().into(),
             Box::new(ctx.task_executor().clone()),
             client,
@@ -312,6 +312,7 @@ where
         let (rpc_server_handles, mut rpc_registry) = crate::rpc::launch_rpc_servers(
             ctx.node_adapter().clone(),
             engine_api,
+            beacon_engine_handle,
             ctx.node_config(),
             jwt_secret,
             rpc,

@@ -24,13 +24,16 @@ reth-rpc-types.workspace = true
 reth-tasks.workspace = true
 reth-payload-builder.workspace = true
 reth-payload-primitives.workspace = true
-reth-payload-validator.workspace = true
+reth-payload-validator = { workspace = true, optional = true }
 reth-prune.workspace = true
 reth-static-file.workspace = true
 reth-tokio-util.workspace = true
 reth-engine-primitives.workspace = true
 reth-network-p2p.workspace = true
 
+# taiko
+taiko-reth-engine-primitives = { workspace = true, optional = true }
+taiko-reth-payload-validator = { workspace = true, optional = true }
 
 # async
 tokio = { workspace = true, features = ["sync"] }
@@ -74,9 +77,16 @@ alloy-genesis.workspace = true
 assert_matches.workspace = true
 
 [features]
+default = []
 optimism = [
     "reth-primitives/optimism",
     "reth-provider/optimism",
     "reth-blockchain-tree/optimism",
     "reth-rpc/optimism",
+]
+taiko = [
+    "reth-rpc/taiko",
+    "reth-primitives/taiko",
+    "dep:taiko-reth-engine-primitives",
+    "dep:taiko-reth-payload-validator",
 ]

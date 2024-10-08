@@ -55,3 +55,8 @@ pub use trace::TraceApi;
 pub use txpool::TxPoolApi;
 pub use web3::Web3Api;
 pub mod result;
+
+#[cfg(feature = "taiko")]
+mod taiko;
+#[cfg(feature = "taiko")]
+pub use taiko::{TaikoApi, TaikoAuthApi};

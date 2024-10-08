@@ -172,7 +172,7 @@ where
             secret_key,
             discovery_v4_addr,
             mut discovery_v4_config,
-            discovery_v5_config,
+            mut discovery_v5_config,
             listener_addr,
             peers_config,
             sessions_config,
@@ -207,12 +207,16 @@ where
             resolved_boot_nodes.push(resolved);
         }
 
-        discovery_v4_config = discovery_v4_config.map(|mut disc_config| {
+        if let Some(disc_config) = discovery_v4_config.as_mut() {
             // merge configured boot nodes
             disc_config.bootstrap_nodes.extend(resolved_boot_nodes.clone());
             disc_config.add_eip868_pair("eth", status.forkid);
-            disc_config
-        });
+        }
+
+        if let Some(discv5) = discovery_v5_config.as_mut() {
+            // merge configured boot nodes
+            discv5.extend_unsigned_boot_nodes(resolved_boot_nodes)
+        }
 
         let discovery = Discovery::new(
             listener_addr,
@@ -537,7 +541,7 @@ where
                 if self.handle.mode().is_stake() {
                     // See [EIP-3675](https://eips.ethereum.org/EIPS/eip-3675#devp2p)
                     warn!(target: "net", "Peer performed block propagation, but it is not supported in proof of stake (EIP-3675)");
-                    return
+                    return;
                 }
                 let msg = NewBlockMessage { hash, block: Arc::new(block) };
                 self.swarm.state_mut().announce_new_block(msg);
@@ -983,7 +987,7 @@ where
         if maybe_more_handle_messages || maybe_more_swarm_events {
             // make sure we're woken up again
             cx.waker().wake_by_ref();
-            return Poll::Pending
+            return Poll::Pending;
         }
 
         this.update_poll_metrics(start, poll_durations);

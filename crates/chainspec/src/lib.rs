@@ -18,12 +18,15 @@ pub use spec::{
 #[cfg(feature = "optimism")]
 pub use spec::{BASE_MAINNET, BASE_SEPOLIA, OP_MAINNET, OP_SEPOLIA};
 
+#[cfg(feature = "taiko")]
+pub use spec::{TAIKO_HEKLA, TAIKO_INTERNAL_L2_A, TAIKO_MAINNET, TAIKO_TESTNET};
+
 #[cfg(not(feature = "std"))]
 extern crate alloc;
 
-// /// The config info module namely spec id.
-// pub mod config;
-/// The chain info module.
+#[cfg(feature = "taiko")]
+pub mod taiko;
+
 mod info;
 
 /// Network related constants

@@ -1,0 +1,26 @@
+[package]
+name = "taiko-reth-provider"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+homepage.workspace = true
+repository.workspace = true
+description = "Reth storage provider."
+
+[lints]
+workspace = true
+
+[dependencies]
+# reth
+reth-primitives.workspace = true
+reth-storage-errors.workspace = true
+reth-provider.workspace = true
+reth-db-api.workspace = true
+reth-db.workspace = true
+
+# taiko
+taiko-reth-primitives.workspace = true
+
+# misc
+auto_impl.workspace = true

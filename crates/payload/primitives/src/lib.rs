@@ -15,6 +15,7 @@ pub use error::{EngineObjectValidationError, PayloadBuilderError, VersionSpecifi
 /// Contains traits to abstract over payload attributes types and default implementations of the
 /// [`PayloadAttributes`] trait for ethereum mainnet and optimism types.
 mod traits;
+use reth_rpc_types::engine::PayloadId;
 pub use traits::{BuiltPayload, PayloadAttributes, PayloadBuilderAttributes};
 
 mod payload;
@@ -34,6 +35,17 @@ pub trait PayloadTypes: Send + Sync + Unpin + core::fmt::Debug + Clone {
     type PayloadBuilderAttributes: PayloadBuilderAttributes<RpcPayloadAttributes = Self::PayloadAttributes>
         + Clone
         + Unpin;
+}
+
+/// Validates the payload ID against the expected payload IDs.
+pub fn validate_payload_id<T: IntoIterator<Item = EngineApiMessageVersion>>(
+    id: PayloadId,
+    expected_vers: T,
+) -> Result<(), EngineObjectValidationError> {
+    if !expected_vers.into_iter().any(|expected_ver| id.0[0] == expected_ver as u8) {
+        return Err(EngineObjectValidationError::UnsupportedFork);
+    }
+    Ok(())
 }
 
 /// Validates the timestamp depending on the version called:
@@ -67,7 +79,7 @@ pub fn validate_payload_timestamp(
         //
         // 1. Client software **MUST** return `-38005: Unsupported fork` error if the `timestamp` of
         //    payload or payloadAttributes is greater or equal to the Cancun activation timestamp.
-        return Err(EngineObjectValidationError::UnsupportedFork)
+        return Err(EngineObjectValidationError::UnsupportedFork);
     }
 
     if version == EngineApiMessageVersion::V3 && !is_cancun {
@@ -89,7 +101,7 @@ pub fn validate_payload_timestamp(
         //
         // 2. Client software **MUST** return `-38005: Unsupported fork` error if the `timestamp` of
         //    the payload does not fall within the time frame of the Cancun fork.
-        return Err(EngineObjectValidationError::UnsupportedFork)
+        return Err(EngineObjectValidationError::UnsupportedFork);
     }
 
     let is_prague = chain_spec.is_prague_active_at_timestamp(timestamp);
@@ -112,7 +124,7 @@ pub fn validate_payload_timestamp(
         //
         // 2. Client software **MUST** return `-38005: Unsupported fork` error if the `timestamp` of
         //    the payload does not fall within the time frame of the Prague fork.
-        return Err(EngineObjectValidationError::UnsupportedFork)
+        return Err(EngineObjectValidationError::UnsupportedFork);
     }
     Ok(())
 }
@@ -133,17 +145,17 @@ pub fn validate_withdrawals_presence(
         EngineApiMessageVersion::V1 => {
             if has_withdrawals {
                 return Err(message_validation_kind
-                    .to_error(VersionSpecificValidationError::WithdrawalsNotSupportedInV1))
+                    .to_error(VersionSpecificValidationError::WithdrawalsNotSupportedInV1));
             }
         }
         EngineApiMessageVersion::V2 | EngineApiMessageVersion::V3 | EngineApiMessageVersion::V4 => {
             if is_shanghai_active && !has_withdrawals {
                 return Err(message_validation_kind
-                    .to_error(VersionSpecificValidationError::NoWithdrawalsPostShanghai))
+                    .to_error(VersionSpecificValidationError::NoWithdrawalsPostShanghai));
             }
             if !is_shanghai_active && has_withdrawals {
                 return Err(message_validation_kind
-                    .to_error(VersionSpecificValidationError::HasWithdrawalsPreShanghai))
+                    .to_error(VersionSpecificValidationError::HasWithdrawalsPreShanghai));
             }
         }
     };
@@ -234,13 +246,13 @@ pub fn validate_parent_beacon_block_root_presence(
             if has_parent_beacon_block_root {
                 return Err(validation_kind.to_error(
                     VersionSpecificValidationError::ParentBeaconBlockRootNotSupportedBeforeV3,
-                ))
+                ));
             }
         }
         EngineApiMessageVersion::V3 | EngineApiMessageVersion::V4 => {
             if !has_parent_beacon_block_root {
                 return Err(validation_kind
-                    .to_error(VersionSpecificValidationError::NoParentBeaconBlockRootPostCancun))
+                    .to_error(VersionSpecificValidationError::NoParentBeaconBlockRootPostCancun));
             }
         }
     };
@@ -318,22 +330,23 @@ where
 }
 
 /// The version of Engine API message.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum EngineApiMessageVersion {
+    #[default]
     /// Version 1
-    V1,
+    V1 = 1,
     /// Version 2
     ///
     /// Added in the Shanghai hardfork.
-    V2,
+    V2 = 2,
     /// Version 3
     ///
     /// Added in the Cancun hardfork.
-    V3,
+    V3 = 3,
     /// Version 4
     ///
     /// Added in the Prague hardfork.
-    V4,
+    V4 = 4,
 }
 
 #[cfg(test)]

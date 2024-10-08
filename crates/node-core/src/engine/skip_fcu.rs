@@ -45,20 +45,32 @@ where
         loop {
             let next = ready!(this.stream.poll_next_unpin(cx));
             let item = match next {
-                Some(BeaconEngineMessage::ForkchoiceUpdated { state, payload_attrs, tx }) => {
+                Some(BeaconEngineMessage::ForkchoiceUpdated {
+                    state,
+                    payload_attrs,
+                    version,
+                    tx,
+                    debug,
+                }) => {
                     if this.skipped < this.threshold {
                         *this.skipped += 1;
                         tracing::warn!(target: "engine::intercept", ?state, ?payload_attrs, threshold=this.threshold, skipped=this.skipped, "Skipping FCU");
                         let _ = tx.send(Ok(OnForkChoiceUpdated::syncing()));
-                        continue
+                        continue;
                     } else {
                         *this.skipped = 0;
-                        Some(BeaconEngineMessage::ForkchoiceUpdated { state, payload_attrs, tx })
+                        Some(BeaconEngineMessage::ForkchoiceUpdated {
+                            state,
+                            payload_attrs,
+                            version,
+                            tx,
+                            debug,
+                        })
                     }
                 }
                 next => next,
             };
-            return Poll::Ready(item)
+            return Poll::Ready(item);
         }
     }
 }

@@ -4,7 +4,7 @@ use crate::version::P2P_CLIENT_VERSION;
 use clap::Args;
 use reth_chainspec::{net::mainnet_nodes, ChainSpec};
 use reth_config::Config;
-use reth_discv4::{DEFAULT_DISCOVERY_ADDR, DEFAULT_DISCOVERY_PORT};
+use reth_discv4::{NodeRecord, DEFAULT_DISCOVERY_ADDR, DEFAULT_DISCOVERY_PORT};
 use reth_discv5::{
     DEFAULT_COUNT_BOOTSTRAP_LOOKUPS, DEFAULT_DISCOVERY_V5_PORT,
     DEFAULT_SECONDS_BOOTSTRAP_LOOKUP_INTERVAL, DEFAULT_SECONDS_LOOKUP_INTERVAL,
@@ -118,11 +118,24 @@ pub struct NetworkArgs {
 }
 
 impl NetworkArgs {
+    /// Returns the resolved bootnodes if any are provided.
+    pub fn resolved_bootnodes(&self) -> Option<Vec<NodeRecord>> {
+        self.bootnodes.clone().map(|bootnodes| {
+            bootnodes.into_iter().filter_map(|node| node.resolve_blocking().ok()).collect()
+        })
+    }
+
     /// Build a [`NetworkConfigBuilder`] from a [`Config`] and a [`ChainSpec`], in addition to the
     /// values in this option struct.
     ///
     /// The `default_peers_file` will be used as the default location to store the persistent peers
     /// file if `no_persist_peers` is false, and there is no provided `peers_file`.
+    ///
+    /// Configured Bootnodes are prioritized, if unset, the chain spec bootnodes are used
+    /// Priority order for bootnodes configuration:
+    /// 1. --bootnodes flag
+    /// 2. Network preset flags (e.g. --holesky)
+    /// 3. default to mainnet nodes
     pub fn network_config(
         &self,
         config: &Config,
@@ -130,7 +143,9 @@ impl NetworkArgs {
         secret_key: SecretKey,
         default_peers_file: PathBuf,
     ) -> NetworkConfigBuilder {
-        let chain_bootnodes = chain_spec.bootnodes().unwrap_or_else(mainnet_nodes);
+        let chain_bootnodes = self
+            .resolved_bootnodes()
+            .unwrap_or_else(|| chain_spec.bootnodes().unwrap_or_else(mainnet_nodes));
         let peers_file = self.peers_file.clone().unwrap_or(default_peers_file);
 
         // Configure peer connections

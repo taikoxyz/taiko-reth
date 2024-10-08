@@ -1,0 +1,30 @@
+[package]
+name = "taiko-reth-beacon-consensus"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+homepage.workspace = true
+repository.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+# reth
+reth-chainspec = { workspace = true, features = ["taiko"] }
+reth-consensus-common.workspace = true
+reth-primitives = { workspace = true, features = ["taiko"] }
+reth-consensus.workspace = true
+
+tracing.workspace = true
+
+# Alloy
+alloy-sol-types.workspace = true
+
+# Ethereum
+revm-primitives = { workspace = true, features = ["taiko"] }
+
+# Misc
+lazy_static.workspace = true
+anyhow.workspace = true

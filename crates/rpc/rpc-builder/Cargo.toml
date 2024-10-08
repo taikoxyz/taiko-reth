@@ -25,6 +25,10 @@ reth-tasks = { workspace = true, features = ["rayon"] }
 reth-transaction-pool.workspace = true
 reth-evm.workspace = true
 reth-engine-primitives.workspace = true
+reth-beacon-consensus.workspace = true
+
+# taiko
+taiko-reth-provider = { workspace = true, optional = true }
 
 # rpc/net
 jsonrpsee = { workspace = true, features = ["server"] }
@@ -62,3 +66,11 @@ reth-tokio-util.workspace = true
 tokio = { workspace = true, features = ["rt", "rt-multi-thread"] }
 serde_json.workspace = true
 clap = { workspace = true, features = ["derive"] }
+
+[features]
+taiko = [
+    "reth-rpc/taiko",
+    "reth-node-core/taiko",
+    "dep:taiko-reth-provider",
+    "reth-rpc-server-types/taiko",
+]

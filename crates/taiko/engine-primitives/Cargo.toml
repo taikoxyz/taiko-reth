@@ -1,0 +1,34 @@
+[package]
+name = "taiko-reth-engine-primitives"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+homepage.workspace = true
+repository.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+# reth
+reth-chainspec.workspace = true
+reth-primitives.workspace = true
+reth-engine-primitives.workspace = true
+reth-payload-primitives.workspace = true
+reth-rpc-types.workspace = true
+reth-rpc-types-compat.workspace = true
+
+# taiko
+taiko-reth-primitives.workspace = true
+reth-ethereum-engine-primitives.workspace = true
+
+# misc
+serde.workspace = true
+serde_with.workspace = true
+alloy-serde = "0.1.3"
+alloy-rlp.workspace = true
+sha2.workspace = true
+
+[dev-dependencies]
+serde_json.workspace = true

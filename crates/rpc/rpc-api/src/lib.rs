@@ -58,6 +58,9 @@ pub mod servers {
         validation::BlockSubmissionValidationApiServer,
         web3::Web3ApiServer,
     };
+
+    #[cfg(feature = "taiko")]
+    pub use crate::taiko::{PreBuiltTxList, TaikoApiServer, TaikoAuthApiServer};
 }
 
 /// re-export of all client traits
@@ -86,4 +89,10 @@ pub mod clients {
         validation::BlockSubmissionValidationApiClient,
         web3::Web3ApiClient,
     };
+
+    #[cfg(feature = "taiko")]
+    pub use crate::taiko::TaikoApiClient;
 }
+
+#[cfg(feature = "taiko")]
+mod taiko;

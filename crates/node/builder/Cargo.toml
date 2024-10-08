@@ -76,3 +76,11 @@ backon.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true
+
+[features]
+taiko = [
+    "reth-rpc/taiko",
+    "reth-node-core/taiko",
+    "reth-node-api/taiko",
+    "reth-rpc-builder/taiko",
+]

@@ -457,6 +457,8 @@ impl From<revm::primitives::InvalidTransaction> for RpcInvalidTransactionError {
             }
             // TODO(EOF)
             InvalidTransaction::EofCrateShouldHaveToAddress => todo!("EOF"),
+            #[cfg(feature = "taiko")]
+            InvalidTransaction::InvalidAnchorTransaction => todo!(),
         }
     }
 }

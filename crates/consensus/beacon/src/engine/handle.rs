@@ -5,13 +5,18 @@ use crate::{
     BeaconForkChoiceUpdateError, BeaconOnNewPayloadError,
 };
 use futures::TryFutureExt;
-use reth_engine_primitives::EngineTypes;
+use reth_engine_primitives::{EngineApiMessageVersion, EngineTypes};
 use reth_errors::RethResult;
+#[cfg(not(feature = "taiko"))]
+use reth_rpc_types::engine::ExecutionPayload;
 use reth_rpc_types::engine::{
-    CancunPayloadFields, ExecutionPayload, ForkchoiceState, ForkchoiceUpdated, PayloadStatus,
+    CancunPayloadFields, ForkchoiceState, ForkchoiceUpdated, PayloadStatus,
 };
 use reth_tokio_util::{EventSender, EventStream};
 use tokio::sync::{mpsc::UnboundedSender, oneshot};
+
+#[cfg(feature = "taiko")]
+use taiko_reth_engine_primitives::TaikoExecutionPayload;
 
 /// A _shareable_ beacon consensus frontend type. Used to interact with the spawned beacon consensus
 /// engine task.
@@ -45,7 +50,8 @@ where
     /// See also <https://github.com/ethereum/execution-apis/blob/3d627c95a4d3510a8187dd02e0250ecb4331d27e/src/engine/shanghai.md#engine_newpayloadv2>
     pub async fn new_payload(
         &self,
-        payload: ExecutionPayload,
+        #[cfg(not(feature = "taiko"))] payload: ExecutionPayload,
+        #[cfg(feature = "taiko")] payload: TaikoExecutionPayload,
         cancun_fields: Option<CancunPayloadFields>,
     ) -> Result<PayloadStatus, BeaconOnNewPayloadError> {
         let (tx, rx) = oneshot::channel();
@@ -60,9 +66,27 @@ where
         &self,
         state: ForkchoiceState,
         payload_attrs: Option<Engine::PayloadAttributes>,
+        version: EngineApiMessageVersion,
     ) -> Result<ForkchoiceUpdated, BeaconForkChoiceUpdateError> {
         Ok(self
-            .send_fork_choice_updated(state, payload_attrs)
+            .send_fork_choice_updated(state, payload_attrs, version, false)
+            .map_err(|_| BeaconForkChoiceUpdateError::EngineUnavailable)
+            .await??
+            .await?)
+    }
+
+    /// Sends a forkchoice update message to the beacon consensus engine and waits for a response.
+    ///
+    /// See also <https://github.com/ethereum/execution-apis/blob/3d627c95a4d3510a8187dd02e0250ecb4331d27e/src/engine/shanghai.md#engine_forkchoiceupdatedv2>
+    /// For debug purposes.
+    pub async fn debug_fork_choice_updated(
+        &self,
+        state: ForkchoiceState,
+        payload_attrs: Option<Engine::PayloadAttributes>,
+        version: EngineApiMessageVersion,
+    ) -> Result<ForkchoiceUpdated, BeaconForkChoiceUpdateError> {
+        Ok(self
+            .send_fork_choice_updated(state, payload_attrs, version, true)
             .map_err(|_| BeaconForkChoiceUpdateError::EngineUnavailable)
             .await??
             .await?)
@@ -74,12 +98,16 @@ where
         &self,
         state: ForkchoiceState,
         payload_attrs: Option<Engine::PayloadAttributes>,
+        version: EngineApiMessageVersion,
+        debug: bool,
     ) -> oneshot::Receiver<RethResult<OnForkChoiceUpdated>> {
         let (tx, rx) = oneshot::channel();
         let _ = self.to_engine.send(BeaconEngineMessage::ForkchoiceUpdated {
             state,
             payload_attrs,
+            version,
             tx,
+            debug,
         });
         rx
     }
