@@ -3,13 +3,13 @@
 use futures::Future;
 use reth_evm::{ConfigureEvm, ConfigureEvmEnv};
 use reth_primitives::B256;
-use reth_revm::database::StateProviderDatabase;
+use reth_revm::database::{StateProviderDatabase, SyncStateProviderDatabase};
 use reth_rpc_eth_types::{
     cache::db::{StateCacheDb, StateCacheDbRefMutWrapper, StateProviderTraitObjWrapper},
     EthApiError,
 };
 use reth_rpc_types::{BlockId, TransactionInfo};
-use revm::{db::CacheDB, Database, DatabaseCommit, GetInspector, Inspector};
+use revm::{db::CacheDB, DatabaseCommit, GetInspector, Inspector, SyncDatabase};
 use revm_inspectors::tracing::{TracingInspector, TracingInspectorConfig};
 use revm_primitives::{EnvWithHandlerCfg, EvmState, ExecutionResult, ResultAndState};
 
@@ -33,7 +33,7 @@ pub trait Trace: LoadState {
         inspector: I,
     ) -> Result<(ResultAndState, EnvWithHandlerCfg), Self::Error>
     where
-        DB: Database,
+        DB: SyncDatabase,
         EthApiError: From<DB::Error>,
         I: GetInspector<DB>,
     {
@@ -52,7 +52,7 @@ pub trait Trace: LoadState {
         inspector: I,
     ) -> Result<(ResultAndState, EnvWithHandlerCfg, DB), Self::Error>
     where
-        DB: Database,
+        DB: SyncDatabase,
         EthApiError: From<DB::Error>,
 
         I: GetInspector<DB>,
@@ -81,8 +81,12 @@ pub trait Trace: LoadState {
         Self: Call,
         F: FnOnce(TracingInspector, ResultAndState) -> Result<R, Self::Error>,
     {
+        let chain_id = env.env.cfg.chain_id;
         self.with_state_at_block(at, |state| {
-            let mut db = CacheDB::new(StateProviderDatabase::new(state));
+            let mut db = CacheDB::new(SyncStateProviderDatabase::new(
+                Some(chain_id),
+                StateProviderDatabase::new(state),
+            ));
             let mut inspector = TracingInspector::new(config);
             let (res, _) = self.inspect(&mut db, env, &mut inspector)?;
             f(inspector, res)
@@ -110,9 +114,13 @@ pub trait Trace: LoadState {
             + 'static,
         R: Send + 'static,
     {
+        let chain_id = env.env.cfg.chain_id;
         let this = self.clone();
         self.spawn_with_state_at_block(at, move |state| {
-            let mut db = CacheDB::new(StateProviderDatabase::new(state));
+            let mut db = CacheDB::new(SyncStateProviderDatabase::new(
+                Some(chain_id),
+                StateProviderDatabase::new(state),
+            ));
             let mut inspector = TracingInspector::new(config);
             let (res, _) = this.inspect(StateCacheDbRefMutWrapper(&mut db), env, &mut inspector)?;
             f(inspector, res, db)
@@ -190,10 +198,14 @@ pub trait Trace: LoadState {
             // block the transaction is included in
             let parent_block = block.parent_hash;
             let block_txs = block.into_transactions_ecrecovered();
+            let chain_id = cfg.chain_id;
 
             let this = self.clone();
             self.spawn_with_state_at_block(parent_block.into(), move |state| {
-                let mut db = CacheDB::new(StateProviderDatabase::new(state));
+                let mut db = CacheDB::new(SyncStateProviderDatabase::new(
+                    Some(chain_id),
+                    StateProviderDatabase::new(state),
+                ));
 
                 // replay all transactions prior to the targeted transaction
                 this.replay_transactions_until(
@@ -332,8 +344,10 @@ pub trait Trace: LoadState {
 
                 // now get the state
                 let state = this.state_at_block_id(state_at.into())?;
-                let mut db =
-                    CacheDB::new(StateProviderDatabase::new(StateProviderTraitObjWrapper(&state)));
+                let mut db = CacheDB::new(SyncStateProviderDatabase::new(
+                    Some(cfg.chain_id),
+                    StateProviderDatabase::new(StateProviderTraitObjWrapper(&state)),
+                ));
 
                 while let Some((tx_info, tx)) = transactions.next() {
                     let env =

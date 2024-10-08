@@ -13,7 +13,7 @@ use reth_provider::{
     BlockReader, Chain, HeaderProvider, ProviderError, StateProviderFactory, TransactionVariant,
 };
 use reth_prune_types::PruneModes;
-use reth_revm::database::StateProviderDatabase;
+use reth_revm::database::{StateProviderDatabase, SyncStateProviderDatabase};
 use reth_stages_api::ExecutionStageThresholds;
 use reth_tracing::tracing::{debug, trace};
 
@@ -63,9 +63,13 @@ where
     }
 
     fn execute_range(&mut self) -> Result<Chain, BlockExecutionError> {
-        let mut executor = self.executor.batch_executor(StateProviderDatabase::new(
-            self.provider.history_by_block_number(self.range.start().saturating_sub(1))?,
-        ));
+        let db = SyncStateProviderDatabase::new(
+            None,
+            StateProviderDatabase::new(
+                self.provider.history_by_block_number(self.range.start().saturating_sub(1))?,
+            ),
+        );
+        let mut executor = self.executor.batch_executor(db);
         executor.set_prune_modes(self.prune_modes.clone());
 
         let mut fetch_block_duration = Duration::default();
@@ -187,8 +191,9 @@ where
         &self,
         block_number: u64,
     ) -> Result<(BlockWithSenders, BlockExecutionOutput<Receipt>), BlockExecutionError> {
-        println!("SingleBlockBackfillJob::execute_block");
 
+
+        
         let td = self
             .provider
             .header_td_by_number(block_number)?
@@ -201,8 +206,11 @@ where
             .ok_or_else(|| ProviderError::HeaderNotFound(block_number.into()))?;
 
         // Configure the executor to use the previous block's state.
-        let executor = self.executor.executor(StateProviderDatabase::new(
-            self.provider.history_by_block_number(block_number.saturating_sub(1))?,
+        let executor = self.executor.executor(SyncStateProviderDatabase::new(
+            None,
+            StateProviderDatabase::new(
+                self.provider.history_by_block_number(block_number.saturating_sub(1))?,
+            ),
         ));
 
         trace!(target: "exex::backfill", number = block_number, txs = block_with_senders.block.body.len(), "Executing block");
@@ -229,7 +237,7 @@ mod tests {
     use std::sync::Arc;
 
     use crate::{
-        backfill::test_utils::{blocks_and_execution_outputs, chain_spec, to_execution_outcome},
+        backfill::test_utils::{blocks_and_execution_outputs, chain_spec},
         BackfillJobFactory,
     };
     use reth_blockchain_tree::noop::NoopBlockchainTree;
@@ -238,6 +246,7 @@ mod tests {
     use reth_primitives::public_key_to_address;
     use reth_provider::{
         providers::BlockchainProvider, test_utils::create_test_provider_factory_with_chain_spec,
+        ExecutionOutcome,
     };
     use reth_testing_utils::generators;
     use secp256k1::Keypair;
@@ -251,6 +260,7 @@ mod tests {
         let address = public_key_to_address(key_pair.public_key());
 
         let chain_spec = chain_spec(address);
+        let chain_id = chain_spec.chain.id();
 
         let executor = EthExecutorProvider::ethereum(chain_spec.clone());
         let provider_factory = create_test_provider_factory_with_chain_spec(chain_spec.clone());
@@ -263,8 +273,8 @@ mod tests {
         let blocks_and_execution_outputs =
             blocks_and_execution_outputs(provider_factory, chain_spec, key_pair)?;
         let (block, block_execution_output) = blocks_and_execution_outputs.first().unwrap();
-        let execution_outcome = to_execution_outcome(block.number, block_execution_output);
-
+        let execution_outcome =
+            ExecutionOutcome::from((block_execution_output.clone(), chain_id, block.number));
         // Backfill the first block
         let factory = BackfillJobFactory::new(executor, blockchain_db);
         let job = factory.backfill(1..=1);

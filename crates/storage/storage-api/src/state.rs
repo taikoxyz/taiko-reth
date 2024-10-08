@@ -1,4 +1,3 @@
-use std::fmt::Debug;
 use super::{
     AccountReader, BlockHashReader, BlockIdReader, StateProofProvider, StateRootProvider,
     StorageRootProvider,
@@ -10,6 +9,7 @@ use reth_primitives::{
     StorageValue, B256, KECCAK_EMPTY, U256,
 };
 use reth_storage_errors::provider::{ProviderError, ProviderResult};
+use std::fmt::Debug;
 
 /// Type alias of boxed [`StateProvider`].
 pub type StateProviderBox = Box<dyn StateProvider>;

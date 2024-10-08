@@ -521,7 +521,8 @@ mod tests {
         transaction::{DbTx, DbTxMut},
     };
     use reth_primitives::{
-        keccak256, Account, Address, Receipt, Receipts, StorageEntry, B256, U256,
+        constants::ETHEREUM_CHAIN_ID, keccak256, Account, Address, Receipt, Receipts, StorageEntry,
+        B256, U256,
     };
     use reth_trie::{
         test_utils::{state_root, storage_root_prehashed},
@@ -533,12 +534,13 @@ mod tests {
             states::{
                 bundle_state::BundleRetention, changes::PlainStorageRevert, PlainStorageChangeset,
             },
-            BundleState, EmptyDB,
+            BundleState, EmptyDB, State,
         },
         primitives::{
-            Account as RevmAccount, AccountInfo as RevmAccountInfo, AccountStatus, EvmStorageSlot,
+            Account as RevmAccount, AccountInfo as RevmAccountInfo, AccountStatus, ChainAddress,
+            EvmStorageSlot,
         },
-        DatabaseCommit, State,
+        DatabaseCommit,
     };
     use std::{
         collections::{BTreeMap, HashMap},
@@ -601,8 +603,8 @@ mod tests {
         let factory = create_test_provider_factory();
         let provider = factory.provider_rw().unwrap();
 
-        let address_a = Address::ZERO;
-        let address_b = Address::repeat_byte(0xff);
+        let address_a = ChainAddress(ETHEREUM_CHAIN_ID, Address::ZERO);
+        let address_b = ChainAddress(ETHEREUM_CHAIN_ID, Address::repeat_byte(0xff));
 
         let account_a = RevmAccountInfo { balance: U256::from(1), nonce: 1, ..Default::default() };
         let account_b = RevmAccountInfo { balance: U256::from(2), nonce: 2, ..Default::default() };
@@ -652,12 +654,12 @@ mod tests {
 
         // Check plain state
         assert_eq!(
-            provider.basic_account(address_a).expect("Could not read account state"),
+            provider.basic_account(address_a.1).expect("Could not read account state"),
             Some(reth_account_a),
             "Account A state is wrong"
         );
         assert_eq!(
-            provider.basic_account(address_b).expect("Could not read account state"),
+            provider.basic_account(address_b.1).expect("Could not read account state"),
             Some(reth_account_b_changed),
             "Account B state is wrong"
         );
@@ -669,12 +671,12 @@ mod tests {
             .expect("Could not open changeset cursor");
         assert_eq!(
             changeset_cursor.seek_exact(1).expect("Could not read account change set"),
-            Some((1, AccountBeforeTx { address: address_a, info: None })),
+            Some((1, AccountBeforeTx { address: address_a.1, info: None })),
             "Account A changeset is wrong"
         );
         assert_eq!(
             changeset_cursor.next_dup().expect("Changeset table is malformed"),
-            Some((1, AccountBeforeTx { address: address_b, info: Some(reth_account_b) })),
+            Some((1, AccountBeforeTx { address: address_b.1, info: Some(reth_account_b) })),
             "Account B changeset is wrong"
         );
 
@@ -713,7 +715,7 @@ mod tests {
 
         // Check new plain state for account B
         assert_eq!(
-            provider.basic_account(address_b).expect("Could not read account state"),
+            provider.basic_account(address_b.1).expect("Could not read account state"),
             None,
             "Account B should be deleted"
         );
@@ -721,7 +723,7 @@ mod tests {
         // Check change set
         assert_eq!(
             changeset_cursor.seek_exact(2).expect("Could not read account change set"),
-            Some((2, AccountBeforeTx { address: address_b, info: Some(reth_account_b_changed) })),
+            Some((2, AccountBeforeTx { address: address_b.1, info: Some(reth_account_b_changed) })),
             "Account B changeset is wrong after deletion"
         );
     }
@@ -731,8 +733,8 @@ mod tests {
         let factory = create_test_provider_factory();
         let provider = factory.provider_rw().unwrap();
 
-        let address_a = Address::ZERO;
-        let address_b = Address::repeat_byte(0xff);
+        let address_a = ChainAddress(ETHEREUM_CHAIN_ID, Address::ZERO);
+        let address_b = ChainAddress(ETHEREUM_CHAIN_ID, Address::repeat_byte(0xff));
 
         let account_b = RevmAccountInfo { balance: U256::from(2), nonce: 2, ..Default::default() };
 
@@ -785,7 +787,7 @@ mod tests {
         state.merge_transitions(BundleRetention::Reverts);
 
         let outcome =
-            ExecutionOutcome::new(state.take_bundle(), Receipts::default(), 1, Vec::new());
+            ExecutionOutcome::new(None, state.take_bundle(), Receipts::default(), 1, Vec::new());
         let mut writer = UnifiedStorageWriter::from_database(&provider);
         writer
             .write_to_storage(outcome, OriginalValuesKnown::Yes)
@@ -798,14 +800,14 @@ mod tests {
             .expect("Could not open plain storage state cursor");
 
         assert_eq!(
-            storage_cursor.seek_exact(address_a).unwrap(),
-            Some((address_a, StorageEntry { key: B256::ZERO, value: U256::from(1) })),
+            storage_cursor.seek_exact(address_a.1).unwrap(),
+            Some((address_a.1, StorageEntry { key: B256::ZERO, value: U256::from(1) })),
             "Slot 0 for account A should be 1"
         );
         assert_eq!(
             storage_cursor.next_dup().unwrap(),
             Some((
-                address_a,
+                address_a.1,
                 StorageEntry { key: B256::from(U256::from(1).to_be_bytes()), value: U256::from(2) }
             )),
             "Slot 1 for account A should be 2"
@@ -817,9 +819,9 @@ mod tests {
         );
 
         assert_eq!(
-            storage_cursor.seek_exact(address_b).unwrap(),
+            storage_cursor.seek_exact(address_b.1).unwrap(),
             Some((
-                address_b,
+                address_b.1,
                 StorageEntry { key: B256::from(U256::from(1).to_be_bytes()), value: U256::from(2) }
             )),
             "Slot 1 for account B should be 2"
@@ -836,9 +838,9 @@ mod tests {
             .cursor_dup_read::<tables::StorageChangeSets>()
             .expect("Could not open storage changeset cursor");
         assert_eq!(
-            changeset_cursor.seek_exact(BlockNumberAddress((1, address_a))).unwrap(),
+            changeset_cursor.seek_exact(BlockNumberAddress((1, address_a.1))).unwrap(),
             Some((
-                BlockNumberAddress((1, address_a)),
+                BlockNumberAddress((1, address_a.1)),
                 StorageEntry { key: B256::ZERO, value: U256::from(0) }
             )),
             "Slot 0 for account A should have changed from 0"
@@ -846,7 +848,7 @@ mod tests {
         assert_eq!(
             changeset_cursor.next_dup().unwrap(),
             Some((
-                BlockNumberAddress((1, address_a)),
+                BlockNumberAddress((1, address_a.1)),
                 StorageEntry { key: B256::from(U256::from(1).to_be_bytes()), value: U256::from(0) }
             )),
             "Slot 1 for account A should have changed from 0"
@@ -858,9 +860,9 @@ mod tests {
         );
 
         assert_eq!(
-            changeset_cursor.seek_exact(BlockNumberAddress((1, address_b))).unwrap(),
+            changeset_cursor.seek_exact(BlockNumberAddress((1, address_b.1))).unwrap(),
             Some((
-                BlockNumberAddress((1, address_b)),
+                BlockNumberAddress((1, address_b.1)),
                 StorageEntry { key: B256::from(U256::from(1).to_be_bytes()), value: U256::from(1) }
             )),
             "Slot 1 for account B should have changed from 1"
@@ -886,22 +888,22 @@ mod tests {
 
         state.merge_transitions(BundleRetention::Reverts);
         let outcome =
-            ExecutionOutcome::new(state.take_bundle(), Receipts::default(), 2, Vec::new());
+            ExecutionOutcome::new(None, state.take_bundle(), Receipts::default(), 2, Vec::new());
         let mut writer = UnifiedStorageWriter::from_database(&provider);
         writer
             .write_to_storage(outcome, OriginalValuesKnown::Yes)
             .expect("Could not write bundle state to DB");
 
         assert_eq!(
-            storage_cursor.seek_exact(address_a).unwrap(),
+            storage_cursor.seek_exact(address_a.1).unwrap(),
             None,
             "Account A should have no storage slots after deletion"
         );
 
         assert_eq!(
-            changeset_cursor.seek_exact(BlockNumberAddress((2, address_a))).unwrap(),
+            changeset_cursor.seek_exact(BlockNumberAddress((2, address_a.1))).unwrap(),
             Some((
-                BlockNumberAddress((2, address_a)),
+                BlockNumberAddress((2, address_a.1)),
                 StorageEntry { key: B256::ZERO, value: U256::from(1) }
             )),
             "Slot 0 for account A should have changed from 1 on deletion"
@@ -909,7 +911,7 @@ mod tests {
         assert_eq!(
             changeset_cursor.next_dup().unwrap(),
             Some((
-                BlockNumberAddress((2, address_a)),
+                BlockNumberAddress((2, address_a.1)),
                 StorageEntry { key: B256::from(U256::from(1).to_be_bytes()), value: U256::from(2) }
             )),
             "Slot 1 for account A should have changed from 2 on deletion"
@@ -926,7 +928,7 @@ mod tests {
         let factory = create_test_provider_factory();
         let provider = factory.provider_rw().unwrap();
 
-        let address1 = Address::random();
+        let address1 = ChainAddress(ETHEREUM_CHAIN_ID, Address::random());
         let account_info = RevmAccountInfo { nonce: 1, ..Default::default() };
 
         // Block #0: initial state.
@@ -953,8 +955,13 @@ mod tests {
         )]));
         init_state.merge_transitions(BundleRetention::Reverts);
 
-        let outcome =
-            ExecutionOutcome::new(init_state.take_bundle(), Receipts::default(), 0, Vec::new());
+        let outcome = ExecutionOutcome::new(
+            None,
+            init_state.take_bundle(),
+            Receipts::default(),
+            0,
+            Vec::new(),
+        );
         let mut writer = UnifiedStorageWriter::from_database(&provider);
         writer
             .write_to_storage(outcome, OriginalValuesKnown::Yes)
@@ -1102,7 +1109,7 @@ mod tests {
 
         let bundle = state.take_bundle();
 
-        let outcome = ExecutionOutcome::new(bundle, Receipts::default(), 1, Vec::new());
+        let outcome = ExecutionOutcome::new(None, bundle, Receipts::default(), 1, Vec::new());
         let mut writer = UnifiedStorageWriter::from_database(&provider);
         writer
             .write_to_storage(outcome, OriginalValuesKnown::Yes)
@@ -1126,14 +1133,14 @@ mod tests {
         assert_eq!(
             storage_changes.next(),
             Some(Ok((
-                BlockNumberAddress((0, address1)),
+                BlockNumberAddress((0, address1.1)),
                 StorageEntry { key: B256::with_last_byte(0), value: U256::ZERO }
             )))
         );
         assert_eq!(
             storage_changes.next(),
             Some(Ok((
-                BlockNumberAddress((0, address1)),
+                BlockNumberAddress((0, address1.1)),
                 StorageEntry { key: B256::with_last_byte(1), value: U256::ZERO }
             )))
         );
@@ -1143,7 +1150,7 @@ mod tests {
         assert_eq!(
             storage_changes.next(),
             Some(Ok((
-                BlockNumberAddress((1, address1)),
+                BlockNumberAddress((1, address1.1)),
                 StorageEntry { key: B256::with_last_byte(0), value: U256::from(1) }
             )))
         );
@@ -1154,14 +1161,14 @@ mod tests {
         assert_eq!(
             storage_changes.next(),
             Some(Ok((
-                BlockNumberAddress((2, address1)),
+                BlockNumberAddress((2, address1.1)),
                 StorageEntry { key: B256::with_last_byte(0), value: U256::from(2) }
             )))
         );
         assert_eq!(
             storage_changes.next(),
             Some(Ok((
-                BlockNumberAddress((2, address1)),
+                BlockNumberAddress((2, address1.1)),
                 StorageEntry { key: B256::with_last_byte(1), value: U256::from(2) }
             )))
         );
@@ -1176,21 +1183,21 @@ mod tests {
         assert_eq!(
             storage_changes.next(),
             Some(Ok((
-                BlockNumberAddress((4, address1)),
+                BlockNumberAddress((4, address1.1)),
                 StorageEntry { key: B256::with_last_byte(0), value: U256::ZERO }
             )))
         );
         assert_eq!(
             storage_changes.next(),
             Some(Ok((
-                BlockNumberAddress((4, address1)),
+                BlockNumberAddress((4, address1.1)),
                 StorageEntry { key: B256::with_last_byte(2), value: U256::ZERO }
             )))
         );
         assert_eq!(
             storage_changes.next(),
             Some(Ok((
-                BlockNumberAddress((4, address1)),
+                BlockNumberAddress((4, address1.1)),
                 StorageEntry { key: B256::with_last_byte(6), value: U256::ZERO }
             )))
         );
@@ -1202,21 +1209,21 @@ mod tests {
         assert_eq!(
             storage_changes.next(),
             Some(Ok((
-                BlockNumberAddress((5, address1)),
+                BlockNumberAddress((5, address1.1)),
                 StorageEntry { key: B256::with_last_byte(0), value: U256::from(2) }
             )))
         );
         assert_eq!(
             storage_changes.next(),
             Some(Ok((
-                BlockNumberAddress((5, address1)),
+                BlockNumberAddress((5, address1.1)),
                 StorageEntry { key: B256::with_last_byte(2), value: U256::from(4) }
             )))
         );
         assert_eq!(
             storage_changes.next(),
             Some(Ok((
-                BlockNumberAddress((5, address1)),
+                BlockNumberAddress((5, address1.1)),
                 StorageEntry { key: B256::with_last_byte(6), value: U256::from(6) }
             )))
         );
@@ -1229,7 +1236,7 @@ mod tests {
         assert_eq!(
             storage_changes.next(),
             Some(Ok((
-                BlockNumberAddress((7, address1)),
+                BlockNumberAddress((7, address1.1)),
                 StorageEntry { key: B256::with_last_byte(0), value: U256::ZERO }
             )))
         );
@@ -1241,7 +1248,7 @@ mod tests {
         let factory = create_test_provider_factory();
         let provider = factory.provider_rw().unwrap();
 
-        let address1 = Address::random();
+        let address1 = ChainAddress(ETHEREUM_CHAIN_ID, Address::random());
         let account1 = RevmAccountInfo { nonce: 1, ..Default::default() };
 
         // Block #0: initial state.
@@ -1267,8 +1274,13 @@ mod tests {
             },
         )]));
         init_state.merge_transitions(BundleRetention::Reverts);
-        let outcome =
-            ExecutionOutcome::new(init_state.take_bundle(), Receipts::default(), 0, Vec::new());
+        let outcome = ExecutionOutcome::new(
+            None,
+            init_state.take_bundle(),
+            Receipts::default(),
+            0,
+            Vec::new(),
+        );
         let mut writer = UnifiedStorageWriter::from_database(&provider);
         writer
             .write_to_storage(outcome, OriginalValuesKnown::Yes)
@@ -1316,7 +1328,7 @@ mod tests {
         // Commit block #1 changes to the database.
         state.merge_transitions(BundleRetention::Reverts);
         let outcome =
-            ExecutionOutcome::new(state.take_bundle(), Receipts::default(), 1, Vec::new());
+            ExecutionOutcome::new(None, state.take_bundle(), Receipts::default(), 1, Vec::new());
         let mut writer = UnifiedStorageWriter::from_database(&provider);
         writer
             .write_to_storage(outcome, OriginalValuesKnown::Yes)
@@ -1332,14 +1344,14 @@ mod tests {
         assert_eq!(
             storage_changes.next(),
             Some(Ok((
-                BlockNumberAddress((1, address1)),
+                BlockNumberAddress((1, address1.1)),
                 StorageEntry { key: B256::with_last_byte(0), value: U256::from(1) }
             )))
         );
         assert_eq!(
             storage_changes.next(),
             Some(Ok((
-                BlockNumberAddress((1, address1)),
+                BlockNumberAddress((1, address1.1)),
                 StorageEntry { key: B256::with_last_byte(1), value: U256::from(2) }
             )))
         );
@@ -1349,6 +1361,7 @@ mod tests {
     #[test]
     fn revert_to_indices() {
         let base = ExecutionOutcome {
+            chain_id: ETHEREUM_CHAIN_ID,
             bundle: BundleState::default(),
             receipts: vec![vec![Some(Receipt::default()); 2]; 7].into(),
             first_block: 10,
@@ -1415,6 +1428,7 @@ mod tests {
                 StateRoot::overlay_root(
                     tx,
                     ExecutionOutcome::new(
+                        None,
                         state.bundle_state.clone(),
                         Receipts::default(),
                         0,
@@ -1435,8 +1449,8 @@ mod tests {
         assert_state_root(&state, &prestate, "empty");
 
         // destroy account 1
-        let address1 = Address::with_last_byte(1);
-        let account1_old = prestate.remove(&address1).unwrap();
+        let address1 = ChainAddress(ETHEREUM_CHAIN_ID, Address::with_last_byte(1));
+        let account1_old = prestate.remove(&address1.1).unwrap();
         state.insert_account(address1, account1_old.0.into());
         state.commit(HashMap::from([(
             address1,
@@ -1450,10 +1464,10 @@ mod tests {
         assert_state_root(&state, &prestate, "destroyed account");
 
         // change slot 2 in account 2
-        let address2 = Address::with_last_byte(2);
+        let address2 = ChainAddress(ETHEREUM_CHAIN_ID, Address::with_last_byte(2));
         let slot2 = U256::from(2);
         let slot2_key = B256::from(slot2);
-        let account2 = prestate.get_mut(&address2).unwrap();
+        let account2 = prestate.get_mut(&address2.1).unwrap();
         let account2_slot2_old_value = *account2.1.get(&slot2_key).unwrap();
         state.insert_account_with_storage(
             address2,
@@ -1478,8 +1492,8 @@ mod tests {
         assert_state_root(&state, &prestate, "changed storage");
 
         // change balance of account 3
-        let address3 = Address::with_last_byte(3);
-        let account3 = prestate.get_mut(&address3).unwrap();
+        let address3 = ChainAddress(ETHEREUM_CHAIN_ID, Address::with_last_byte(3));
+        let account3 = prestate.get_mut(&address3.1).unwrap();
         state.insert_account(address3, account3.0.into());
 
         account3.0.balance = U256::from(24);
@@ -1495,8 +1509,8 @@ mod tests {
         assert_state_root(&state, &prestate, "changed balance");
 
         // change nonce of account 4
-        let address4 = Address::with_last_byte(4);
-        let account4 = prestate.get_mut(&address4).unwrap();
+        let address4 = ChainAddress(ETHEREUM_CHAIN_ID, Address::with_last_byte(4));
+        let account4 = prestate.get_mut(&address4.1).unwrap();
         state.insert_account(address4, account4.0.into());
 
         account4.0.nonce = 128;
@@ -1514,7 +1528,7 @@ mod tests {
         // recreate account 1
         let account1_new =
             Account { nonce: 56, balance: U256::from(123), bytecode_hash: Some(B256::random()) };
-        prestate.insert(address1, (account1_new, BTreeMap::default()));
+        prestate.insert(address1.1, (account1_new, BTreeMap::default()));
         state.commit(HashMap::from([(
             address1,
             RevmAccount {
@@ -1530,7 +1544,7 @@ mod tests {
         let slot20 = U256::from(20);
         let slot20_key = B256::from(slot20);
         let account1_slot20_value = U256::from(12345);
-        prestate.get_mut(&address1).unwrap().1.insert(slot20_key, account1_slot20_value);
+        prestate.get_mut(&address1.1).unwrap().1.insert(slot20_key, account1_slot20_value);
         state.commit(HashMap::from([(
             address1,
             RevmAccount {
@@ -1548,8 +1562,8 @@ mod tests {
 
     #[test]
     fn prepend_state() {
-        let address1 = Address::random();
-        let address2 = Address::random();
+        let address1 = ChainAddress(ETHEREUM_CHAIN_ID, Address::random());
+        let address2 = ChainAddress(ETHEREUM_CHAIN_ID, Address::random());
 
         let account1 = RevmAccountInfo { nonce: 1, ..Default::default() };
         let account1_changed = RevmAccountInfo { nonce: 1, ..Default::default() };
@@ -1566,6 +1580,7 @@ mod tests {
         assert_eq!(previous_state.reverts.len(), 1);
 
         let mut test = ExecutionOutcome {
+            chain_id: ETHEREUM_CHAIN_ID,
             bundle: present_state,
             receipts: vec![vec![Some(Receipt::default()); 2]; 1].into(),
             first_block: 2,
@@ -1575,7 +1590,7 @@ mod tests {
         test.prepend_state(previous_state);
 
         assert_eq!(test.receipts.len(), 1);
-        let end_state = test.state();
+        let end_state = test.all_states();
         assert_eq!(end_state.state.len(), 2);
         // reverts num should stay the same.
         assert_eq!(end_state.reverts.len(), 1);
@@ -1587,8 +1602,8 @@ mod tests {
 
     #[test]
     fn hashed_state_storage_root() {
-        let address = Address::random();
-        let hashed_address = keccak256(address);
+        let address = ChainAddress(ETHEREUM_CHAIN_ID, Address::random());
+        let hashed_address = keccak256(address.1);
         let provider_factory = create_test_provider_factory();
         let provider_rw = provider_factory.provider_rw().unwrap();
         let tx = provider_rw.tx_ref();
@@ -1632,7 +1647,8 @@ mod tests {
         provider_rw.write_hashed_state(&state.clone().into_sorted()).unwrap();
 
         // re-calculate database storage root
-        let storage_root = StorageRoot::overlay_root(tx, address, updated_storage.clone()).unwrap();
+        let storage_root =
+            StorageRoot::overlay_root(tx, address.1, updated_storage.clone()).unwrap();
         assert_eq!(storage_root, storage_root_prehashed(updated_storage.storage));
     }
 }

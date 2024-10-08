@@ -1,5 +1,6 @@
 //! utilities for working with revm
 
+use futures::io::Chain;
 use reth_primitives::{Address, B256, U256};
 use reth_rpc_types::{
     state::{AccountOverride, StateOverride},
@@ -8,10 +9,10 @@ use reth_rpc_types::{
 use revm::{
     db::CacheDB,
     precompile::{PrecompileSpecId, Precompiles},
-    primitives::{db::DatabaseRef, Bytecode, SpecId, TxEnv},
-    Database,
+    primitives::{db::SyncDatabaseRef, Bytecode, SpecId, TxEnv},
+    SyncDatabase,
 };
-use revm_primitives::BlockEnv;
+use revm_primitives::{BlockEnv, ChainAddress};
 use std::cmp::min;
 
 use super::{EthApiError, EthResult, RpcInvalidTransactionError};
@@ -26,8 +27,8 @@ pub fn get_precompiles(spec_id: SpecId) -> impl IntoIterator<Item = Address> {
 /// Caps the configured [`TxEnv`] `gas_limit` with the allowance of the caller.
 pub fn cap_tx_gas_limit_with_caller_allowance<DB>(db: &mut DB, env: &mut TxEnv) -> EthResult<()>
 where
-    DB: Database,
-    EthApiError: From<<DB as Database>::Error>,
+    DB: SyncDatabase,
+    EthApiError: From<<DB as SyncDatabase>::Error>,
 {
     if let Ok(gas_limit) = caller_gas_allowance(db, env)?.try_into() {
         env.gas_limit = gas_limit;
@@ -44,8 +45,8 @@ where
 /// Caution: This assumes non-zero `env.gas_price`. Otherwise, zero allowance will be returned.
 pub fn caller_gas_allowance<DB>(db: &mut DB, env: &TxEnv) -> EthResult<U256>
 where
-    DB: Database,
-    EthApiError: From<<DB as Database>::Error>,
+    DB: SyncDatabase,
+    EthApiError: From<<DB as SyncDatabase>::Error>,
 {
     Ok(db
         // Get the caller account.
@@ -203,7 +204,7 @@ impl CallFees {
 }
 
 /// Applies the given block overrides to the env
-pub fn apply_block_overrides(overrides: BlockOverrides, env: &mut BlockEnv) {
+pub fn apply_block_overrides(chain_id: u64, overrides: BlockOverrides, env: &mut BlockEnv) {
     let BlockOverrides {
         number,
         difficulty,
@@ -228,7 +229,7 @@ pub fn apply_block_overrides(overrides: BlockOverrides, env: &mut BlockEnv) {
         env.gas_limit = U256::from(gas_limit);
     }
     if let Some(coinbase) = coinbase {
-        env.coinbase = coinbase;
+        env.coinbase = ChainAddress(chain_id, coinbase);
     }
     if let Some(random) = random {
         env.prevrandao = Some(random);
@@ -239,30 +240,34 @@ pub fn apply_block_overrides(overrides: BlockOverrides, env: &mut BlockEnv) {
 }
 
 /// Applies the given state overrides (a set of [`AccountOverride`]) to the [`CacheDB`].
-pub fn apply_state_overrides<DB>(overrides: StateOverride, db: &mut CacheDB<DB>) -> EthResult<()>
+pub fn apply_state_overrides<DB>(
+    chain_id: u64,
+    overrides: StateOverride,
+    db: &mut CacheDB<DB>,
+) -> EthResult<()>
 where
-    DB: DatabaseRef,
-    EthApiError: From<<DB as DatabaseRef>::Error>,
+    DB: SyncDatabaseRef,
+    EthApiError: From<<DB as SyncDatabaseRef>::Error>,
 {
     for (account, account_overrides) in overrides {
-        apply_account_override(account, account_overrides, db)?;
+        apply_account_override(ChainAddress(chain_id, account), account_overrides, db)?;
     }
     Ok(())
 }
 
 /// Applies a single [`AccountOverride`] to the [`CacheDB`].
 fn apply_account_override<DB>(
-    account: Address,
+    account: ChainAddress,
     account_override: AccountOverride,
     db: &mut CacheDB<DB>,
 ) -> EthResult<()>
 where
-    DB: DatabaseRef,
-    EthApiError: From<<DB as DatabaseRef>::Error>,
+    DB: SyncDatabaseRef,
+    EthApiError: From<<DB as SyncDatabaseRef>::Error>,
 {
-    // we need to fetch the account via the `DatabaseRef` to not update the state of the account,
-    // which is modified via `Database::basic_ref`
-    let mut account_info = DatabaseRef::basic_ref(db, account)?.unwrap_or_default();
+    // we need to fetch the account via the `SyncDatabaseRef` to not update the state of the
+    // account, which is modified via `Database::basic_ref`
+    let mut account_info = SyncDatabaseRef::basic_ref(db, account)?.unwrap_or_default();
 
     if let Some(nonce) = account_override.nonce {
         account_info.nonce = nonce;

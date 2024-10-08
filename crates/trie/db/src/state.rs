@@ -283,14 +283,16 @@ mod tests {
     use super::*;
     use reth_db::test_utils::create_test_rw_db;
     use reth_db_api::database::Database;
-    use reth_primitives::{hex, revm_primitives::AccountInfo, Address, U256};
-    use revm::db::BundleState;
+    use reth_primitives::{
+        constants::ETHEREUM_CHAIN_ID, hex, revm_primitives::AccountInfo, Address, U256,
+    };
+    use revm::{db::BundleState, primitives::ChainAddress};
     use std::collections::HashMap;
 
     #[test]
     fn from_bundle_state_with_rayon() {
-        let address1 = Address::with_last_byte(1);
-        let address2 = Address::with_last_byte(2);
+        let address1 = ChainAddress(ETHEREUM_CHAIN_ID, Address::with_last_byte(1));
+        let address2 = ChainAddress(ETHEREUM_CHAIN_ID, Address::with_last_byte(2));
         let slot1 = U256::from(1015);
         let slot2 = U256::from(2015);
 

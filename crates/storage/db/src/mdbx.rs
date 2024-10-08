@@ -10,7 +10,6 @@ pub use reth_libmdbx::*;
 /// Creates a new database at the specified path if it doesn't exist. Does NOT create tables. Check
 /// [`init_db`].
 pub fn create_db<P: AsRef<Path>>(path: P, args: DatabaseArguments) -> eyre::Result<DatabaseEnv> {
-    println!("create_db");
     use crate::version::{check_db_version_file, create_db_version_file, DatabaseVersionError};
 
     let rpath = path.as_ref();
@@ -32,7 +31,6 @@ pub fn create_db<P: AsRef<Path>>(path: P, args: DatabaseArguments) -> eyre::Resu
 /// Opens up an existing database or creates a new one at the specified path. Creates tables if
 /// necessary. Read/Write mode.
 pub fn init_db<P: AsRef<Path>>(path: P, args: DatabaseArguments) -> eyre::Result<DatabaseEnv> {
-    println!("init_db");
     let client_version: reth_db_api::models::ClientVersion = args.client_version().clone();
     let db = create_db(path, args)?;
     db.create_tables()?;
