@@ -13,3 +13,8 @@ network_params:
 additional_services:
   - blockscout
   - blockscout_l2_1
+port_publisher:
+  nat_exit_ip: KURTOSIS_IP_ADDR_PLACEHOLDER
+  el:
+    enabled: true
+    public_port_start: 32000
