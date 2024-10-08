@@ -3,9 +3,18 @@ participants:
     el_image: taiko_reth
     cl_type: lighthouse
     cl_image: sigp/lighthouse:latest
+    cl_extra_params: [--always-prepare-payload, --prepare-payload-lookahead, "12000"]
   - el_type: reth
     el_image: taiko_reth
     cl_type: teku
     cl_image: consensys/teku:latest
 network_params:
   network_id: '160010'
+additional_services:
+  - blockscout
+  - blockscout_l2_1
+port_publisher:
+  nat_exit_ip: KURTOSIS_IP_ADDR_PLACEHOLDER
+  el:
+    enabled: true
+    public_port_start: 32000
