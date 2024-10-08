@@ -1,9 +1,14 @@
 use std::collections::BTreeMap;
 use std::fmt::Debug;
+use std::path::PathBuf;
 use std::sync::Arc;
 use alloy_rlp::Decodable;
 use ef_tests::assert::assert_equal;
+use ef_tests::cases::blockchain_test::BlockchainTestCase;
 use ef_tests::models::ForkSpec;
+use ef_tests::result::assert_tests_pass;
+use ef_tests::suite::find_all_files_with_extension;
+use ef_tests::{Cases, Suite};
 use ef_tests::{models::BlockchainTest, Case, Error};
 use gwyneth::exex::INITIAL_TIMESTAMP;
 use gwyneth::{GwynethPayloadAttributes, GwynethPayloadBuilder, GwynethPayloadBuilderAttributes};
@@ -30,6 +35,52 @@ use reth_transaction_pool::noop::NoopTransactionPool;
 use revm::primitives::ChainAddress;
 use revm::SyncDatabase;
 
+
+/// A handler for the blockchain test suite.
+#[derive(Debug)]
+pub struct BlockchainTests {
+    suite: String,
+}
+
+impl BlockchainTests {
+    /// Create a new handler for a subset of the blockchain test suite.
+    pub const fn new(suite: String) -> Self {
+        Self { suite }
+    }
+}
+
+impl Suite for BlockchainTests {
+    type Case = SyncBlockchainTestCase;
+
+    fn suite_name(&self) -> String {
+        format!("SyncBlockchainTests/{}", self.suite)
+    }
+
+    fn run(&self) {
+        // Build the path to the test suite directory
+        let suite_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../../testing/ef-tests/ethereum-tests")
+            .join(self.suite_name());
+
+        // Verify that the path exists
+        assert!(suite_path.exists(), "Test suite path does not exist: {suite_path:?}");
+
+        // Find all files with the ".json" extension in the test suite directory
+        let test_cases = find_all_files_with_extension(&suite_path, ".json")
+            .into_iter()
+            .map(|test_case_path| {
+                let case = Self::Case::load(&test_case_path).expect("test case should load");
+                (test_case_path, case)
+            })
+            .collect();
+
+        // Run the test cases and collect the results
+        let results = Cases { test_cases }.run();
+
+        // Assert that all tests in the suite pass
+        assert_tests_pass(&self.suite_name(), &suite_path, &results);
+    }
+}
 
 /// An Ethereum blockchain test.
 #[derive(Debug, PartialEq, Eq)]

@@ -71,7 +71,7 @@ impl CaseResult {
 }
 
 /// Assert that all the given tests passed and print the results to stdout.
-pub(crate) fn assert_tests_pass(suite_name: &str, path: &Path, results: &[CaseResult]) {
+pub fn assert_tests_pass(suite_name: &str, path: &Path, results: &[CaseResult]) {
     let (passed, failed, skipped) = categorize_results(results);
 
     print_results(suite_name, path, &passed, &failed, &skipped);
