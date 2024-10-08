@@ -76,7 +76,7 @@ build-op: ## Build the op-reth binary into `target` directory.
 
 .PHONY: build-taiko
 build-taiko: ## Build the op-reth binary into `target` directory.
-	cargo build --bin op-reth --features "taiko,$(FEATURES)" --profile "$(PROFILE)"
+	cargo build --bin taiko-reth --features "taiko,$(FEATURES)" --profile "$(PROFILE)"
 
 # Builds the reth binary natively.
 build-native-%:
@@ -340,9 +340,9 @@ define taiko_docker_build_push
 	mkdir -p $(BIN_DIR)/amd64
 	cp $(BUILD_PATH)/x86_64-unknown-linux-gnu/$(PROFILE)/taiko-reth $(BIN_DIR)/amd64/taiko-reth
 
-	# $(MAKE) taiko-build-aarch64-unknown-linux-gnu
-	# mkdir -p $(BIN_DIR)/arm64
-	# cp $(BUILD_PATH)/aarch64-unknown-linux-gnu/$(PROFILE)/taiko-reth $(BIN_DIR)/arm64/taiko-reth
+	$(MAKE) taiko-build-aarch64-unknown-linux-gnu
+	mkdir -p $(BIN_DIR)/arm64
+	cp $(BUILD_PATH)/aarch64-unknown-linux-gnu/$(PROFILE)/taiko-reth $(BIN_DIR)/arm64/taiko-reth
 
 	docker buildx build --file ./DockerfileTaiko.cross . \
 		--platform linux/amd64,linux/arm64 \

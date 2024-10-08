@@ -258,7 +258,7 @@ impl Command {
         }
         // take db
         let db = std::mem::take(evm.db_mut());
-        // calcuate roots
+        // calculate roots
         let mut tx_trie = MptNode::default();
         let mut receipt_trie = MptNode::default();
         let mut bloom = Bloom::default();
@@ -343,9 +343,9 @@ impl Command {
 
     fn parse_prestate(&self) -> eyre::Result<Prestate> {
         let mut input: Input = Default::default();
-        if self.input_alloc == STDIN_ARG_NAME ||
-            self.input_env == STDIN_ARG_NAME ||
-            self.input_txs == STDIN_ARG_NAME
+        if self.input_alloc == STDIN_ARG_NAME
+            || self.input_env == STDIN_ARG_NAME
+            || self.input_txs == STDIN_ARG_NAME
         {
             input = serde_json::from_reader(io::stdin())?;
         }
@@ -447,8 +447,8 @@ fn apply_london_checks(env: &mut PrestateEnv, chain: &ChainSpec) -> eyre::Result
 }
 
 fn apply_shanghai_checks(env: &mut PrestateEnv, chain: &ChainSpec) -> eyre::Result<()> {
-    if !(chain.fork(Hardfork::Shanghai).active_at_block(env.current_number) &&
-        chain.is_shanghai_active_at_timestamp(env.current_timestamp))
+    if !(chain.fork(Hardfork::Shanghai).active_at_block(env.current_number)
+        && chain.is_shanghai_active_at_timestamp(env.current_timestamp))
     {
         return Ok(());
     }
@@ -459,8 +459,8 @@ fn apply_shanghai_checks(env: &mut PrestateEnv, chain: &ChainSpec) -> eyre::Resu
 }
 
 fn apply_merge_checks(env: &mut PrestateEnv, chain: &ChainSpec) -> eyre::Result<()> {
-    let is_merged = chain.get_final_paris_total_difficulty().is_some() &&
-        chain.get_final_paris_total_difficulty().unwrap().is_zero();
+    let is_merged = chain.get_final_paris_total_difficulty().is_some()
+        && chain.get_final_paris_total_difficulty().unwrap().is_zero();
     if !is_merged {
         if env.current_difficulty.is_some() {
             return Ok(());
@@ -493,8 +493,8 @@ fn apply_merge_checks(env: &mut PrestateEnv, chain: &ChainSpec) -> eyre::Result<
 }
 
 fn apply_cancun_checks(env: &mut PrestateEnv, chain: &ChainSpec) -> eyre::Result<()> {
-    if !(chain.fork(Hardfork::Cancun).active_at_block(env.current_number) &&
-        chain.is_cancun_active_at_timestamp(env.current_timestamp))
+    if !(chain.fork(Hardfork::Cancun).active_at_block(env.current_number)
+        && chain.is_cancun_active_at_timestamp(env.current_timestamp))
     {
         env.parent_beacon_block_root = None;
         return Ok(());

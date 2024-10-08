@@ -82,7 +82,7 @@ pub fn decode_anchor(bytes: &[u8]) -> Result<anchorCall> {
 }
 
 /// decodes an ontake block's extradata, returns `basefee_ratio` configurations,
-/// the corresponding enocding function in protocol is `LibProposing._encodeGasConfigs`.
+/// the corresponding encoding function in protocol is `LibProposing._encodeGasConfigs`.
 pub fn decode_ontake_extra_data(extradata: &[u8]) -> u8 {
     let basefee_ratio = U256::from_be_slice(extradata);
     let val: u64 = basefee_ratio.try_into().unwrap();
