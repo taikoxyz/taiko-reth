@@ -17,6 +17,7 @@ use reth_rpc_types::{
 use std::{marker::PhantomData, net::Ipv4Addr};
 
 /// Helper for engine api operations
+#[derive(Debug)]
 pub struct EngineApiContext<E> {
     pub canonical_stream: CanonStateNotificationStream,
     pub engine_api_client: HttpClient<AuthClientService<HttpBackend>>,

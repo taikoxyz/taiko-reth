@@ -33,7 +33,7 @@ use RollupContract::{BlockProposed, RollupContractEvents};
 
 const ROLLUP_CONTRACT_ADDRESS: Address = address!("9fCF7D13d10dEdF17d0f24C62f0cf4ED462f65b7");
 pub const CHAIN_ID: u64 = 167010;
-const INITIAL_TIMESTAMP: u64 = 1710338135;
+pub const INITIAL_TIMESTAMP: u64 = 1710338135;
 
 pub type GwynethFullNode = FullNode<
     NodeAdapter<

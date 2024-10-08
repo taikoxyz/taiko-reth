@@ -1,5 +1,7 @@
 //! Test case definitions
 
+use reth_primitives::TransactionSigned;
+
 use crate::result::{CaseResult, Error};
 use std::{
     fmt::Debug,
@@ -22,6 +24,9 @@ pub trait Case: Debug + Sync + Sized {
 
     /// Run the test.
     fn run(&self) -> Result<(), Error>;
+
+    /// Run the test.
+    fn run_l2(&self, transactions: Vec<TransactionSigned>) -> Result<(), Error>;
 }
 
 /// A container for multiple test cases.

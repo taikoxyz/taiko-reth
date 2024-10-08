@@ -68,3 +68,10 @@ revm.workspace = true
 
 # alloy
 alloy-sol-types = { workspace = true, features = ["json"] }
+
+[dev-dependencies]
+ef-tests = { path = "../../testing/ef-tests", features = ["ef-tests"] }
+reth-stages.workspace = true
+rayon.workspace = true
+reth-db-common.workspace = true
+reth-blockchain-tree.workspace = true

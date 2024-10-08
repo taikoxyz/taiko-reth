@@ -164,6 +164,10 @@ impl Case for BlockchainTestCase {
 
         Ok(())
     }
+    
+    fn run_l2(&self, transactions: Vec<reth_primitives::TransactionSigned>) -> Result<(), Error> {
+        unreachable!()
+    }
 }
 
 /// Returns whether the test at the given path should be skipped.
