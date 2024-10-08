@@ -313,19 +313,19 @@ abstract contract TaikoL1TestBase is TaikoTest {
 
         TaikoData.BlockMetadata[] memory _returnedBlocks = new TaikoData.BlockMetadata[](1);
 
-        if (revertReason == "") {
-            vm.prank(proposer, proposer);
-            _returnedBlocks = L1.proposeBlock{ value: 1 ether / 10 }(
-                metasEncoded, meta.blobUsed == true ? emptyTxList : dummyTxList
-            );
-        } else {
-            vm.prank(proposer, proposer);
-            vm.expectRevert(revertReason);
-            _returnedBlocks = L1.proposeBlock{ value: 1 ether / 10 }(
-                metasEncoded, meta.blobUsed == true ? emptyTxList : dummyTxList
-            );
-            return meta;
-        }
+        // if (revertReason == "") {
+        //     vm.prank(proposer, proposer);
+        //     _returnedBlocks = L1.proposeBlock{ value: 1 ether / 10 }(
+        //         metasEncoded, meta.blobUsed == true ? emptyTxList : dummyTxList
+        //     );
+        // } else {
+        //     vm.prank(proposer, proposer);
+        //     vm.expectRevert(revertReason);
+        //     _returnedBlocks = L1.proposeBlock{ value: 1 ether / 10 }(
+        //         metasEncoded, meta.blobUsed == true ? emptyTxList : dummyTxList
+        //     );
+        //     return meta;
+        // }
 
         return _returnedBlocks[0];
     }

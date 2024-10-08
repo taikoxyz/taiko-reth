@@ -1,4 +1,4 @@
-use std::{fmt::Debug, sync::Arc};
+use std::fmt::Debug;
 use super::{
     AccountReader, BlockHashReader, BlockIdReader, StateProofProvider, StateRootProvider,
     StorageRootProvider,

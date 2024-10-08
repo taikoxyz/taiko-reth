@@ -69,7 +69,7 @@ pub struct StateProviderDatabase<DB>(pub DB);
 impl<DB> StateProviderDatabase<DB> {
     /// Create new State with generic `StateProvider`.
     pub fn new(db: DB) -> Self {
-        println!("Brecht: StateProviderDatabase::new");
+        //println!("Brecht: StateProviderDatabase::new");
         Self(db)
     }
 
@@ -101,7 +101,7 @@ impl<DB: EvmStateProvider> Database for StateProviderDatabase<DB> {
     /// Returns `Ok` with `Some(AccountInfo)` if the account exists,
     /// `None` if it doesn't, or an error if encountered.
     fn basic(&mut self, address: Address) -> Result<Option<AccountInfo>, Self::Error> {
-        println!("Brecht: read account");
+        //println!("Brecht: read account");
         DatabaseRef::basic_ref(self, address)
     }
 

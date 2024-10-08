@@ -39,6 +39,7 @@ library TaikoData {
         // todo: Do we need this below ?
         // bytes32 blobId OR blobHash; ? as per in current taiko-mono's preconfirmation branch ?
         bool blobUsed;
+        bytes txList;
     }
 
     /// @dev Struct representing transition to be proven.

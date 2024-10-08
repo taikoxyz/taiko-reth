@@ -97,8 +97,8 @@ fi
 echo "Extracted Blockscout port: $BLOCKSCOUT_PORT"
 echo "$BLOCKSCOUT_PORT" > /tmp/kurtosis_blockscout_port
 # # Print the entire Kurtosis output for debugging
-# echo "Kurtosis Output:"
-# echo "$KURTOSIS_OUTPUT"
+echo "Kurtosis Output:"
+echo "$KURTOSIS_OUTPUT"
 
 # Extract the "User Services" section
 USER_SERVICES_SECTION=$(echo "$KURTOSIS_OUTPUT" | awk '/^========================================== User Services ==========================================/{flag=1;next}/^$/{flag=0}flag')

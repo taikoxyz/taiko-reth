@@ -112,12 +112,12 @@ impl<Node: reth_node_api::FullNodeComponents> Rollup<Node> {
 
             if let RollupContractEvents::BlockProposed(BlockProposed {
                 blockId: block_number,
-                meta: _,
-                txList: tx_list,
+                meta,
             }) = event
             {
                 println!("block_number: {:?}", block_number);
-                let transactions: Vec<TransactionSigned> = decode_transactions(&tx_list);
+                println!("tx_list: {:?}", meta.txList);
+                let transactions: Vec<TransactionSigned> = decode_transactions(&meta.txList);
                 println!("transactions: {:?}", transactions);
 
                 let attrs = GwynethPayloadAttributes {
