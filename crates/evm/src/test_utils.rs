@@ -9,7 +9,7 @@ use reth_execution_types::ExecutionOutcome;
 use reth_primitives::{BlockNumber, BlockWithSenders, Receipt};
 use reth_prune_types::PruneModes;
 use reth_storage_errors::provider::ProviderError;
-use revm_primitives::db::Database;
+use revm_primitives::db::SyncDatabase;
 use std::{fmt::Display, sync::Arc};
 
 /// A [`BlockExecutorProvider`] that returns mocked execution results.
@@ -26,20 +26,20 @@ impl MockExecutorProvider {
 }
 
 impl BlockExecutorProvider for MockExecutorProvider {
-    type Executor<DB: Database<Error: Into<ProviderError> + Display>> = Self;
+    type Executor<DB: SyncDatabase<Error: Into<ProviderError> + Display>> = Self;
 
-    type BatchExecutor<DB: Database<Error: Into<ProviderError> + Display>> = Self;
+    type BatchExecutor<DB: SyncDatabase<Error: Into<ProviderError> + Display>> = Self;
 
     fn executor<DB>(&self, _: DB) -> Self::Executor<DB>
     where
-        DB: Database<Error: Into<ProviderError> + Display>,
+        DB: SyncDatabase<Error: Into<ProviderError> + Display>,
     {
         self.clone()
     }
 
     fn batch_executor<DB>(&self, _: DB) -> Self::BatchExecutor<DB>
     where
-        DB: Database<Error: Into<ProviderError> + Display>,
+        DB: SyncDatabase<Error: Into<ProviderError> + Display>,
     {
         self.clone()
     }
@@ -51,7 +51,7 @@ impl<DB> Executor<DB> for MockExecutorProvider {
     type Error = BlockExecutionError;
 
     fn execute(self, _: Self::Input<'_>) -> Result<Self::Output, Self::Error> {
-        let ExecutionOutcome { bundle, receipts, requests, first_block: _ } =
+        let ExecutionOutcome { chain_id, bundle, receipts, requests, first_block: _ } =
             self.exec_results.lock().pop().unwrap();
         Ok(BlockExecutionOutput {
             state: bundle,

@@ -203,13 +203,15 @@ pub fn insert_state<'a, 'b, DB: Database>(
     let all_reverts_init: RevertsInit = HashMap::from([(block, reverts_init)]);
 
     let execution_outcome = ExecutionOutcome::new_init(
+        Some(provider.chain_spec().chain().id()),
         state_init,
         all_reverts_init,
         contracts.into_iter().collect(),
         Receipts::default(),
         block,
         Vec::new(),
-    );
+    )
+    .filter_current_chain();
 
     let mut storage_writer = UnifiedStorageWriter::from_database(provider);
     storage_writer.write_to_storage(execution_outcome, OriginalValuesKnown::Yes)?;

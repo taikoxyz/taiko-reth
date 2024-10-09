@@ -112,6 +112,8 @@ where
                             TransferKind::Create => OperationType::OpCreate,
                             TransferKind::Create2 => OperationType::OpCreate2,
                             TransferKind::SelfDestruct => OperationType::OpSelfDestruct,
+                            // FIX(Cecilia): seems like reth version > alloy, 'EofCreate' unconvered
+                            TransferKind::EofCreate => OperationType::OpCreate,
                         },
                     })
                     .collect::<Vec<_>>()

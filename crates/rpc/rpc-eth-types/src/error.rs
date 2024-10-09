@@ -17,6 +17,7 @@ use reth_transaction_pool::error::{
 };
 use revm::primitives::{EVMError, ExecutionResult, HaltReason, OutOfGasError};
 use revm_inspectors::tracing::MuxError;
+use revm_primitives::ChainAddress;
 use tracing::error;
 
 /// Result alias
@@ -76,7 +77,7 @@ pub enum EthApiError {
     InvalidBlockData(#[from] BlockError),
     /// Thrown when an `AccountOverride` contains conflicting `state` and `stateDiff` fields
     #[error("account {0:?} has both 'state' and 'stateDiff'")]
-    BothStateAndStateDiffInOverride(Address),
+    BothStateAndStateDiffInOverride(ChainAddress),
     /// Other internal error
     #[error(transparent)]
     Internal(RethError),

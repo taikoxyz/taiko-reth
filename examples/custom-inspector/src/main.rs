@@ -19,7 +19,7 @@ use reth::{
     revm::{
         inspector_handle_register,
         interpreter::{Interpreter, OpCode},
-        Database, Evm, EvmContext, Inspector,
+        Evm, EvmContext, Inspector, SyncDatabase,
     },
     rpc::{api::eth::helpers::Call, compat::transaction::transaction_to_call_request},
     transaction_pool::TransactionPool,
@@ -122,7 +122,7 @@ struct DummyInspector {
 
 impl<DB> Inspector<DB> for DummyInspector
 where
-    DB: Database,
+    DB: SyncDatabase,
 {
     /// This method is called at each step of the EVM execution.
     /// It checks if the current opcode is valid and if so, it stores the opcode and its
