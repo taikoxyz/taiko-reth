@@ -37,12 +37,12 @@ fn main() -> eyre::Result<()> {
             .with_chain(chain_spec.clone())
             .with_network(network_config.clone())
             .with_unused_ports()
-            .with_rpc(RpcServerArgs::default().with_unused_ports().with_static_l2_rpc_ip_and_port())
+            .with_rpc(RpcServerArgs::default().with_unused_ports().with_static_l2_rpc_ip_and_port(chain_spec.chain.id()))
             .set_dev(true);
 
         let NodeHandle { node: gwyneth_node, node_exit_future: _ } =
             NodeBuilder::new(node_config.clone())
-                .testing_node(exec.clone())
+                .gwyneth_node(exec.clone(), chain_spec.chain.id())
                 .node(GwynethNode::default())
                 .launch()
                 .await?;

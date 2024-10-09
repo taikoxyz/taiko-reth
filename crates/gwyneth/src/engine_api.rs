@@ -15,6 +15,7 @@ use reth_rpc_types::{
     ExecutionPayloadV3,
 };
 use std::{marker::PhantomData, net::Ipv4Addr};
+use reth_rpc_builder::constants;
 
 /// Helper for engine api operations
 pub struct EngineApiContext<E> {
@@ -112,17 +113,18 @@ impl PayloadEnvelopeExt for ExecutionPayloadEnvelopeV3 {
     }
 }
 pub trait RpcServerArgsExEx {
-    fn with_static_l2_rpc_ip_and_port(self) -> Self;
+    fn with_static_l2_rpc_ip_and_port(self, chain_id: u64) -> Self;
 }
 
 impl RpcServerArgsExEx for RpcServerArgs {
-    fn with_static_l2_rpc_ip_and_port(mut self) -> Self {
+    fn with_static_l2_rpc_ip_and_port(mut self, chain_id: u64) -> Self {
         self.http = true;
         // On the instance the program is running, we wanna have 10111 exposed as the (exex) L2's
         // RPC port.
         self.http_addr = Ipv4Addr::new(0, 0, 0, 0).into();
         self.http_port = 10110u16;
         self.ws_port = 10111u16;
+        self.ipcpath = format!("{}-{}", constants::DEFAULT_IPC_ENDPOINT, chain_id);
         self
     }
 }
