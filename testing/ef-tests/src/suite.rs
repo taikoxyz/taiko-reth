@@ -5,6 +5,7 @@ use crate::{
     result::assert_tests_pass,
 };
 use std::path::{Path, PathBuf};
+use reth_primitives::TransactionSigned;
 use walkdir::{DirEntry, WalkDir};
 
 /// A collection of tests.
@@ -21,34 +22,35 @@ pub trait Suite {
     /// - `BlockchainTests/TransitionTests`
     fn suite_name(&self) -> String;
 
+    /// Load the cases
+    fn load(&self) -> (PathBuf, Cases<Self::Case>);
+
     /// Load an run each contained test case.
     ///
     /// # Note
     ///
     /// This recursively finds every test description in the resulting path.
     fn run(&self) {
-        // Build the path to the test suite directory
-        let suite_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("ethereum-tests")
-            .join(self.suite_name());
-
-        // Verify that the path exists
-        assert!(suite_path.exists(), "Test suite path does not exist: {suite_path:?}");
-
-        // Find all files with the ".json" extension in the test suite directory
-        let test_cases = find_all_files_with_extension(&suite_path, ".json")
-            .into_iter()
-            .map(|test_case_path| {
-                let case = Self::Case::load(&test_case_path).expect("test case should load");
-                (test_case_path, case)
-            })
-            .collect();
 
         // Run the test cases and collect the results
-        let results = Cases { test_cases }.run();
+        let (suite_path, cases) = self.load();
+        let results = cases.run();
 
         // Assert that all tests in the suite pass
-        assert_tests_pass(&self.suite_name(), &suite_path, &results);
+        assert_tests_pass(&self.suite_name(), suite_path.as_path(), &results);
+    }
+
+    fn run_l2<TX>(&self,  generate_tx: TX) where TX: Fn() -> Vec<TransactionSigned>{
+
+        // Run the test cases and collect the results
+        let (suite_path, mut cases) = self.load();
+        for (_, case) in cases.test_cases.iter_mut() {
+            case.load_l2_payload(generate_tx())
+        }
+        let results = cases.run();
+
+        // Assert that all tests in the suite pass
+        assert_tests_pass(&self.suite_name(), suite_path.as_path(), &results);
     }
 }
 

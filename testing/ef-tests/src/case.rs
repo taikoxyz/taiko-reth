@@ -22,11 +22,15 @@ pub trait Case: Debug + Sync + Sized {
     /// The file can be assumed to be a valid EF test case as described on <https://ethereum-tests.readthedocs.io/>.
     fn load(path: &Path) -> Result<Self, Error>;
 
+    /// Load L1 test from the given file path.
+    /// Generate L2 tx list from closure
+    fn load_l2_payload(&mut self, l2_payload: Vec<TransactionSigned>);
+
     /// Run the test.
     fn run(&self) -> Result<(), Error>;
 
     /// Run the test.
-    fn run_l2(&self, transactions: Vec<TransactionSigned>) -> Result<(), Error>;
+    fn run_l2(&self) -> Result<(), Error>;
 }
 
 /// A container for multiple test cases.
@@ -40,5 +44,10 @@ impl<T: Case> Cases<T> {
     /// Run the contained test cases.
     pub fn run(&self) -> Vec<CaseResult> {
         self.test_cases.iter().map(|(path, case)| CaseResult::new(path, case, case.run())).collect()
+    }
+
+    /// Run the contained test cases.
+    pub fn run_l2(&self) -> Vec<CaseResult> {
+        self.test_cases.iter().map(|(path, case)| CaseResult::new(path, case, case.run_l2())).collect()
     }
 }

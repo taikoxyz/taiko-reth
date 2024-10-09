@@ -1,10 +1,11 @@
 use std::collections::BTreeMap;
 use std::fmt::Debug;
-use std::path::PathBuf;
+use std::fs;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use alloy_rlp::Decodable;
 use ef_tests::assert::assert_equal;
-use ef_tests::cases::blockchain_test::BlockchainTestCase;
+use ef_tests::cases::blockchain_test::{should_skip, BlockchainTestCase};
 use ef_tests::models::ForkSpec;
 use ef_tests::result::assert_tests_pass;
 use ef_tests::suite::find_all_files_with_extension;
@@ -38,29 +39,30 @@ use revm::SyncDatabase;
 
 /// A handler for the blockchain test suite.
 #[derive(Debug)]
-pub struct BlockchainTests {
+pub struct SyncBlockchainTests {
     suite: String,
 }
 
-impl BlockchainTests {
+impl SyncBlockchainTests {
     /// Create a new handler for a subset of the blockchain test suite.
     pub const fn new(suite: String) -> Self {
         Self { suite }
     }
 }
 
-impl Suite for BlockchainTests {
+impl Suite for SyncBlockchainTests {
     type Case = SyncBlockchainTestCase;
 
     fn suite_name(&self) -> String {
-        format!("SyncBlockchainTests/{}", self.suite)
+        format!("BlockchainTests/{}", self.suite)
     }
 
-    fn run(&self) {
+    fn load(&self) -> (PathBuf, Cases<Self::Case>) {
         // Build the path to the test suite directory
         let suite_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("../../testing/ef-tests/ethereum-tests")
             .join(self.suite_name());
+        println!("{:?}", suite_path);
 
         // Verify that the path exists
         assert!(suite_path.exists(), "Test suite path does not exist: {suite_path:?}");
@@ -74,11 +76,7 @@ impl Suite for BlockchainTests {
             })
             .collect();
 
-        // Run the test cases and collect the results
-        let results = Cases { test_cases }.run();
-
-        // Assert that all tests in the suite pass
-        assert_tests_pass(&self.suite_name(), &suite_path, &results);
+        (suite_path, Cases { test_cases })
     }
 }
 
@@ -86,12 +84,26 @@ impl Suite for BlockchainTests {
 #[derive(Debug, PartialEq, Eq)]
 pub struct SyncBlockchainTestCase {
     tests: BTreeMap<String, BlockchainTest>,
+    l2_payload: Vec<TransactionSigned>,
     skip: bool,
 }
 
 impl Case for SyncBlockchainTestCase {
-    fn load(path: &std::path::Path) -> Result<Self, ef_tests::Error> {
-        todo!()
+    fn load(path: &Path) -> Result<Self, Error> {
+        Ok(Self {
+            tests: {
+                let s = fs::read_to_string(path)
+                    .map_err(|error| Error::Io { path: path.into(), error })?;
+                serde_json::from_str(&s)
+                    .map_err(|error| Error::CouldNotDeserialize { path: path.into(), error })?
+            },
+            l2_payload: Vec::new(),
+            skip: should_skip(path),
+        })
+    }
+
+    fn load_l2_payload(&mut self, l2_payload: Vec<TransactionSigned>) {
+        self.l2_payload = l2_payload;
     }
 
     fn run(&self) -> Result<(), ef_tests::Error> {
@@ -185,7 +197,7 @@ impl Case for SyncBlockchainTestCase {
         Ok(())
     }
 
-    fn run_l2(&self, transactions: Vec<TransactionSigned>) -> Result<(), Error> {
+    fn run_l2(&self) -> Result<(), Error> {
         // If the test is marked for skipping, return a Skipped error immediately.
         if self.skip {
             return Err(Error::Skipped)
@@ -231,7 +243,7 @@ impl Case for SyncBlockchainTestCase {
                         withdrawals: Some(vec![]),
                         parent_beacon_block_root: Some(B256::ZERO),
                     },
-                    transactions: Some(transactions.clone()),
+                    transactions: Some(self.l2_payload.clone()),
                     gas_limit: None,
                 };
                 
@@ -250,10 +262,10 @@ impl Case for SyncBlockchainTestCase {
                 .map_err(|e| ef_tests::Error::Assertion(e.to_string()))?;
 
                 if let BuildOutcome::Better { payload, cached_reads } = output {
-
+                    Ok(())
+                } else {
+                    Err(Error::Assertion("L2 Payload failed".to_string())) 
                 }
-
-                Result::<(), Error>::Ok(())
             })?;
         
         Ok(())
@@ -348,6 +360,7 @@ fn execute_l1_case_and_commit<DB: Database>(provider_factory: &ProviderFactory<D
         &provider,
         ExecInput { target: last_block.as_ref().map(|b| b.number), checkpoint: None },
     );
+    provider.commit()?;
 
     Ok(last_block)
 }

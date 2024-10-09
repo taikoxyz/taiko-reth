@@ -1,8 +1,7 @@
 //! Test runners for `BlockchainTests` in <https://github.com/ethereum/tests>
 
 use crate::{
-    models::{BlockchainTest, ForkSpec},
-    Case, Error, Suite,
+    models::{BlockchainTest, ForkSpec}, suite::find_all_files_with_extension, Case, Cases, Error, Suite
 };
 use alloy_rlp::Decodable;
 use rayon::iter::{ParallelBridge, ParallelIterator};
@@ -12,7 +11,7 @@ use reth_provider::{
     HashingWriter,
 };
 use reth_stages::{stages::ExecutionStage, ExecInput, Stage};
-use std::{collections::BTreeMap, fs, path::Path, sync::Arc};
+use std::{collections::BTreeMap, fs, path::{Path, PathBuf}, sync::Arc};
 
 /// A handler for the blockchain test suite.
 #[derive(Debug)]
@@ -32,6 +31,28 @@ impl Suite for BlockchainTests {
 
     fn suite_name(&self) -> String {
         format!("BlockchainTests/{}", self.suite)
+    }
+    
+    fn load(&self) -> (PathBuf, crate::Cases<BlockchainTestCase>) {
+        // Build the path to the test suite directory
+        let suite_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("ethereum-tests")
+            .join(self.suite_name());
+
+        // Verify that the path exists
+        assert!(suite_path.exists(), "Test suite path does not exist: {suite_path:?}");
+
+        // Find all files with the ".json" extension in the test suite directory
+        let test_cases = find_all_files_with_extension(&suite_path, ".json")
+            .into_iter()
+            .map(|test_case_path| {
+                let case = Self::Case::load(&test_case_path).expect("test case should load");
+                (test_case_path, case)
+            })
+            .collect();
+
+        // Run the test cases and collect the results
+        (suite_path, Cases { test_cases })
     }
 }
 
@@ -53,6 +74,10 @@ impl Case for BlockchainTestCase {
             },
             skip: should_skip(path),
         })
+    }
+
+    fn load_l2_payload(&mut self, l2_payload: Vec<reth_primitives::TransactionSigned>) {
+        unreachable!()
     }
 
     /// Runs the test cases for the Ethereum Forks test suite.
@@ -165,7 +190,7 @@ impl Case for BlockchainTestCase {
         Ok(())
     }
     
-    fn run_l2(&self, transactions: Vec<reth_primitives::TransactionSigned>) -> Result<(), Error> {
+    fn run_l2(&self) -> Result<(), Error> {
         unreachable!()
     }
 }
