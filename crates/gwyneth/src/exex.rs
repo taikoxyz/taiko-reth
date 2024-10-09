@@ -206,9 +206,7 @@ fn decode_chain_into_rollup_events(
             receipt
                 .logs
                 .iter()
-                .filter(|log| {
-                    log.address == ROLLUP_CONTRACT_ADDRESS
-                })
+                .filter(|log| log.address == ROLLUP_CONTRACT_ADDRESS)
                 .map(move |log| (block, tx, log))
         })
         // Decode and filter rollup events

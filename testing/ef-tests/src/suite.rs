@@ -4,8 +4,8 @@ use crate::{
     case::{Case, Cases},
     result::assert_tests_pass,
 };
-use std::path::{Path, PathBuf};
 use reth_primitives::TransactionSigned;
+use std::path::{Path, PathBuf};
 use walkdir::{DirEntry, WalkDir};
 
 /// A collection of tests.
@@ -31,7 +31,6 @@ pub trait Suite {
     ///
     /// This recursively finds every test description in the resulting path.
     fn run(&self) {
-
         // Run the test cases and collect the results
         let (suite_path, cases) = self.load();
         let results = cases.run();
@@ -40,8 +39,10 @@ pub trait Suite {
         assert_tests_pass(&self.suite_name(), suite_path.as_path(), &results);
     }
 
-    fn run_l2<TX>(&self,  generate_tx: TX) where TX: Fn() -> Vec<TransactionSigned>{
-
+    fn run_l2<TX>(&self, generate_tx: TX)
+    where
+        TX: Fn() -> Vec<TransactionSigned>,
+    {
         // Run the test cases and collect the results
         let (suite_path, mut cases) = self.load();
         for (_, case) in cases.test_cases.iter_mut() {

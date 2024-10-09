@@ -1,20 +1,20 @@
-use std::collections::BTreeMap;
-use std::fmt::Debug;
-use std::fs;
-use std::path::{Path, PathBuf};
-use std::sync::Arc;
 use alloy_rlp::Decodable;
-use ef_tests::assert::assert_equal;
-use ef_tests::cases::blockchain_test::{should_skip, BlockchainTestCase};
-use ef_tests::models::ForkSpec;
-use ef_tests::result::assert_tests_pass;
-use ef_tests::suite::find_all_files_with_extension;
-use ef_tests::{Cases, Suite};
-use ef_tests::{models::BlockchainTest, Case, Error};
-use gwyneth::exex::INITIAL_TIMESTAMP;
-use gwyneth::{GwynethPayloadAttributes, GwynethPayloadBuilder, GwynethPayloadBuilderAttributes};
+use ef_tests::{
+    assert::assert_equal,
+    cases::blockchain_test::{should_skip, BlockchainTestCase},
+    models::{BlockchainTest, ForkSpec},
+    result::assert_tests_pass,
+    suite::find_all_files_with_extension,
+    Case, Cases, Error, Suite,
+};
+use gwyneth::{
+    exex::INITIAL_TIMESTAMP, GwynethPayloadAttributes, GwynethPayloadBuilder,
+    GwynethPayloadBuilderAttributes,
+};
 use rayon::iter::{ParallelBridge, ParallelIterator};
-use reth_basic_payload_builder::{BuildArguments, BuildOutcome, Cancelled, PayloadBuilder, PayloadConfig};
+use reth_basic_payload_builder::{
+    BuildArguments, BuildOutcome, Cancelled, PayloadBuilder, PayloadConfig,
+};
 use reth_blockchain_tree::noop::NoopBlockchainTree;
 use reth_chainspec::{ChainSpec, ChainSpecBuilder};
 use reth_db::Database;
@@ -22,20 +22,26 @@ use reth_db_common::init::init_genesis;
 use reth_ethereum_engine_primitives::EthPayloadAttributes;
 use reth_node_api::PayloadBuilderAttributes;
 use reth_node_core::cli;
-use reth_payload_builder::database::CachedReads;
-use reth_payload_builder::EthBuiltPayload;
-use reth_primitives::{keccak256, Address, Bytes, StaticFileSegment, TransactionSigned, B256};
-use reth_primitives::{BlockBody, SealedBlock};
-use reth_provider::providers::BlockchainProvider;
-use reth_provider::test_utils::create_test_provider_factory_with_chain_spec;
-use reth_provider::{BlockReader, HashingWriter, HeaderProvider, ProviderFactory, StateProviderFactory};
-use reth_provider::StaticFileWriter;
+use reth_payload_builder::{database::CachedReads, EthBuiltPayload};
+use reth_primitives::{
+    keccak256, Address, BlockBody, Bytes, SealedBlock, StaticFileSegment, TransactionSigned, B256,
+};
+use reth_provider::{
+    providers::BlockchainProvider, test_utils::create_test_provider_factory_with_chain_spec,
+    BlockReader, HashingWriter, HeaderProvider, ProviderFactory, StateProviderFactory,
+    StaticFileWriter,
+};
 use reth_revm::database::{StateProviderDatabase, SyncEvmStateProvider, SyncStateProviderDatabase};
 use reth_stages::{stages::ExecutionStage, ExecInput, Stage};
 use reth_transaction_pool::noop::NoopTransactionPool;
-use revm::primitives::ChainAddress;
-use revm::SyncDatabase;
-
+use revm::{primitives::ChainAddress, SyncDatabase};
+use std::{
+    collections::BTreeMap,
+    fmt::Debug,
+    fs,
+    path::{Path, PathBuf},
+    sync::Arc,
+};
 
 /// A handler for the blockchain test suite.
 #[derive(Debug)]
@@ -246,28 +252,29 @@ impl Case for SyncBlockchainTestCase {
                     transactions: Some(self.l2_payload.clone()),
                     gas_limit: None,
                 };
-                
-                let mut builder_attrs = GwynethPayloadBuilderAttributes::try_new(B256::ZERO, attrs).unwrap();
-                builder_attrs.l1_provider = Some((l1_spec.chain().id(), Arc::new(l2_factory.latest()?)));
+
+                let mut builder_attrs =
+                    GwynethPayloadBuilderAttributes::try_new(B256::ZERO, attrs).unwrap();
+                builder_attrs.l1_provider =
+                    Some((l1_spec.chain().id(), Arc::new(l2_factory.latest()?)));
 
                 let l2_payload_builder = GwynethPayloadBuilder::default();
-                let output = l2_payload_builder.try_build(
-                    l2_builder_args(
-                        blockchain_db, 
-                        l2_spec.clone(), 
-                        l2_genesis_block.seal_slow(), 
-                        builder_attrs
-                    )
-                )
-                .map_err(|e| ef_tests::Error::Assertion(e.to_string()))?;
+                let output = l2_payload_builder
+                    .try_build(l2_builder_args(
+                        blockchain_db,
+                        l2_spec.clone(),
+                        l2_genesis_block.seal_slow(),
+                        builder_attrs,
+                    ))
+                    .map_err(|e| ef_tests::Error::Assertion(e.to_string()))?;
 
                 if let BuildOutcome::Better { payload, cached_reads } = output {
                     Ok(())
                 } else {
-                    Err(Error::Assertion("L2 Payload failed".to_string())) 
+                    Err(Error::Assertion("L2 Payload failed".to_string()))
                 }
             })?;
-        
+
         Ok(())
     }
 }
@@ -285,20 +292,14 @@ fn l2_chain_spec() -> ChainSpec {
         .build()
 }
 
-
 fn l2_builder_args<DB: Debug + Send + Sync, Client>(
-    client: Client, 
+    client: Client,
     chain_spec: Arc<ChainSpec>,
     parent_block: SealedBlock,
-    attr: GwynethPayloadBuilderAttributes<DB>
+    attr: GwynethPayloadBuilderAttributes<DB>,
 ) -> BuildArguments<NoopTransactionPool, Client, GwynethPayloadBuilderAttributes<DB>, EthBuiltPayload>
 {
-    let config = PayloadConfig::new(
-        Arc::new(parent_block),
-        Bytes::default(),
-        attr,
-        chain_spec
-    );
+    let config = PayloadConfig::new(Arc::new(parent_block), Bytes::default(), attr, chain_spec);
     BuildArguments {
         client,
         pool: NoopTransactionPool::default(),
@@ -309,27 +310,25 @@ fn l2_builder_args<DB: Debug + Send + Sync, Client>(
     }
 }
 
-fn execute_l1_case_and_commit<DB: Database>(provider_factory: &ProviderFactory<DB>, case: &BlockchainTest) -> Result<Option<SealedBlock>, Error> {
-     // Create a new test database and initialize a provider for the test case.
-     let provider = provider_factory.provider_rw().unwrap();
+fn execute_l1_case_and_commit<DB: Database>(
+    provider_factory: &ProviderFactory<DB>,
+    case: &BlockchainTest,
+) -> Result<Option<SealedBlock>, Error> {
+    // Create a new test database and initialize a provider for the test case.
+    let provider = provider_factory.provider_rw().unwrap();
 
     // Insert initial test state into the provider.
     provider.insert_historical_block(
-        SealedBlock::new(
-            case.genesis_block_header.clone().into(),
-            BlockBody::default(),
-        )
-        .try_seal_with_senders()
-        .unwrap(),
+        SealedBlock::new(case.genesis_block_header.clone().into(), BlockBody::default())
+            .try_seal_with_senders()
+            .unwrap(),
     )?;
     case.pre.write_to_db(provider.tx_ref())?;
 
     // Initialize receipts static file with genesis
     {
-        let mut receipts_writer = provider
-            .static_file_provider()
-            .latest_writer(StaticFileSegment::Receipts)
-            .unwrap();
+        let mut receipts_writer =
+            provider.static_file_provider().latest_writer(StaticFileSegment::Receipts).unwrap();
         receipts_writer.increment_block(0).unwrap();
         receipts_writer.commit_without_sync_all().unwrap();
     }
@@ -337,9 +336,7 @@ fn execute_l1_case_and_commit<DB: Database>(provider_factory: &ProviderFactory<D
     // Decode and insert blocks, creating a chain of blocks for the test case.
     let last_block = case.blocks.iter().try_fold(None, |_, block| {
         let decoded = SealedBlock::decode(&mut block.rlp.as_ref())?;
-        provider.insert_historical_block(
-            decoded.clone().try_seal_with_senders().unwrap(),
-        )?;
+        provider.insert_historical_block(decoded.clone().try_seal_with_senders().unwrap())?;
         Ok::<Option<SealedBlock>, Error>(Some(decoded))
     })?;
     provider

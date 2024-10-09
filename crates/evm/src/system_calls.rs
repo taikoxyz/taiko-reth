@@ -217,7 +217,6 @@ where
         parent_beacon_block_root.0.into(),
     );
 
-    
     let mut state = match evm.transact() {
         Ok(res) => res.state,
         Err(e) => {

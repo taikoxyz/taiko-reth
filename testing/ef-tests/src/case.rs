@@ -48,6 +48,9 @@ impl<T: Case> Cases<T> {
 
     /// Run the contained test cases.
     pub fn run_l2(&self) -> Vec<CaseResult> {
-        self.test_cases.iter().map(|(path, case)| CaseResult::new(path, case, case.run_l2())).collect()
+        self.test_cases
+            .iter()
+            .map(|(path, case)| CaseResult::new(path, case, case.run_l2()))
+            .collect()
     }
 }

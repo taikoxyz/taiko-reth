@@ -3,7 +3,10 @@ use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
 use proptest::{prelude::*, strategy::ValueTree, test_runner::TestRunner};
 use reth_primitives::{constants::ETHEREUM_CHAIN_ID, keccak256, Address, B256, U256};
 use reth_trie::{HashedPostState, HashedStorage};
-use revm::{db::{states::BundleBuilder, BundleAccount}, primitives::ChainAddress};
+use revm::{
+    db::{states::BundleBuilder, BundleAccount},
+    primitives::ChainAddress,
+};
 use std::collections::HashMap;
 
 pub fn hash_post_state(c: &mut Criterion) {
@@ -68,7 +71,8 @@ fn generate_test_data(size: usize) -> HashMap<ChainAddress, BundleAccount> {
     let mut bundle_builder = BundleBuilder::default();
 
     for (address, storage) in state {
-        bundle_builder = bundle_builder.state_storage(ChainAddress(ETHEREUM_CHAIN_ID, address), storage);
+        bundle_builder =
+            bundle_builder.state_storage(ChainAddress(ETHEREUM_CHAIN_ID, address), storage);
     }
 
     let bundle_state = bundle_builder.build();

@@ -91,10 +91,7 @@ pub fn insert_post_block_withdrawals_balance_increments(
 mod tests {
     use super::*;
     use reth_ethereum_forks::{ChainHardforks, EthereumHardfork, ForkCondition};
-    use reth_primitives::{
-        constants::GWEI_TO_WEI,
-        Address,
-    };
+    use reth_primitives::{constants::GWEI_TO_WEI, Address};
 
     /// Tests that the function correctly inserts balance increments when the Shanghai hardfork is
     /// active and there are withdrawals.

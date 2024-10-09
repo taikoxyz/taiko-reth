@@ -162,7 +162,6 @@ where
             )
             .await?;
 
-            
         // trigger forkchoice update via engine api to commit the block to the blockchain
         self.engine_api.update_forkchoice(block_hash, block_hash).await?;
 

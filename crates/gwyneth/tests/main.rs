@@ -1,7 +1,6 @@
+use ef_tests::{suite::Suite, Case};
 use gwyneth::GwynethNode;
-use ef_tests::Case;
 use reth_chainspec::{ChainSpec, ChainSpecBuilder};
-use ef_tests::suite::Suite;
 
 pub mod cases;
 pub mod test_payload;
@@ -31,7 +30,6 @@ mod l2_payload_tests {
 
     l2_payload_test!(shanghai, Shanghai, bullshit_l2_payload);
     l2_payload_test!(st_args_zero_one_balance, stArgsZeroOneBalance, bullshit_l2_payload);
-
 }
 
 mod sync_db_access_tests {
@@ -100,6 +98,3 @@ mod sync_db_access_tests {
 }
 
 // TODO: Add ValidBlocks and InvalidBlocks tests
-
-
-

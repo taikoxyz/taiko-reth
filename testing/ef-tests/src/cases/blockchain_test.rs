@@ -1,7 +1,9 @@
 //! Test runners for `BlockchainTests` in <https://github.com/ethereum/tests>
 
 use crate::{
-    models::{BlockchainTest, ForkSpec}, suite::find_all_files_with_extension, Case, Cases, Error, Suite
+    models::{BlockchainTest, ForkSpec},
+    suite::find_all_files_with_extension,
+    Case, Cases, Error, Suite,
 };
 use alloy_rlp::Decodable;
 use rayon::iter::{ParallelBridge, ParallelIterator};
@@ -11,7 +13,12 @@ use reth_provider::{
     HashingWriter,
 };
 use reth_stages::{stages::ExecutionStage, ExecInput, Stage};
-use std::{collections::BTreeMap, fs, path::{Path, PathBuf}, sync::Arc};
+use std::{
+    collections::BTreeMap,
+    fs,
+    path::{Path, PathBuf},
+    sync::Arc,
+};
 
 /// A handler for the blockchain test suite.
 #[derive(Debug)]
@@ -32,7 +39,7 @@ impl Suite for BlockchainTests {
     fn suite_name(&self) -> String {
         format!("BlockchainTests/{}", self.suite)
     }
-    
+
     fn load(&self) -> (PathBuf, crate::Cases<BlockchainTestCase>) {
         // Build the path to the test suite directory
         let suite_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -189,7 +196,7 @@ impl Case for BlockchainTestCase {
 
         Ok(())
     }
-    
+
     fn run_l2(&self) -> Result<(), Error> {
         unreachable!()
     }
