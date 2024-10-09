@@ -6,7 +6,7 @@ use std::time::{Duration, Instant};
 use crate::{EthApiTypes, FromEthApiError, FromEvmError};
 use futures::Future;
 use reth_chainspec::{ChainSpec, EthereumHardforks};
-use reth_errors::{DatabaseError, RethError};
+use reth_errors::DatabaseError;
 use reth_evm::{
     system_calls::{pre_block_beacon_root_contract_call, pre_block_blockhashes_contract_call},
     ConfigureEvm, ConfigureEvmEnv,
@@ -38,7 +38,6 @@ use revm::{
     db::{states::bundle_state::BundleRetention, State},
     DatabaseCommit,
 };
-use revm_primitives::ChainAddress;
 use tokio::sync::Mutex;
 use tracing::debug;
 

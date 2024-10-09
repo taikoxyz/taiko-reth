@@ -1,10 +1,9 @@
 //! Loads a pending block from database. Helper trait for `eth_` transaction, call and trace RPC
 //! methods.
 
-use core::sync;
 
 use crate::{AsEthApiError, FromEthApiError, FromEvmError, IntoEthApiError};
-use futures::{io::Chain, Future};
+use futures::Future;
 use reth_evm::{ConfigureEvm, ConfigureEvmEnv};
 use reth_primitives::{
     constants::ETHEREUM_CHAIN_ID,
@@ -1033,7 +1032,7 @@ pub trait Call: LoadState + SpawnBlocking {
     }
 }
 
-fn convert_tx_kind(kind: TxKind, chain_id: u64) -> TransactTo {
+const fn convert_tx_kind(kind: TxKind, chain_id: u64) -> TransactTo {
     match kind {
         TxKind::Call(to) => TransactTo::Call(ChainAddress(chain_id, to)),
         TxKind::Create => TransactTo::Create,

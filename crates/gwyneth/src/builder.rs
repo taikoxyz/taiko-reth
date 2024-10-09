@@ -21,7 +21,7 @@ use reth_evm::{
 use reth_evm_ethereum::eip6110::parse_deposits_from_receipts;
 use reth_execution_types::ExecutionOutcome;
 use reth_payload_builder::{
-    database::{to_sync_cached_reads, CachedReads, SyncCachedReads},
+    database::to_sync_cached_reads,
     error::PayloadBuilderError,
     EthBuiltPayload,
 };
@@ -37,7 +37,7 @@ use reth_revm::database::{StateProviderDatabase, SyncStateProviderDatabase};
 use reth_transaction_pool::{BestTransactionsAttributes, TransactionPool};
 use reth_trie::HashedPostState;
 use revm::{
-    db::{states::bundle_state::BundleRetention, BundleState, State},
+    db::{states::bundle_state::BundleRetention, State},
     primitives::{EVMError, EnvWithHandlerCfg, ResultAndState},
     DatabaseCommit, SyncDatabase,
 };
@@ -66,7 +66,7 @@ where
     Pool: TransactionPool,
     SyncProvider: StateProvider,
 {
-    let BuildArguments { client, pool, mut cached_reads, config, cancel, best_payload } = args;
+    let BuildArguments { client, pool, cached_reads, config, cancel, best_payload } = args;
     let PayloadConfig {
         initialized_block_env,
         initialized_cfg,

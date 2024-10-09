@@ -1,7 +1,6 @@
 use std::sync::Arc;
 
 use eyre::OptionExt;
-use reth_blockchain_tree::chain;
 use reth_chainspec::{ChainSpec, ChainSpecBuilder, EthereumHardfork, MAINNET};
 use reth_evm::execute::{
     BatchExecutor, BlockExecutionInput, BlockExecutionOutput, BlockExecutorProvider, Executor,
@@ -9,7 +8,7 @@ use reth_evm::execute::{
 use reth_evm_ethereum::execute::EthExecutorProvider;
 use reth_primitives::{
     b256, constants::ETH_TO_WEI, Address, Block, BlockWithSenders, Genesis, GenesisAccount, Header,
-    Receipt, Requests, SealedBlockWithSenders, Transaction, TxEip2930, TxKind, U256,
+    Receipt, SealedBlockWithSenders, Transaction, TxEip2930, TxKind, U256,
 };
 use reth_provider::{BlockWriter as _, ExecutionOutcome, LatestStateProviderRef, ProviderFactory};
 use reth_revm::database::{StateProviderDatabase, SyncStateProviderDatabase};

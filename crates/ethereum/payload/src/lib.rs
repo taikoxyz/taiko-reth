@@ -112,10 +112,10 @@ where
         })?;
         let mut db = State::builder()
             .with_database(
-                (SyncStateProviderDatabase::new(
+                SyncStateProviderDatabase::new(
                     Some(chain_spec.chain.id()),
                     StateProviderDatabase::new(state),
-                )),
+                ),
             )
             .with_bundle_update()
             .build();
@@ -283,7 +283,7 @@ where
 {
     // Brecht: ethereum payload builder
 
-    let BuildArguments { client, pool, mut cached_reads, config, cancel, best_payload } = args;
+    let BuildArguments { client, pool, cached_reads, config, cancel, best_payload } = args;
     let extra_data = config.extra_data();
     let PayloadConfig {
         initialized_block_env,

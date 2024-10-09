@@ -1,9 +1,8 @@
 use alloy_rlp::Decodable;
 use ef_tests::{
     assert::assert_equal,
-    cases::blockchain_test::{should_skip, BlockchainTestCase},
+    cases::blockchain_test::should_skip,
     models::{BlockchainTest, ForkSpec},
-    result::assert_tests_pass,
     suite::find_all_files_with_extension,
     Case, Cases, Error, Suite,
 };
@@ -21,14 +20,13 @@ use reth_db::Database;
 use reth_db_common::init::init_genesis;
 use reth_ethereum_engine_primitives::EthPayloadAttributes;
 use reth_node_api::PayloadBuilderAttributes;
-use reth_node_core::cli;
 use reth_payload_builder::{database::CachedReads, EthBuiltPayload};
 use reth_primitives::{
     keccak256, Address, BlockBody, Bytes, SealedBlock, StaticFileSegment, TransactionSigned, B256,
 };
 use reth_provider::{
     providers::BlockchainProvider, test_utils::create_test_provider_factory_with_chain_spec,
-    BlockReader, HashingWriter, HeaderProvider, ProviderFactory, StateProviderFactory,
+    BlockReader, HashingWriter, ProviderFactory, StateProviderFactory,
     StaticFileWriter,
 };
 use reth_revm::database::{StateProviderDatabase, SyncEvmStateProvider, SyncStateProviderDatabase};
@@ -262,7 +260,7 @@ impl Case for SyncBlockchainTestCase {
                 let output = l2_payload_builder
                     .try_build(l2_builder_args(
                         blockchain_db,
-                        l2_spec.clone(),
+                        l2_spec,
                         l2_genesis_block.seal_slow(),
                         builder_attrs,
                     ))

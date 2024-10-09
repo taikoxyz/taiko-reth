@@ -24,9 +24,9 @@ use reth_rpc_types::{
 };
 use reth_rpc_types_compat::engine::payload::block_to_payload;
 use reth_trie::HashedPostState;
-use revm_primitives::{BlockEnv, CfgEnvWithHandlerCfg, ChainAddress, EVMError, EnvWithHandlerCfg};
+use revm_primitives::{BlockEnv, CfgEnvWithHandlerCfg, EVMError, EnvWithHandlerCfg};
 use std::{
-    collections::{HashMap, VecDeque},
+    collections::VecDeque,
     future::Future,
     pin::Pin,
     task::{ready, Context, Poll},

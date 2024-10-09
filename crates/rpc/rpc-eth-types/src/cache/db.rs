@@ -2,7 +2,6 @@
 //! <https://github.com/rust-lang/rust/issues/100013> in default implementation of
 //! `reth_rpc_eth_api::helpers::Call`.
 
-use reth_chainspec::Chain;
 use reth_errors::ProviderResult;
 use reth_primitives::{Address, B256, U256};
 use reth_revm::{

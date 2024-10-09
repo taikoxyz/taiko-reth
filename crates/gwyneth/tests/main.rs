@@ -1,6 +1,4 @@
 use ef_tests::{suite::Suite, Case};
-use gwyneth::GwynethNode;
-use reth_chainspec::{ChainSpec, ChainSpecBuilder};
 
 pub mod cases;
 pub mod test_payload;

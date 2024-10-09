@@ -17,7 +17,7 @@ use reth_node_builder::{
     components::NodeComponentsBuilder, rpc::EthApiBuilderProvider, FullNodeTypesAdapter, Node,
     NodeAdapter, NodeAddOns, NodeComponents, NodeTypes, RethFullAdapter,
 };
-use reth_provider::{providers::BlockchainProvider, StateProviderFactory};
+use reth_provider::providers::BlockchainProvider;
 use tracing::{span, Level};
 use wallet::Wallet;
 

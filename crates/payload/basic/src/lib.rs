@@ -29,7 +29,7 @@ use reth_tasks::TaskSpawner;
 use reth_transaction_pool::TransactionPool;
 use revm::{
     db::State,
-    primitives::{BlockEnv, CfgEnvWithHandlerCfg, ChainAddress},
+    primitives::{BlockEnv, CfgEnvWithHandlerCfg},
     SyncDatabase,
 };
 use std::{
@@ -886,7 +886,7 @@ impl WithdrawalsOutcome {
     }
 }
 
-/// Executes the withdrawals and commits them to the _runtime_ SyncDatabase and `BundleState`.
+/// Executes the withdrawals and commits them to the _runtime_ `SyncDatabase` and `BundleState`.
 ///
 /// Returns the withdrawals root.
 ///

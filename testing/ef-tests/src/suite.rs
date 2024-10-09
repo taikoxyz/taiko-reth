@@ -45,7 +45,7 @@ pub trait Suite {
     {
         // Run the test cases and collect the results
         let (suite_path, mut cases) = self.load();
-        for (_, case) in cases.test_cases.iter_mut() {
+        for (_, case) in &mut cases.test_cases {
             case.load_l2_payload(generate_tx())
         }
         let results = cases.run();

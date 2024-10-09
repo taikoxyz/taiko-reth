@@ -6,7 +6,7 @@ use jsonrpsee::core::RpcResult;
 use reth_evm::{ConfigureEvm, ConfigureEvmEnv};
 use reth_primitives::{
     keccak256,
-    revm_primitives::db::{DatabaseCommit, DatabaseRef},
+    revm_primitives::db::DatabaseCommit,
     PooledTransactionsElement, U256,
 };
 use reth_revm::database::{StateProviderDatabase, SyncStateProviderDatabase};

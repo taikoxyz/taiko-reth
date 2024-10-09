@@ -157,9 +157,9 @@ impl<'a, DB: DatabaseRef> DatabaseRef for CachedReadsDBRef<'a, DB> {
 impl From<SyncCachedReads> for CachedReads {
     fn from(sync: SyncCachedReads) -> Self {
         let accounts = sync.accounts.into_iter().map(|(k, v)| (k.1, v)).collect();
-        let contracts = sync.contracts.into_iter().map(|(((a, b), v))| (b, v)).collect();
-        let block_hashes = sync.block_hashes.into_iter().map(|(((a, b), v))| (b, v)).collect();
-        CachedReads { accounts, contracts, block_hashes }
+        let contracts = sync.contracts.into_iter().map(|((a, b), v)| (b, v)).collect();
+        let block_hashes = sync.block_hashes.into_iter().map(|((a, b), v)| (b, v)).collect();
+        Self { accounts, contracts, block_hashes }
     }
 }
 
