@@ -181,8 +181,26 @@ echo "Script execution completed."
 # Extract the path to run-latest.json
 RUN_LATEST_PATH=$(echo "$FORGE_OUTPUT" | grep "Transactions saved to:" | sed 's/Transactions saved to: //')
 
-# Run the verification script
-echo "Starting contract verification..."
-BLOCKSCOUT_PORT=$(cat /tmp/kurtosis_blockscout_port)
-SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
-"$SCRIPT_DIR/verify_contracts.sh" "$BLOCKSCOUT_PORT" "$RUN_LATEST_PATH"
+# # Run the verification script
+# echo "Starting contract verification..."
+# BLOCKSCOUT_PORT=$(cat /tmp/kurtosis_blockscout_port)
+# SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
+# "$SCRIPT_DIR/verify_contracts.sh" "$BLOCKSCOUT_PORT" "$RUN_LATEST_PATH"
+
+echo "Starting rbuilder and streaming logs..."
+docker exec -t "$CONTAINER_ID" /bin/bash -c "
+    /app/start_rbuilder.sh > >(tee /tmp/rbuilder.log) 2>&1 &
+    RBUILDER_PID=\$!
+    tail -f /tmp/rbuilder.log &
+    TAIL_PID=\$!
+    trap 'echo \"Interrupt received, stopping log stream...\"; kill \$TAIL_PID; exit' INT TERM
+    wait \$RBUILDER_PID
+"
+
+# Check the exit status
+if [ $? -eq 0 ]; then
+    echo "rbuilder started successfully and is running in the background."
+else
+    echo "Failed to start rbuilder or it exited unexpectedly."
+    exit 1
+fi
