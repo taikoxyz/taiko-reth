@@ -47,6 +47,7 @@ reth-rpc-api.workspace = true
 reth-rpc-layer.workspace = true
 reth-db.workspace = true
 reth-trie.workspace = true
+reth-rpc-builder.workspace = true
 
 # ethereum
 reth-node-ethereum.workspace = true

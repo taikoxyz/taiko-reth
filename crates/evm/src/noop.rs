@@ -7,7 +7,7 @@ use reth_execution_types::{BlockExecutionInput, BlockExecutionOutput, ExecutionO
 use reth_primitives::{BlockNumber, BlockWithSenders, Receipt};
 use reth_prune_types::PruneModes;
 use reth_storage_errors::provider::ProviderError;
-use revm_primitives::db::Database;
+use revm_primitives::db::SyncDatabase;
 
 use crate::execute::{BatchExecutor, BlockExecutorProvider, Executor};
 
@@ -19,20 +19,20 @@ const UNAVAILABLE_FOR_NOOP: &str = "execution unavailable for noop";
 pub struct NoopBlockExecutorProvider;
 
 impl BlockExecutorProvider for NoopBlockExecutorProvider {
-    type Executor<DB: Database<Error: Into<ProviderError> + Display>> = Self;
+    type Executor<DB: SyncDatabase<Error: Into<ProviderError> + Display>> = Self;
 
-    type BatchExecutor<DB: Database<Error: Into<ProviderError> + Display>> = Self;
+    type BatchExecutor<DB: SyncDatabase<Error: Into<ProviderError> + Display>> = Self;
 
     fn executor<DB>(&self, _: DB) -> Self::Executor<DB>
     where
-        DB: Database<Error: Into<ProviderError> + Display>,
+        DB: SyncDatabase<Error: Into<ProviderError> + Display>,
     {
         Self
     }
 
     fn batch_executor<DB>(&self, _: DB) -> Self::BatchExecutor<DB>
     where
-        DB: Database<Error: Into<ProviderError> + Display>,
+        DB: SyncDatabase<Error: Into<ProviderError> + Display>,
     {
         Self
     }

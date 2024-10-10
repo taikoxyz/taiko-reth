@@ -13,7 +13,7 @@ use reth_basic_payload_builder::{
     commit_withdrawals, is_better_payload, BuildArguments, BuildOutcome, PayloadBuilder,
     PayloadConfig, WithdrawalsOutcome,
 };
-use reth_errors::RethError;
+use reth_errors::{DatabaseError, ProviderError, RethError};
 use reth_evm::{
     system_calls::{
         post_block_consolidation_requests_contract_call,
@@ -25,7 +25,8 @@ use reth_evm::{
 use reth_evm_ethereum::{eip6110::parse_deposits_from_receipts, EthEvmConfig};
 use reth_execution_types::ExecutionOutcome;
 use reth_payload_builder::{
-    error::PayloadBuilderError, EthBuiltPayload, EthPayloadBuilderAttributes,
+    database::to_sync_cached_reads, error::PayloadBuilderError, EthBuiltPayload,
+    EthPayloadBuilderAttributes,
 };
 use reth_primitives::{
     constants::{
@@ -37,13 +38,13 @@ use reth_primitives::{
     U256,
 };
 use reth_provider::StateProviderFactory;
-use reth_revm::database::StateProviderDatabase;
+use reth_revm::database::{StateProviderDatabase, SyncStateProviderDatabase};
 use reth_transaction_pool::{BestTransactionsAttributes, TransactionPool};
 use reth_trie::HashedPostState;
 use revm::{
-    db::states::bundle_state::BundleRetention,
+    db::{states::bundle_state::BundleRetention, State},
     primitives::{EVMError, EnvWithHandlerCfg, InvalidTransaction, ResultAndState},
-    DatabaseCommit, State,
+    DatabaseCommit,
 };
 use tracing::{debug, trace, warn};
 
@@ -101,6 +102,8 @@ where
 
         debug!(target: "payload_builder", parent_hash = ?parent_block.hash(), parent_number = parent_block.number, "building empty payload");
 
+        println!("brecht: empty payload builder for {}", chain_spec.chain.id());
+
         let state = client.state_by_block_hash(parent_block.hash()).map_err(|err| {
             warn!(target: "payload_builder",
                 parent_hash=%parent_block.hash(),
@@ -110,7 +113,12 @@ where
             err
         })?;
         let mut db = State::builder()
-            .with_database(StateProviderDatabase::new(state))
+            .with_database(
+                (SyncStateProviderDatabase::new(
+                    Some(chain_spec.chain.id()),
+                    StateProviderDatabase::new(state),
+                )),
+            )
             .with_bundle_update()
             .build();
 
@@ -173,6 +181,8 @@ where
         let bundle_state = db.take_bundle();
         let state_root = db
             .database
+            .get_db(chain_spec.chain.id())
+            .ok_or(ProviderError::Database(DatabaseError::GetSyncDatabase(chain_spec.chain.id())))?
             .state_root(HashedPostState::from_bundle_state(&bundle_state.state))
             .map_err(|err| {
                 warn!(target: "payload_builder",
@@ -230,7 +240,7 @@ where
         let header = Header {
             parent_hash: parent_block.hash(),
             ommers_hash: EMPTY_OMMER_ROOT_HASH,
-            beneficiary: initialized_block_env.coinbase,
+            beneficiary: initialized_block_env.coinbase.1,
             state_root,
             transactions_root: EMPTY_TRANSACTIONS,
             withdrawals_root,
@@ -254,6 +264,8 @@ where
         let block = Block { header, body: vec![], ommers: vec![], withdrawals, requests };
         let sealed_block = block.seal_slow();
 
+        println!("empty payload done [{:?}]: {:?}", sealed_block.hash(), sealed_block.state_root);
+
         Ok(EthBuiltPayload::new(attributes.payload_id(), sealed_block, U256::ZERO))
     }
 }
@@ -276,11 +288,6 @@ where
     // Brecht: ethereum payload builder
 
     let BuildArguments { client, pool, mut cached_reads, config, cancel, best_payload } = args;
-
-    let state_provider = client.state_by_block_hash(config.parent_block.hash())?;
-    let state = StateProviderDatabase::new(state_provider);
-    let mut db =
-        State::builder().with_database_ref(cached_reads.as_db(state)).with_bundle_update().build();
     let extra_data = config.extra_data();
     let PayloadConfig {
         initialized_block_env,
@@ -290,6 +297,17 @@ where
         chain_spec,
         ..
     } = config;
+
+    let state_provider = client.state_by_block_hash(parent_block.hash())?;
+    let state = SyncStateProviderDatabase::new(
+        Some(chain_spec.chain.id()),
+        StateProviderDatabase::new(state_provider),
+    );
+    let mut sync_cached_reads = to_sync_cached_reads(cached_reads, chain_spec.chain.id());
+    let mut db = State::builder()
+        .with_database_ref(sync_cached_reads.as_db(state))
+        .with_bundle_update()
+        .build();
 
     debug!(target: "payload_builder", id=%attributes.id, parent_hash = ?parent_block.hash(), parent_number = parent_block.number, "building new payload");
     let mut cumulative_gas_used = 0;
@@ -308,8 +326,6 @@ where
     let mut total_fees = U256::ZERO;
 
     let block_number = initialized_block_env.number.to::<u64>();
-
-    // println!("brecht: payload builder: {:?}", attributes.transactions);
 
     // apply eip-4788 pre block contract call
     pre_block_beacon_root_contract_call(
@@ -342,10 +358,10 @@ where
         warn!(target: "payload_builder", parent_hash=%parent_block.hash(), %err, "failed to update blockhashes for empty payload");
         PayloadBuilderError::Internal(err.into())
     })?;
-
     let mut receipts = Vec::new();
     while let Some(pool_tx) = best_txs.next() {
         // ensure we still have capacity for this transaction
+        println!("Brecht: pool tx! {:?}", pool_tx.hash());
         if cumulative_gas_used + pool_tx.gas_limit() > block_gas_limit {
             // we can't fit this transaction into the block, so we need to mark it as invalid
             // which also removes all dependent transaction from the iterator before we can
@@ -356,7 +372,7 @@ where
 
         // check if the job was cancelled, if so we can exit early
         if cancel.is_cancelled() {
-            return Ok(BuildOutcome::Cancelled)
+            return Ok(BuildOutcome::Cancelled);
         }
 
         // convert tx to a signed transaction
@@ -373,7 +389,7 @@ where
                 // for regular transactions above.
                 trace!(target: "payload_builder", tx=?tx.hash, ?sum_blob_gas_used, ?tx_blob_gas, "skipping blob transaction because it would exceed the max data gas per block");
                 best_txs.mark_invalid(&pool_tx);
-                continue
+                continue;
             }
         }
 
@@ -401,11 +417,11 @@ where
                             best_txs.mark_invalid(&pool_tx);
                         }
 
-                        continue
+                        continue;
                     }
                     err => {
                         // this is an error that we should treat as fatal for this attempt
-                        return Err(PayloadBuilderError::EvmExecutionError(err))
+                        return Err(PayloadBuilderError::EvmExecutionError(err));
                     }
                 }
             }
@@ -454,7 +470,10 @@ where
     // check if we have a better block
     if !is_better_payload(best_payload.as_ref(), total_fees) {
         // can skip building the block
-        return Ok(BuildOutcome::Aborted { fees: total_fees, cached_reads })
+        return Ok(BuildOutcome::Aborted {
+            fees: total_fees,
+            cached_reads: sync_cached_reads.into(),
+        });
     }
 
     // calculate the requests and the requests root
@@ -493,6 +512,7 @@ where
     db.merge_transitions(BundleRetention::PlainState);
 
     let execution_outcome = ExecutionOutcome::new(
+        Some(chain_spec.chain.id()),
         db.take_bundle(),
         vec![receipts].into(),
         block_number,
@@ -507,7 +527,11 @@ where
         let state_provider = db.database.0.inner.borrow_mut();
         state_provider
             .db
-            .state_root(HashedPostState::from_bundle_state(&execution_outcome.state().state))?
+            .get_db(chain_spec.chain.id())
+            .ok_or(ProviderError::Database(DatabaseError::GetSyncDatabase(chain_spec.chain.id())))?
+            .state_root(HashedPostState::from_bundle_state(
+                &execution_outcome.current_state().state,
+            ))?
     };
 
     // create the block header
@@ -541,7 +565,7 @@ where
     let header = Header {
         parent_hash: parent_block.hash(),
         ommers_hash: EMPTY_OMMER_ROOT_HASH,
-        beneficiary: initialized_block_env.coinbase,
+        beneficiary: initialized_block_env.coinbase.1,
         state_root,
         transactions_root,
         receipts_root,
@@ -568,10 +592,12 @@ where
     let sealed_block = block.seal_slow();
     debug!(target: "payload_builder", ?sealed_block, "sealed built block");
 
+    println!("default payload done [{:?}]: {:?}", sealed_block.hash(), sealed_block.state_root);
+
     let mut payload = EthBuiltPayload::new(attributes.id, sealed_block, total_fees);
 
     // extend the payload with the blob sidecars from the executed txs
     payload.extend_sidecars(blob_sidecars);
 
-    Ok(BuildOutcome::Better { payload, cached_reads })
+    Ok(BuildOutcome::Better { payload, cached_reads: sync_cached_reads.into() })
 }

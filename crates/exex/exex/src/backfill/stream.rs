@@ -260,7 +260,7 @@ mod tests {
             );
         let mut backfill_stream = factory.backfill(1..=2).into_stream();
         let mut chain = backfill_stream.next().await.unwrap().unwrap();
-        chain.execution_outcome_mut().state_mut().reverts.sort();
+        chain.execution_outcome_mut().all_states_mut().reverts.sort();
 
         assert!(chain.blocks_iter().eq(&blocks));
         assert_eq!(chain.execution_outcome(), &execution_outcome);

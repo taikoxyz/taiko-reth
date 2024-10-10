@@ -55,9 +55,9 @@ if __name__ == "__main__":
         # print("RawTransaction:")
         # print(signed_txn.rawTransaction)
         print("RawTransaction.hex():")
-        print(signed_txn.rawTransaction.hex())
+        print(signed_txn.raw_transaction.hex())
 
-        txn_hash = w3_taiko_l2.eth.send_raw_transaction(signed_txn.rawTransaction)
+        txn_hash = w3_taiko_l2.eth.send_raw_transaction(signed_txn.raw_transaction)
         print("Txn hash:")
         print(txn_hash.hex())
 

@@ -55,8 +55,7 @@ contract TaikoL1 is EssentialContract, TaikoEvents, TaikoErrors {
 
     /// @dev Proposes multiple Taiko L2 blocks.
     function proposeBlock(
-        bytes[] calldata data,
-        bytes[] calldata txLists
+        TaikoData.BlockMetadata[] calldata data
     )
         external
         payable
@@ -64,70 +63,57 @@ contract TaikoL1 is EssentialContract, TaikoEvents, TaikoErrors {
         whenNotPaused
         returns (TaikoData.BlockMetadata[] memory _blocks)
     {
-        if (txLists.length != 0) {
-            require(data.length == txLists.length, "mismatched params length");
-        }
-
-        _blocks = new TaikoData.BlockMetadata[](data.length);
         for (uint256 i = 0; i < data.length; i++) {
-            if (txLists.length != 0) {
-                // If calldata, then pass forward the calldata
-                _blocks[i] = _proposeBlock(data[i], txLists[i]);
-            } else {
-                // Blob otherwise
-                _blocks[i] = _proposeBlock(data[i], bytes(""));
-            }
+            _proposeBlock(data[i]);
 
             // Check if we have whitelisted proposers
-            if (!_isProposerPermitted()) {
-                revert L1_INVALID_PROPOSER();
-            }
+            //if (!_isProposerPermitted()) {
+            //    revert L1_INVALID_PROPOSER();
+            //}
         }
+
+        _blocks = data;
     }
 
     /// Proposes a Taiko L2 block.
-    /// @param data Block parameters, currently an encoded BlockMetadata object.
-    /// @param txList txList data if calldata is used for DA.
-    /// @return _block The metadata of the proposed L2 block.
+    /// @param _block Block parameters, currently an encoded BlockMetadata object.
     function _proposeBlock(
-        bytes calldata data,
-        bytes memory txList
+        TaikoData.BlockMetadata calldata _block
     )
         private
-        returns (TaikoData.BlockMetadata memory _block)
     {
-        TaikoData.Config memory config = getConfig();
+        //TaikoData.Config memory config = getConfig();
 
         // Decode the block data
-        _block = abi.decode(data, (TaikoData.BlockMetadata));
+        //_block = abi.decode(data, (TaikoData.BlockMetadata));
 
         // Verify L1 data
         // TODO(Brecht): needs to be more configurable for preconfirmations
-        require(_block.l1Hash == blockhash(_block.l1StateBlockNumber), "INVALID_L1_BLOCKHASH");
-        require(_block.blockHash != 0x0, "INVALID_L2_BLOCKHASH");
-        //require(_block.difficulty == block.prevrandao, "INVALID_DIFFICULTY");
-        // Verify misc data
-        require(_block.gasLimit == config.blockMaxGasLimit, "INVALID_GAS_LIMIT");
+        // require(_block.l1Hash == blockhash(_block.l1StateBlockNumber), "INVALID_L1_BLOCKHASH");
+        // require(_block.blockHash != 0x0, "INVALID_L2_BLOCKHASH");
+        // //require(_block.difficulty == block.prevrandao, "INVALID_DIFFICULTY");
+        // // Verify misc data
+        // require(_block.gasLimit == config.blockMaxGasLimit, "INVALID_GAS_LIMIT");
 
-        require(_block.blobUsed == (txList.length == 0), "INVALID_BLOB_USED");
-        // Verify DA data
-        if (_block.blobUsed) {
-            // Todo: Is blobHash posisble to be checked and pre-calculated in input metadata
-            // off-chain ?
-            // or shall we do something with it to cross check ?
-            // require(_block.blobHash == blobhash(0), "invalid data blob");
-            require(
-                uint256(_block.txListByteOffset) + _block.txListByteSize <= MAX_BYTES_PER_BLOB,
-                "invalid blob size"
-            );
-        } else {
-            require(_block.blobHash == keccak256(txList), "INVALID_TXLIST_HASH");
-            require(_block.txListByteOffset == 0, "INVALID_TXLIST_START");
-            require(_block.txListByteSize == uint24(txList.length), "INVALID_TXLIST_SIZE");
-        }
+        // require(_block.blobUsed == (_block.txList.length == 0), "INVALID_BLOB_USED");
+        // // Verify DA data
+        // if (_block.blobUsed) {
+        //     // Todo: Is blobHash posisble to be checked and pre-calculated in input metadata
+        //     // off-chain ?
+        //     // or shall we do something with it to cross check ?
+        //     // require(_block.blobHash == blobhash(0), "invalid data blob");
+        //     require(
+        //         uint256(_block.txListByteOffset) + _block.txListByteSize <= MAX_BYTES_PER_BLOB,
+        //         "invalid blob size"
+        //     );
+        // } else {
+        //     require(_block.blobHash == keccak256(txList), "INVALID_TXLIST_HASH");
+        //     require(_block.txListByteOffset == 0, "INVALID_TXLIST_START");
+        //     require(_block.txListByteSize == uint24(txList.length), "INVALID_TXLIST_SIZE");
+        // }
 
-        // Check that the tx length is non-zero and within the supported range
-        require(_block.txListByteSize <= config.blockMaxTxListBytes, "invalid txlist size");
+        // // Check that the tx length is non-zero and within the supported range
+        // require(_block.txListByteSize <= config.blockMaxTxListBytes, "invalid txlist size");
 
         /* NOT NEEDED ! Commenting out. When PR approved, i'll delete also. */
         // // Also since we dont write into storage this check is hard to do here + the
@@ -164,7 +150,7 @@ contract TaikoL1 is EssentialContract, TaikoEvents, TaikoErrors {
         //     revert L1_INVALID_TIMESTAMP();
         // }
 
-        emit BlockProposed({ blockId: _block.l2BlockNumber, meta: _block, txList: txList });
+        emit BlockProposed({ blockId: _block.l2BlockNumber, meta: _block });
     }
 
     // These will be unknown in the smart contract

@@ -16,7 +16,9 @@ use reth_rpc_types_compat::engine::payload::{
     block_to_payload_v1, block_to_payload_v3, block_to_payload_v4,
     convert_block_to_payload_field_v2,
 };
-use revm_primitives::{BlobExcessGasAndPrice, BlockEnv, CfgEnv, CfgEnvWithHandlerCfg, SpecId};
+use revm_primitives::{
+    BlobExcessGasAndPrice, BlockEnv, CfgEnv, CfgEnvWithHandlerCfg, ChainAddress, SpecId,
+};
 use std::convert::Infallible;
 
 /// Contains the built payload.
@@ -280,7 +282,7 @@ impl PayloadBuilderAttributes for EthPayloadBuilderAttributes {
 
         let block_env = BlockEnv {
             number: U256::from(parent.number + 1),
-            coinbase: self.suggested_fee_recipient(),
+            coinbase: ChainAddress(cfg.chain_id, self.suggested_fee_recipient()),
             timestamp: U256::from(self.timestamp()),
             difficulty: U256::ZERO,
             prevrandao: Some(self.prev_randao()),

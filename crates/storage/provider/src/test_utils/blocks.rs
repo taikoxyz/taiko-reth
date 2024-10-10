@@ -5,14 +5,15 @@ use once_cell::sync::Lazy;
 use reth_db::tables;
 use reth_db_api::{database::Database, models::StoredBlockBodyIndices};
 use reth_primitives::{
-    alloy_primitives, b256, hex_literal::hex, Account, Address, BlockNumber, Bytes, Header,
-    Receipt, Requests, SealedBlock, SealedBlockWithSenders, SealedHeader, Signature, Transaction,
-    TransactionSigned, TxKind, TxLegacy, TxType, Withdrawal, Withdrawals, B256, U256,
+    alloy_primitives, b256, constants::ETHEREUM_CHAIN_ID, hex_literal::hex, Account, Address,
+    BlockNumber, Bytes, Header, Receipt, Requests, SealedBlock, SealedBlockWithSenders,
+    SealedHeader, Signature, Transaction, TransactionSigned, TxKind, TxLegacy, TxType, Withdrawal,
+    Withdrawals, B256, U256,
 };
 use reth_trie::root::{state_root_unhashed, storage_root_unhashed};
 use revm::{
     db::BundleState,
-    primitives::{AccountInfo, HashMap},
+    primitives::{AccountInfo, ChainAddress, HashMap},
 };
 use std::str::FromStr;
 
@@ -184,12 +185,13 @@ fn bundle_state_root(execution_outcome: &ExecutionOutcome) -> B256 {
 /// Block one that points to genesis
 fn block1(number: BlockNumber) -> (SealedBlockWithSenders, ExecutionOutcome) {
     // block changes
-    let account1: Address = [0x60; 20].into();
-    let account2: Address = [0x61; 20].into();
+    let account1: ChainAddress = ChainAddress(ETHEREUM_CHAIN_ID, [0x60; 20].into());
+    let account2: ChainAddress = ChainAddress(ETHEREUM_CHAIN_ID, [0x61; 20].into());
     let slot = U256::from(5);
     let info = AccountInfo { nonce: 1, balance: U256::from(10), ..Default::default() };
 
     let execution_outcome = ExecutionOutcome::new(
+        None,
         BundleState::builder(number..=number)
             .state_present_account_info(account1, info.clone())
             .revert_account_info(number, account1, Some(None))
@@ -240,10 +242,11 @@ fn block2(
     prev_execution_outcome: &ExecutionOutcome,
 ) -> (SealedBlockWithSenders, ExecutionOutcome) {
     // block changes
-    let account: Address = [0x60; 20].into();
+    let account: ChainAddress = ChainAddress(ETHEREUM_CHAIN_ID, [0x60; 20].into());
     let slot = U256::from(5);
 
     let execution_outcome = ExecutionOutcome::new(
+        None,
         BundleState::builder(number..=number)
             .state_present_account_info(
                 account,
@@ -308,7 +311,7 @@ fn block3(
 
     let mut bundle_state_builder = BundleState::builder(number..=number);
     for idx in address_range {
-        let address = Address::with_last_byte(idx);
+        let address = ChainAddress(ETHEREUM_CHAIN_ID, Address::with_last_byte(idx));
         bundle_state_builder = bundle_state_builder
             .state_present_account_info(
                 address,
@@ -326,6 +329,7 @@ fn block3(
             .revert_storage(number, address, Vec::new());
     }
     let execution_outcome = ExecutionOutcome::new(
+        None,
         bundle_state_builder.build(),
         vec![vec![Some(Receipt {
             tx_type: TxType::Eip1559,
@@ -373,7 +377,7 @@ fn block4(
 
     let mut bundle_state_builder = BundleState::builder(number..=number);
     for idx in address_range {
-        let address = Address::with_last_byte(idx);
+        let address = ChainAddress(ETHEREUM_CHAIN_ID, Address::with_last_byte(idx));
         // increase balance for every even account and destroy every odd
         bundle_state_builder = if idx % 2 == 0 {
             bundle_state_builder
@@ -417,6 +421,7 @@ fn block4(
             );
     }
     let execution_outcome = ExecutionOutcome::new(
+        None,
         bundle_state_builder.build(),
         vec![vec![Some(Receipt {
             tx_type: TxType::Eip1559,
@@ -464,7 +469,7 @@ fn block5(
 
     let mut bundle_state_builder = BundleState::builder(number..=number);
     for idx in address_range {
-        let address = Address::with_last_byte(idx);
+        let address = ChainAddress(ETHEREUM_CHAIN_ID, Address::with_last_byte(idx));
         // update every even account and recreate every odd only with half of slots
         bundle_state_builder = bundle_state_builder
             .state_present_account_info(
@@ -503,6 +508,7 @@ fn block5(
         };
     }
     let execution_outcome = ExecutionOutcome::new(
+        None,
         bundle_state_builder.build(),
         vec![vec![Some(Receipt {
             tx_type: TxType::Eip1559,

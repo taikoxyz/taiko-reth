@@ -4,6 +4,8 @@
 #![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
 #![allow(clippy::useless_let_if_seq)]
 
+use std::collections::HashMap;
+
 use reth_basic_payload_builder::{
     commit_withdrawals, is_better_payload, BuildArguments, BuildOutcome, PayloadConfig,
     WithdrawalsOutcome,
@@ -11,33 +13,37 @@ use reth_basic_payload_builder::{
 use reth_errors::RethError;
 use reth_evm::{
     system_calls::{
-        post_block_withdrawal_requests_contract_call, pre_block_beacon_root_contract_call, pre_block_blockhashes_contract_call,
+        post_block_withdrawal_requests_contract_call, pre_block_beacon_root_contract_call,
+        pre_block_blockhashes_contract_call,
     },
     ConfigureEvm,
 };
 use reth_evm_ethereum::eip6110::parse_deposits_from_receipts;
 use reth_execution_types::ExecutionOutcome;
-use reth_payload_builder::{error::PayloadBuilderError, EthBuiltPayload};
+use reth_payload_builder::{
+    database::{to_sync_cached_reads, CachedReads, SyncCachedReads},
+    error::PayloadBuilderError,
+    EthBuiltPayload,
+};
 use reth_primitives::{
     constants::{eip4844::MAX_DATA_GAS_PER_BLOCK, BEACON_NONCE},
     eip4844::calculate_excess_blob_gas,
     proofs::{self, calculate_requests_root},
-    Block, EthereumHardforks, Header, Receipt, EMPTY_OMMER_ROOT_HASH, U256,
+    Block, BlockNumber, ChainId, EthereumHardforks, Header, Receipt, Receipts, Requests,
+    EMPTY_OMMER_ROOT_HASH, U256,
 };
 use reth_provider::{StateProvider, StateProviderFactory};
-use reth_revm::database::StateProviderDatabase;
+use reth_revm::database::{StateProviderDatabase, SyncStateProviderDatabase};
 use reth_transaction_pool::{BestTransactionsAttributes, TransactionPool};
 use reth_trie::HashedPostState;
 use revm::{
-    db::states::bundle_state::BundleRetention,
+    db::{states::bundle_state::BundleRetention, BundleState, State},
     primitives::{EVMError, EnvWithHandlerCfg, ResultAndState},
-    DatabaseCommit, State,
+    DatabaseCommit, SyncDatabase,
 };
 use tracing::{debug, trace, warn};
 
 use crate::GwynethPayloadBuilderAttributes;
-
-
 
 /// Constructs an Ethereum transaction payload using the best transactions from the pool.
 ///
@@ -47,7 +53,12 @@ use crate::GwynethPayloadBuilderAttributes;
 #[inline]
 pub fn default_gwyneth_payload_builder<EvmConfig, Pool, Client, SyncProvider>(
     evm_config: EvmConfig,
-    args: BuildArguments<Pool, Client, GwynethPayloadBuilderAttributes<SyncProvider>, EthBuiltPayload>,
+    args: BuildArguments<
+        Pool,
+        Client,
+        GwynethPayloadBuilderAttributes<SyncProvider>,
+        EthBuiltPayload,
+    >,
 ) -> Result<BuildOutcome<EthBuiltPayload>, PayloadBuilderError>
 where
     EvmConfig: ConfigureEvm,
@@ -55,28 +66,31 @@ where
     Pool: TransactionPool,
     SyncProvider: StateProvider,
 {
-    // Brecht: ethereum payload builder
-
     let BuildArguments { client, pool, mut cached_reads, config, cancel, best_payload } = args;
-
-    let state_provider = client.state_by_block_hash(config.parent_block.hash())?;
-    let state = StateProviderDatabase::new(state_provider);
-    let mut db =
-        State::builder().with_database_ref(cached_reads.as_db(state)).with_bundle_update().build();
-    let extra_data = config.extra_data();
     let PayloadConfig {
         initialized_block_env,
         initialized_cfg,
         parent_block,
         attributes,
         chain_spec,
+        extra_data,
         ..
     } = config;
 
-    let l1_provider = attributes.l1_provider.as_ref().unwrap();
-    let l1_state = StateProviderDatabase::new(l1_provider);
-    // let mut l1_db =
-    //     State::builder().with_database_ref(cached_reads.as_db(l1_state)).with_bundle_update().build();
+    let state_provider = client.state_by_block_hash(parent_block.hash())?;
+    let state = StateProviderDatabase::new(state_provider);
+    let mut sync_state = SyncStateProviderDatabase::new(Some(chain_spec.chain().id()), state);
+
+    let (l1_id, l1_provider) = attributes.l1_provider.unwrap();
+    let l1_box: Box<dyn StateProvider> = Box::new(l1_provider);
+    let l1_state = StateProviderDatabase::new(l1_box);
+    sync_state.add_db(l1_id, l1_state);
+
+    let mut sync_cached_reads = to_sync_cached_reads(cached_reads, chain_spec.chain.id());
+    let mut sync_db = State::builder()
+        .with_database_ref(sync_cached_reads.as_db(sync_state))
+        .with_bundle_update()
+        .build();
 
     debug!(target: "payload_builder", id=%attributes.inner.id, parent_hash = ?parent_block.hash(), parent_number = parent_block.number, "building new payload");
     let mut cumulative_gas_used = 0;
@@ -96,11 +110,9 @@ where
 
     let block_number = initialized_block_env.number.to::<u64>();
 
-    println!("brecht: payload builder: {:?}", attributes.transactions);
-
     // apply eip-4788 pre block contract call
     pre_block_beacon_root_contract_call(
-        &mut db,
+        &mut sync_db,
         &evm_config,
         &chain_spec,
         &initialized_cfg,
@@ -118,7 +130,7 @@ where
 
     // apply eip-2935 blockhashes update
     pre_block_blockhashes_contract_call(
-        &mut db,
+        &mut sync_db,
         &evm_config,
         &chain_spec,
         &initialized_cfg,
@@ -157,7 +169,8 @@ where
         //         // invalid, which removes its dependent transactions from
         //         // the iterator. This is similar to the gas limit condition
         //         // for regular transactions above.
-        //         trace!(target: "payload_builder", tx=?tx.hash, ?sum_blob_gas_used, ?tx_blob_gas, "skipping blob transaction because it would exceed the max data gas per block");
+        //         trace!(target: "payload_builder", tx=?tx.hash, ?sum_blob_gas_used, ?tx_blob_gas,
+        // "skipping blob transaction because it would exceed the max data gas per block");
         //         best_txs.mark_invalid(&tx);
         //         continue
         //     }
@@ -170,7 +183,7 @@ where
         );
 
         // Configure the environment for the block.
-        let mut evm = evm_config.evm_with_env(&mut db, env);
+        let mut evm = evm_config.evm_with_env(&mut sync_db, env);
 
         let ResultAndState { result, state } = match evm.transact() {
             Ok(res) => res,
@@ -190,7 +203,7 @@ where
         // drop evm so db is released.
         drop(evm);
         // commit changes
-        db.commit(state);
+        sync_db.commit(state);
 
         // add to the total blob gas used if the transaction successfully executed
         if let Some(blob_tx) = tx.transaction.as_eip4844() {
@@ -231,7 +244,10 @@ where
     // check if we have a better block
     if !is_better_payload(best_payload.as_ref(), total_fees) {
         // can skip building the block
-        return Ok(BuildOutcome::Aborted { fees: total_fees, cached_reads })
+        return Ok(BuildOutcome::Aborted {
+            fees: total_fees,
+            cached_reads: sync_cached_reads.into(),
+        })
     }
 
     // calculate the requests and the requests root
@@ -242,7 +258,7 @@ where
             .map_err(|err| PayloadBuilderError::Internal(RethError::Execution(err.into())))?;
         let withdrawal_requests = post_block_withdrawal_requests_contract_call(
             &evm_config,
-            &mut db,
+            &mut sync_db,
             &initialized_cfg,
             &initialized_block_env,
         )
@@ -255,29 +271,35 @@ where
         (None, None)
     };
 
-    let WithdrawalsOutcome { withdrawals_root, withdrawals } =
-        commit_withdrawals(&mut db, &chain_spec, attributes.inner.timestamp, attributes.inner.withdrawals)?;
+    let WithdrawalsOutcome { withdrawals_root, withdrawals } = commit_withdrawals(
+        &mut sync_db,
+        &chain_spec,
+        attributes.inner.timestamp,
+        attributes.inner.withdrawals,
+    )?;
 
     // merge all transitions into bundle state, this would apply the withdrawal balance changes
     // and 4788 contract call
-    db.merge_transitions(BundleRetention::PlainState);
+    sync_db.merge_transitions(BundleRetention::PlainState);
 
     let execution_outcome = ExecutionOutcome::new(
-        db.take_bundle(),
+        Some(chain_spec.chain().id()),
+        sync_db.take_bundle(),
         vec![receipts].into(),
         block_number,
         vec![requests.clone().unwrap_or_default()],
-    );
+    )
+    .filter_current_chain();
     let receipts_root =
         execution_outcome.receipts_root_slow(block_number).expect("Number is in range");
     let logs_bloom = execution_outcome.block_logs_bloom(block_number).expect("Number is in range");
 
     // calculate the state root
     let state_root = {
-        let state_provider = db.database.0.inner.borrow_mut();
-        state_provider
-            .db
-            .state_root(HashedPostState::from_bundle_state(&execution_outcome.state().state))?
+        let state_provider = sync_db.database.0.inner.borrow_mut();
+        state_provider.db.get_db(chain_spec.chain().id()).unwrap().state_root(
+            HashedPostState::from_bundle_state(&execution_outcome.current_state().state),
+        )?
     };
 
     // create the block header
@@ -311,7 +333,7 @@ where
     let header = Header {
         parent_hash: parent_block.hash(),
         ommers_hash: EMPTY_OMMER_ROOT_HASH,
-        beneficiary: initialized_block_env.coinbase,
+        beneficiary: initialized_block_env.coinbase.1,
         state_root,
         transactions_root,
         receipts_root,
@@ -343,5 +365,16 @@ where
     // extend the payload with the blob sidecars from the executed txs
     payload.extend_sidecars(blob_sidecars);
 
-    Ok(BuildOutcome::Better { payload, cached_reads })
+    Ok(BuildOutcome::Better { payload, cached_reads: sync_cached_reads.into() })
+}
+
+pub fn build_execution_outcome<DB: SyncDatabase>(
+    sync_db: &mut State<DB>,
+    receipts: Receipts,
+    first_block: BlockNumber,
+    requests: Vec<Requests>,
+) -> HashMap<ChainId, ExecutionOutcome> {
+    let bundle_states = sync_db.take_bundle();
+
+    todo!()
 }

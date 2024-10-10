@@ -19,7 +19,7 @@ abstract contract TaikoEvents {
     /// @param blockId The ID of the proposed block.
     /// @param meta The block metadata containing information about the proposed
     /// block.
-    event BlockProposed(uint256 indexed blockId, TaikoData.BlockMetadata meta, bytes txList);
+    event BlockProposed(uint256 indexed blockId, TaikoData.BlockMetadata meta);
     /// @dev Emitted when a block is verified.
     /// @param blockId The ID of the verified block.
     /// @param blockHash The hash of the verified block.

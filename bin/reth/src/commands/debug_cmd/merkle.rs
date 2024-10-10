@@ -20,8 +20,9 @@ use reth_primitives::BlockHashOrNumber;
 use reth_provider::{
     writer::UnifiedStorageWriter, BlockNumReader, BlockWriter, ChainSpecProvider, HeaderProvider,
     LatestStateProviderRef, OriginalValuesKnown, ProviderError, ProviderFactory, StateWriter,
+    StaticFileProviderFactory,
 };
-use reth_revm::database::StateProviderDatabase;
+use reth_revm::database::{StateProviderDatabase, SyncStateProviderDatabase};
 use reth_stages::{
     stages::{AccountHashingStage, MerkleStage, StorageHashingStage},
     ExecInput, Stage, StageCheckpoint,
@@ -146,12 +147,14 @@ impl Command {
             provider_rw.insert_block(sealed_block.clone())?;
 
             td += sealed_block.difficulty;
-            let mut executor = executor_provider.batch_executor(StateProviderDatabase::new(
-                LatestStateProviderRef::new(
+            let db = SyncStateProviderDatabase::new(
+                Some(provider_factory.chain_spec().chain().id()),
+                StateProviderDatabase::new(LatestStateProviderRef::new(
                     provider_rw.tx_ref(),
                     provider_rw.static_file_provider().clone(),
-                ),
-            ));
+                )),
+            );
+            let mut executor = executor_provider.batch_executor(db);
             executor.execute_and_verify_one((&sealed_block.clone().unseal(), td).into())?;
             let execution_outcome = executor.finalize();
 

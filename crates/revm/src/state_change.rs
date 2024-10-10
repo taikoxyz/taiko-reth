@@ -1,7 +1,8 @@
 use crate::precompile::HashMap;
 use reth_chainspec::{ChainSpec, EthereumHardforks};
 use reth_consensus_common::calc;
-use reth_primitives::{Address, Block, Withdrawal, Withdrawals, U256};
+use reth_primitives::{Block, Withdrawal, Withdrawals, U256};
+use revm::primitives::ChainAddress;
 
 /// Collect all balance changes at the end of the block.
 ///
@@ -12,21 +13,21 @@ pub fn post_block_balance_increments(
     chain_spec: &ChainSpec,
     block: &Block,
     total_difficulty: U256,
-) -> HashMap<Address, u128> {
+) -> HashMap<ChainAddress, u128> {
     let mut balance_increments = HashMap::new();
-
+    let china_id = chain_spec.chain.id();
     // Add block rewards if they are enabled.
     if let Some(base_block_reward) =
         calc::base_block_reward(chain_spec, block.number, block.difficulty, total_difficulty)
     {
         // Ommer rewards
         for ommer in &block.ommers {
-            *balance_increments.entry(ommer.beneficiary).or_default() +=
+            *balance_increments.entry(ChainAddress(china_id, ommer.beneficiary)).or_default() +=
                 calc::ommer_reward(base_block_reward, block.number, ommer.number);
         }
 
         // Full block reward
-        *balance_increments.entry(block.beneficiary).or_default() +=
+        *balance_increments.entry(ChainAddress(china_id, block.beneficiary)).or_default() +=
             calc::block_reward(base_block_reward, block.ommers.len());
     }
 
@@ -50,7 +51,7 @@ pub fn post_block_withdrawals_balance_increments(
     chain_spec: &ChainSpec,
     block_timestamp: u64,
     withdrawals: &[Withdrawal],
-) -> HashMap<Address, u128> {
+) -> HashMap<ChainAddress, u128> {
     let mut balance_increments = HashMap::with_capacity(withdrawals.len());
     insert_post_block_withdrawals_balance_increments(
         chain_spec,
@@ -70,15 +71,16 @@ pub fn insert_post_block_withdrawals_balance_increments(
     chain_spec: &ChainSpec,
     block_timestamp: u64,
     withdrawals: Option<&[Withdrawal]>,
-    balance_increments: &mut HashMap<Address, u128>,
+    balance_increments: &mut HashMap<ChainAddress, u128>,
 ) {
     // Process withdrawals
     if chain_spec.is_shanghai_active_at_timestamp(block_timestamp) {
         if let Some(withdrawals) = withdrawals {
             for withdrawal in withdrawals {
                 if withdrawal.amount > 0 {
-                    *balance_increments.entry(withdrawal.address).or_default() +=
-                        withdrawal.amount_wei().to::<u128>();
+                    *balance_increments
+                        .entry(ChainAddress(chain_spec.chain.id(), withdrawal.address))
+                        .or_default() += withdrawal.amount_wei().to::<u128>();
                 }
             }
         }
@@ -89,7 +91,10 @@ pub fn insert_post_block_withdrawals_balance_increments(
 mod tests {
     use super::*;
     use reth_ethereum_forks::{ChainHardforks, EthereumHardfork, ForkCondition};
-    use reth_primitives::constants::GWEI_TO_WEI;
+    use reth_primitives::{
+        constants::GWEI_TO_WEI,
+        Address,
+    };
 
     /// Tests that the function correctly inserts balance increments when the Shanghai hardfork is
     /// active and there are withdrawals.
@@ -139,11 +144,15 @@ mod tests {
         assert_eq!(balance_increments.len(), 2);
         // Verify that the balance increments map contains the correct values for each address
         assert_eq!(
-            *balance_increments.get(&Address::from([1; 20])).unwrap(),
+            *balance_increments
+                .get(&ChainAddress(chain_spec.chain().id(), Address::from([1; 20])))
+                .unwrap(),
             (1000 * GWEI_TO_WEI).into()
         );
         assert_eq!(
-            *balance_increments.get(&Address::from([2; 20])).unwrap(),
+            *balance_increments
+                .get(&ChainAddress(chain_spec.chain().id(), Address::from([2; 20])))
+                .unwrap(),
             (500 * GWEI_TO_WEI).into()
         );
     }

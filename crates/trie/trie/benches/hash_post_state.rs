@@ -1,9 +1,9 @@
 #![allow(missing_docs, unreachable_pub)]
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
 use proptest::{prelude::*, strategy::ValueTree, test_runner::TestRunner};
-use reth_primitives::{keccak256, Address, B256, U256};
+use reth_primitives::{constants::ETHEREUM_CHAIN_ID, keccak256, Address, B256, U256};
 use reth_trie::{HashedPostState, HashedStorage};
-use revm::db::{states::BundleBuilder, BundleAccount};
+use revm::{db::{states::BundleBuilder, BundleAccount}, primitives::ChainAddress};
 use std::collections::HashMap;
 
 pub fn hash_post_state(c: &mut Criterion) {
@@ -25,11 +25,11 @@ pub fn hash_post_state(c: &mut Criterion) {
     }
 }
 
-fn from_bundle_state_seq(state: &HashMap<Address, BundleAccount>) -> HashedPostState {
+fn from_bundle_state_seq(state: &HashMap<ChainAddress, BundleAccount>) -> HashedPostState {
     let mut this = HashedPostState::default();
 
     for (address, account) in state {
-        let hashed_address = keccak256(address);
+        let hashed_address = keccak256(address.1);
         this.accounts.insert(hashed_address, account.info.clone().map(Into::into));
 
         let hashed_storage = HashedStorage::from_iter(
@@ -44,7 +44,7 @@ fn from_bundle_state_seq(state: &HashMap<Address, BundleAccount>) -> HashedPostS
     this
 }
 
-fn generate_test_data(size: usize) -> HashMap<Address, BundleAccount> {
+fn generate_test_data(size: usize) -> HashMap<ChainAddress, BundleAccount> {
     let storage_size = 1_000;
     let mut runner = TestRunner::new(ProptestConfig::default());
 
@@ -68,7 +68,7 @@ fn generate_test_data(size: usize) -> HashMap<Address, BundleAccount> {
     let mut bundle_builder = BundleBuilder::default();
 
     for (address, storage) in state {
-        bundle_builder = bundle_builder.state_storage(address, storage);
+        bundle_builder = bundle_builder.state_storage(ChainAddress(ETHEREUM_CHAIN_ID, address), storage);
     }
 
     let bundle_state = bundle_builder.build();

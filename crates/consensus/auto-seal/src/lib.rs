@@ -29,7 +29,7 @@ use reth_primitives::{
     TransactionSigned, Withdrawals, B256, U256,
 };
 use reth_provider::{BlockReaderIdExt, StateProviderFactory, StateRootProvider};
-use reth_revm::database::StateProviderDatabase;
+use reth_revm::database::{StateProviderDatabase, SyncStateProviderDatabase};
 use reth_transaction_pool::TransactionPool;
 use reth_trie::HashedPostState;
 use std::{
@@ -372,16 +372,23 @@ impl StorageInner {
 
         trace!(target: "consensus::auto", transactions=?&block.body, "executing transactions");
 
-        let mut db = StateProviderDatabase::new(
-            provider.latest().map_err(InternalBlockExecutionError::LatestBlock)?,
+        let chain_id = chain_spec.chain().id();
+        let mut db = SyncStateProviderDatabase::new(
+            Some(chain_id),
+            StateProviderDatabase::new(
+                provider.latest().map_err(InternalBlockExecutionError::LatestBlock)?,
+            ),
         );
 
         // execute the block
         let block_execution_output =
             executor.executor(&mut db).execute((&block, U256::ZERO).into())?;
         let gas_used = block_execution_output.gas_used;
-        let execution_outcome = ExecutionOutcome::from((block_execution_output, block.number));
-        let hashed_state = HashedPostState::from_bundle_state(&execution_outcome.state().state);
+        let execution_outcome =
+            ExecutionOutcome::from((block_execution_output, chain_id, block.number))
+                .filter_current_chain();
+        let hashed_state =
+            HashedPostState::from_bundle_state(&execution_outcome.current_state().state);
 
         // todo(onbjerg): we should not pass requests around as this is building a block, which
         // means we need to extract the requests from the execution output and compute the requests
@@ -393,7 +400,7 @@ impl StorageInner {
         trace!(target: "consensus::auto", ?execution_outcome, ?header, ?body, "executed block, calculating state root and completing header");
 
         // now we need to update certain header fields with the results of the execution
-        header.state_root = db.state_root(hashed_state)?;
+        header.state_root = db.get_db(chain_spec.chain.id()).unwrap().state_root(hashed_state)?;
         header.gas_used = gas_used;
 
         let receipts = execution_outcome.receipts_by_block(header.number);

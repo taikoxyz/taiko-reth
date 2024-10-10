@@ -15,8 +15,8 @@ use reth_evm::execute::BlockExecutorProvider;
 use reth_execution_errors::{BlockExecutionError, BlockValidationError};
 use reth_execution_types::{Chain, ExecutionOutcome};
 use reth_primitives::{
-    BlockHash, BlockNumHash, BlockNumber, EthereumHardfork, ForkBlock, GotExpected, Receipt,
-    SealedBlock, SealedBlockWithSenders, SealedHeader, StaticFileSegment, B256, U256,
+    BlockHash, BlockNumHash, BlockNumber, BufMut, EthereumHardfork, ForkBlock, GotExpected,
+    Receipt, SealedBlock, SealedBlockWithSenders, SealedHeader, StaticFileSegment, B256, U256,
 };
 use reth_provider::{
     BlockExecutionWriter, BlockNumReader, BlockWriter, CanonStateNotification,
@@ -390,6 +390,11 @@ where
         block: SealedBlockWithSenders,
         block_validation_kind: BlockValidationKind,
     ) -> Result<BlockStatus, InsertBlockErrorKind> {
+        println!(
+            "BlockchainTree: try_append_canonical_chain {:?} \n    tx {:?}",
+            block.state_root,
+            block.transactions().count()
+        );
         let parent = block.parent_num_hash();
         let block_num_hash = block.num_hash();
         debug!(target: "blockchain_tree", head = ?block_num_hash.hash, ?parent, "Appending block to canonical chain");
@@ -648,8 +653,8 @@ where
                         chain_id = ?chain_id,
                         chain_tip = ?chain.tip().num_hash(),
                         "Prepend unwound block state to blockchain tree chain");
-
-                    chain.prepend_state(cloned_execution_outcome.state().clone())
+                    let chain_id = self.externals.provider_factory.chain_spec().chain.id();
+                    chain.prepend_state(cloned_execution_outcome.state(chain_id))
                 }
             }
         }
@@ -1974,12 +1979,12 @@ mod tests {
         // chain 0 has two blocks so receipts and reverts len is 2
         let chain0 = tree.state.chains.get(&0.into()).unwrap().execution_outcome();
         assert_eq!(chain0.receipts().len(), 2);
-        assert_eq!(chain0.state().reverts.len(), 2);
+        assert_eq!(chain0.all_states().reverts.len(), 2);
         assert_eq!(chain0.first_block(), block1.number);
         // chain 1 has one block so receipts and reverts len is 1
         let chain1 = tree.state.chains.get(&1.into()).unwrap().execution_outcome();
         assert_eq!(chain1.receipts().len(), 1);
-        assert_eq!(chain1.state().reverts.len(), 1);
+        assert_eq!(chain1.all_states().reverts.len(), 1);
         assert_eq!(chain1.first_block(), block2.number);
     }
 

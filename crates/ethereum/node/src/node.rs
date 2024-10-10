@@ -54,7 +54,6 @@ impl EthereumNode {
             PayloadBuilderAttributes = EthPayloadBuilderAttributes,
         >,
     {
-        println!("EthereumNode.components");
         ComponentsBuilder::default()
             .node_types::<Node>()
             .pool(EthereumPoolBuilder::default())
@@ -227,6 +226,7 @@ where
         ctx: &BuilderContext<Node>,
         pool: Pool,
     ) -> eyre::Result<PayloadBuilderHandle<Node::Engine>> {
+        println!("EthereumPayloadBuilder.spawn_payload_service");
         let payload_builder =
             reth_ethereum_payload_builder::EthereumPayloadBuilder::new(self.evm_config);
         let conf = ctx.payload_builder_config();

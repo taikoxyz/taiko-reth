@@ -30,7 +30,7 @@ use reth_provider::{
     BlockReader, ExecutionOutcome, ProviderError, StateProviderBox, StateProviderFactory,
     StateRootProvider,
 };
-use reth_revm::database::StateProviderDatabase;
+use reth_revm::database::{StateProviderDatabase, SyncStateProviderDatabase};
 use reth_rpc_types::{
     engine::{
         CancunPayloadFields, ForkchoiceState, PayloadStatus, PayloadStatusEnum,
@@ -1750,7 +1750,12 @@ where
             return Err(e.into())
         }
 
-        let executor = self.executor_provider.executor(StateProviderDatabase::new(&state_provider));
+        let chain_id = self.payload_validator.chain_spec().chain.id();
+        let db = SyncStateProviderDatabase::new(
+            Some(chain_id),
+            StateProviderDatabase::new(&state_provider),
+        );
+        let executor = self.executor_provider.executor(db);
 
         let block_number = block.number;
         let block_hash = block.hash();

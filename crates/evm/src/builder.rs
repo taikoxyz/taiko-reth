@@ -3,7 +3,7 @@
 #[cfg(not(feature = "std"))]
 use alloc::boxed::Box;
 
-use revm::{inspector_handle_register, Database, Evm, EvmBuilder, GetInspector};
+use revm::{inspector_handle_register, Evm, EvmBuilder, GetInspector, SyncDatabase};
 use revm_primitives::EnvWithHandlerCfg;
 
 /// Builder for creating an EVM with a database and environment.
@@ -13,7 +13,7 @@ use revm_primitives::EnvWithHandlerCfg;
 /// This is useful for creating an EVM with a custom database and environment without having to
 /// necessarily rely on Revm inspector.
 #[derive(Debug)]
-pub struct RethEvmBuilder<DB: Database, EXT = ()> {
+pub struct RethEvmBuilder<DB: SyncDatabase, EXT = ()> {
     /// The database to use for the EVM.
     db: DB,
     /// The environment to use for the EVM.
@@ -24,7 +24,7 @@ pub struct RethEvmBuilder<DB: Database, EXT = ()> {
 
 impl<DB, EXT> RethEvmBuilder<DB, EXT>
 where
-    DB: Database,
+    DB: SyncDatabase,
 {
     /// Create a new EVM builder with the given database.
     pub const fn new(db: DB, external_context: EXT) -> Self {
@@ -76,7 +76,7 @@ where
 /// Trait for configuring an EVM builder.
 pub trait ConfigureEvmBuilder {
     /// The type of EVM builder that this trait can configure.
-    type Builder<'a, DB: Database>: EvmFactory;
+    type Builder<'a, DB: SyncDatabase>: EvmFactory;
 }
 
 /// Trait for configuring the EVM for executing full blocks.
@@ -92,7 +92,10 @@ pub trait EvmFactory {
     /// This does not automatically configure the EVM with [`crate::ConfigureEvmEnv`] methods. It is
     /// up to the caller to call an appropriate method to fill the transaction and block
     /// environment before executing any transactions using the provided EVM.
-    fn evm<DB: Database>(self, db: DB) -> Evm<'static, Self::DefaultExternalContext<'static>, DB>
+    fn evm<DB: SyncDatabase>(
+        self,
+        db: DB,
+    ) -> Evm<'static, Self::DefaultExternalContext<'static>, DB>
     where
         Self: Sized,
     {
@@ -103,7 +106,7 @@ pub trait EvmFactory {
     /// including the spec id.
     ///
     /// This will preserve any handler modifications
-    fn evm_with_env<'a, DB: Database + 'a>(
+    fn evm_with_env<'a, DB: SyncDatabase + 'a>(
         &self,
         db: DB,
         env: EnvWithHandlerCfg,
@@ -124,7 +127,7 @@ pub trait EvmFactory {
         inspector: I,
     ) -> Evm<'_, I, DB>
     where
-        DB: Database,
+        DB: SyncDatabase,
         I: GetInspector<DB>,
     {
         RethEvmBuilder::new(db, self.default_external_context())
@@ -139,14 +142,14 @@ pub trait EvmFactory {
     /// and block environment before executing any transactions using the provided EVM.
     fn evm_with_inspector<DB, I>(&self, db: DB, inspector: I) -> Evm<'_, I, DB>
     where
-        DB: Database,
+        DB: SyncDatabase,
         I: GetInspector<DB>,
     {
         RethEvmBuilder::new(db, self.default_external_context()).build_with_inspector(inspector)
     }
 }
 
-impl<DB: Database, EXT: Clone> EvmFactory for RethEvmBuilder<DB, EXT> {
+impl<DB: SyncDatabase, EXT: Clone> EvmFactory for RethEvmBuilder<DB, EXT> {
     type DefaultExternalContext<'a> = EXT;
 
     fn default_external_context<'a>(&self) -> Self::DefaultExternalContext<'a> {

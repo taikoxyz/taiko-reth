@@ -831,6 +831,7 @@ impl<TX: DbTx> DatabaseProvider<TX> {
         }
 
         Ok(ExecutionOutcome::new_init(
+            Some(self.chain_spec().chain().id()),
             state,
             reverts,
             Vec::new(),
@@ -1129,6 +1130,7 @@ impl<TX: DbTxMut + DbTx> DatabaseProvider<TX> {
         }
 
         Ok(ExecutionOutcome::new_init(
+            Some(self.chain_spec().chain().id()),
             state,
             reverts,
             Vec::new(),
@@ -2647,6 +2649,7 @@ impl<TX: DbTxMut + DbTx> StateChangeWriter for DatabaseProvider<TX> {
         let mut storages_cursor = self.tx_ref().cursor_dup_write::<tables::PlainStorageState>()?;
         let mut storage_changeset_cursor =
             self.tx_ref().cursor_dup_write::<tables::StorageChangeSets>()?;
+
         for (block_index, mut storage_changes) in reverts.storage.into_iter().enumerate() {
             let block_number = first_block + block_index as BlockNumber;
 
@@ -2654,7 +2657,7 @@ impl<TX: DbTxMut + DbTx> StateChangeWriter for DatabaseProvider<TX> {
             // sort changes by address.
             storage_changes.par_sort_unstable_by_key(|a| a.address);
             for PlainStorageRevert { address, wiped, storage_revert } in storage_changes {
-                let storage_id = BlockNumberAddress((block_number, address));
+                let storage_id = BlockNumberAddress((block_number, address.1));
 
                 let mut storage = storage_revert
                     .into_iter()
@@ -2669,7 +2672,7 @@ impl<TX: DbTxMut + DbTx> StateChangeWriter for DatabaseProvider<TX> {
                 let mut wiped_storage = Vec::new();
                 if wiped {
                     tracing::trace!(?address, "Wiping storage");
-                    if let Some((_, entry)) = storages_cursor.seek_exact(address)? {
+                    if let Some((_, entry)) = storages_cursor.seek_exact(address.1)? {
                         wiped_storage.push((entry.key, entry.value));
                         while let Some(entry) = storages_cursor.next_dup_val()? {
                             wiped_storage.push((entry.key, entry.value))
@@ -2697,7 +2700,7 @@ impl<TX: DbTxMut + DbTx> StateChangeWriter for DatabaseProvider<TX> {
             for (address, info) in account_block_reverts {
                 account_changeset_cursor.append_dup(
                     block_number,
-                    AccountBeforeTx { address, info: info.map(Into::into) },
+                    AccountBeforeTx { address: address.1, info: info.map(Into::into) },
                 )?;
             }
         }
@@ -2706,6 +2709,7 @@ impl<TX: DbTxMut + DbTx> StateChangeWriter for DatabaseProvider<TX> {
     }
 
     fn write_state_changes(&self, mut changes: StateChangeset) -> ProviderResult<()> {
+        changes.filter_for_chain(self.chain_spec.chain().id());
         // sort all entries so they can be written to database in more performant way.
         // and take smaller memory footprint.
         changes.accounts.par_sort_by_key(|a| a.0);
@@ -2719,8 +2723,8 @@ impl<TX: DbTxMut + DbTx> StateChangeWriter for DatabaseProvider<TX> {
         for (address, account) in changes.accounts {
             if let Some(account) = account {
                 tracing::trace!(?address, "Updating plain state account");
-                accounts_cursor.upsert(address, account.into())?;
-            } else if accounts_cursor.seek_exact(address)?.is_some() {
+                accounts_cursor.upsert(address.1, account.into())?;
+            } else if accounts_cursor.seek_exact(address.1)?.is_some() {
                 tracing::trace!(?address, "Deleting plain state account");
                 accounts_cursor.delete_current()?;
             }
@@ -2729,7 +2733,7 @@ impl<TX: DbTxMut + DbTx> StateChangeWriter for DatabaseProvider<TX> {
         // Write bytecode
         tracing::trace!(len = changes.contracts.len(), "Writing bytecodes");
         let mut bytecodes_cursor = self.tx_ref().cursor_write::<tables::Bytecodes>()?;
-        for (hash, bytecode) in changes.contracts {
+        for ((_, hash), bytecode) in changes.contracts {
             bytecodes_cursor.upsert(hash, Bytecode(bytecode))?;
         }
 
@@ -2738,7 +2742,7 @@ impl<TX: DbTxMut + DbTx> StateChangeWriter for DatabaseProvider<TX> {
         let mut storages_cursor = self.tx_ref().cursor_dup_write::<tables::PlainStorageState>()?;
         for PlainStorageChangeset { address, wipe_storage, storage } in changes.storage {
             // Wiping of storage.
-            if wipe_storage && storages_cursor.seek_exact(address)?.is_some() {
+            if wipe_storage && storages_cursor.seek_exact(address.1)?.is_some() {
                 storages_cursor.delete_current_duplicates()?;
             }
             // cast storages to B256.
@@ -2751,14 +2755,14 @@ impl<TX: DbTxMut + DbTx> StateChangeWriter for DatabaseProvider<TX> {
 
             for entry in storage {
                 tracing::trace!(?address, ?entry.key, "Updating plain state storage");
-                if let Some(db_entry) = storages_cursor.seek_by_key_subkey(address, entry.key)? {
+                if let Some(db_entry) = storages_cursor.seek_by_key_subkey(address.1, entry.key)? {
                     if db_entry.key == entry.key {
                         storages_cursor.delete_current()?;
                     }
                 }
 
                 if !entry.value.is_zero() {
-                    storages_cursor.upsert(address, entry)?;
+                    storages_cursor.upsert(address.1, entry)?;
                 }
             }
         }
