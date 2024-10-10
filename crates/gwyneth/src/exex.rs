@@ -3,7 +3,6 @@ use std::{marker::PhantomData, sync::Arc};
 use alloy_rlp::Decodable;
 use alloy_sol_types::{sol, SolEventInterface};
 
-sol!(RollupContract, "TaikoL1.json");
 use crate::{
     engine_api::EngineApiContext, GwynethEngineTypes, GwynethNode, GwynethPayloadAttributes,
     GwynethPayloadBuilderAttributes,
@@ -65,6 +64,8 @@ pub type GwynethFullNode = FullNode<
     >,
     EthereumAddOns,
 >;
+
+sol!(RollupContract, "TaikoL1.json");
 
 pub struct Rollup<Node: reth_node_api::FullNodeComponents> {
     ctx: ExExContext<Node>,
