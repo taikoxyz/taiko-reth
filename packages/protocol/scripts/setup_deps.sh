@@ -178,29 +178,51 @@ echo "Running forge foundry script..."
 FORGE_OUTPUT=$(eval $FORGE_COMMAND | tee /dev/tty)
 echo "Script execution completed."
 
-# Extract the path to run-latest.json
-RUN_LATEST_PATH=$(echo "$FORGE_OUTPUT" | grep "Transactions saved to:" | sed 's/Transactions saved to: //')
 
-# # Run the verification script
-# echo "Starting contract verification..."
-# BLOCKSCOUT_PORT=$(cat /tmp/kurtosis_blockscout_port)
-# SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
-# "$SCRIPT_DIR/verify_contracts.sh" "$BLOCKSCOUT_PORT" "$RUN_LATEST_PATH"
+# Ensure the log file exists in the current working directory
+touch ./rbuilder.log
 
-echo "Starting rbuilder and streaming logs..."
-docker exec -t "$CONTAINER_ID" /bin/bash -c "
-    /app/start_rbuilder.sh > >(tee /tmp/rbuilder.log) 2>&1 &
+echo "Starting rbuilder and streaming logs to ./rbuilder.log..."
+docker exec -d "$CONTAINER_ID" /bin/bash -c "
+    /app/start_rbuilder.sh > /tmp/rbuilder.log 2>&1 &
     RBUILDER_PID=\$!
     tail -f /tmp/rbuilder.log &
     TAIL_PID=\$!
-    trap 'echo \"Interrupt received, stopping log stream...\"; kill \$TAIL_PID; exit' INT TERM
     wait \$RBUILDER_PID
 "
 
-# Check the exit status
-if [ $? -eq 0 ]; then
-    echo "rbuilder started successfully and is running in the background."
+# Start a background process to stream logs from the container to the host file
+docker exec "$CONTAINER_ID" tail -f /tmp/rbuilder.log >> ./rbuilder.log &
+FILE_LOG_PID=$!
+
+# Start another process to stream logs to the terminal
+docker exec "$CONTAINER_ID" tail -f /tmp/rbuilder.log &
+TERMINAL_LOG_PID=$!
+
+# Set up a trap to handle Ctrl+C (SIGINT)
+trap 'echo "Interrupt received. Stopping terminal log streaming, but file logging continues."; kill $TERMINAL_LOG_PID; exit' INT TERM
+
+echo "rbuilder is running in the container."
+echo "Logs are being streamed to ./rbuilder.log and to this terminal."
+echo "Press Ctrl+C to stop watching logs in the terminal. rbuilder and file logging will continue."
+
+# Wait for the terminal log streaming to be manually interrupted
+wait $TERMINAL_LOG_PID
+
+# Check if rbuilder is still running
+if docker exec "$CONTAINER_ID" pgrep -f "/app/start_rbuilder.sh" > /dev/null; then
+    echo "rbuilder is still running in the container. Logs continue to be written to ./rbuilder.log"
 else
-    echo "Failed to start rbuilder or it exited unexpectedly."
+    echo "rbuilder has stopped unexpectedly."
+    kill $FILE_LOG_PID
     exit 1
 fi
+
+# Extract the path to run-latest.json
+RUN_LATEST_PATH=$(echo "$FORGE_OUTPUT" | grep "Transactions saved to:" | sed 's/Transactions saved to: //')
+
+# Run the verification script
+echo "Starting contract verification..."
+BLOCKSCOUT_PORT=$(cat /tmp/kurtosis_blockscout_port)
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
+"$SCRIPT_DIR/verify_contracts.sh" "$BLOCKSCOUT_PORT" "$RUN_LATEST_PATH"
