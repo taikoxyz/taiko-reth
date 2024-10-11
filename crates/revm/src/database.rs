@@ -92,6 +92,9 @@ impl<DB: EvmStateProvider> SyncEvmStateProvider for SyncStateProviderDatabase<DB
         if let Some(db) = self.get(&address.0) {
             db.0.basic_account(address.1)
         } else {
+            if address.0 != 1 {
+                println!("unknown db: {}", address.0);
+            }
             Err(ProviderError::UnsupportedProvider)
         }
     }
@@ -100,6 +103,9 @@ impl<DB: EvmStateProvider> SyncEvmStateProvider for SyncStateProviderDatabase<DB
         if let Some(db) = self.get(&chain_id) {
             db.0.block_hash(number)
         } else {
+            if chain_id != 1 {
+                println!("unknown db: {}", chain_id);
+            }
             Err(ProviderError::UnsupportedProvider)
         }
     }
@@ -112,6 +118,9 @@ impl<DB: EvmStateProvider> SyncEvmStateProvider for SyncStateProviderDatabase<DB
         if let Some(db) = self.get(&chain_id) {
             db.0.bytecode_by_hash(code_hash)
         } else {
+            if chain_id != 1 {
+                println!("unknown db: {}", chain_id);
+            }
             Err(ProviderError::UnsupportedProvider)
         }
     }
@@ -124,6 +133,9 @@ impl<DB: EvmStateProvider> SyncEvmStateProvider for SyncStateProviderDatabase<DB
         if let Some(db) = self.get(&account.0) {
             db.0.storage(account.1, storage_key)
         } else {
+            if account.0 != 1 {
+                println!("unknown db: {}", account.0);
+            }
             Err(ProviderError::UnsupportedProvider)
         }
     }
@@ -230,7 +242,7 @@ pub struct StateProviderDatabase<DB>(pub DB);
 impl<DB> StateProviderDatabase<DB> {
     /// Create new State with generic `StateProvider`.
     pub fn new(db: DB) -> Self {
-        println!("Brecht: StateProviderDatabase::new");
+        //println!("Brecht: StateProviderDatabase::new");
         Self(db)
     }
 
@@ -262,7 +274,7 @@ impl<DB: EvmStateProvider> Database for StateProviderDatabase<DB> {
     /// Returns `Ok` with `Some(AccountInfo)` if the account exists,
     /// `None` if it doesn't, or an error if encountered.
     fn basic(&mut self, address: Address) -> Result<Option<AccountInfo>, Self::Error> {
-        println!("Brecht: read account");
+        //println!("Brecht: read account");
         DatabaseRef::basic_ref(self, address)
     }
 

@@ -395,8 +395,6 @@ where
                             .await?;
                         return Ok(frame)
                     }
-                    // FIX(Cecilia)
-                    GethDebugBuiltInTracerType::FlatCallTracer => todo!(),
                 },
                 #[cfg(not(feature = "js-tracer"))]
                 GethDebugTracerType::JsTracer(_) => {

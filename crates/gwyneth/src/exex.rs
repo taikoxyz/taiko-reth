@@ -3,7 +3,6 @@ use std::{marker::PhantomData, sync::Arc};
 use alloy_rlp::Decodable;
 use alloy_sol_types::{sol, SolEventInterface};
 
-sol!(RollupContract, "TaikoL1.json");
 use crate::{
     engine_api::EngineApiContext, GwynethEngineTypes, GwynethNode, GwynethPayloadAttributes,
     GwynethPayloadBuilderAttributes,
@@ -66,6 +65,8 @@ pub type GwynethFullNode = FullNode<
     EthereumAddOns,
 >;
 
+sol!(RollupContract, "TaikoL1.json");
+
 pub struct Rollup<Node: reth_node_api::FullNodeComponents> {
     ctx: ExExContext<Node>,
     node: GwynethFullNode,
@@ -111,11 +112,13 @@ impl<Node: reth_node_api::FullNodeComponents> Rollup<Node> {
 
             if let RollupContractEvents::BlockProposed(BlockProposed {
                 blockId: block_number,
-                meta: _,
-                txList: tx_list,
+                meta,
             }) = event
             {
-                let transactions: Vec<TransactionSigned> = decode_transactions(&tx_list);
+                println!("block_number: {:?}", block_number);
+                println!("tx_list: {:?}", meta.txList);
+                let transactions: Vec<TransactionSigned> = decode_transactions(&meta.txList);
+                println!("transactions: {:?}", transactions);
 
                 let attrs = GwynethPayloadAttributes {
                     inner: EthPayloadAttributes {

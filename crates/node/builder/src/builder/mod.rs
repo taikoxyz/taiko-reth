@@ -8,7 +8,7 @@ mod states;
 use reth_rpc_types::WithOtherFields;
 pub use states::*;
 
-use std::sync::Arc;
+use std::{fs, path::PathBuf, sync::Arc};
 
 use futures::Future;
 use reth_chainspec::ChainSpec;
@@ -175,6 +175,39 @@ impl<DB> NodeBuilder<DB> {
     pub const fn with_launch_context(self, task_executor: TaskExecutor) -> WithLaunchContext<Self> {
         WithLaunchContext { builder: self, task_executor }
     }
+
+    /// Creates a Gwyneth node
+    pub fn gwyneth_node(
+        mut self,
+        task_executor: TaskExecutor,
+        chain_id: u64,
+    ) -> WithLaunchContext<NodeBuilder<Arc<reth_db::test_utils::TempDatabase<reth_db::DatabaseEnv>>>>
+    {
+        let folder_name = format!("/data/reth/gwyneth-{}/", chain_id);
+        let path = reth_node_core::dirs::MaybePlatformPath::<DataDirPath>::from(
+            PathBuf::from(folder_name.clone()),
+        );
+
+        println!("path: {:?}", folder_name);
+
+        fs::create_dir_all(folder_name).expect("gwyneth db dir creation failed");
+
+        self.config = self.config.with_datadir_args(reth_node_core::args::DatadirArgs {
+            datadir: path.clone(),
+            ..Default::default()
+        });
+
+        let data_dir =
+            path.unwrap_or_chain_default(self.config.chain.chain, self.config.datadir.clone());
+
+        println!("data_dir: {:?}", data_dir);
+
+        let db = reth_db::test_utils::create_test_rw_db_with_path(data_dir.db());
+
+        WithLaunchContext { builder: self.with_database(db), task_executor }
+    }
+
+
 
     /// Creates an _ephemeral_ preconfigured node for testing purposes.
     //#[cfg(feature = "test-utils")]

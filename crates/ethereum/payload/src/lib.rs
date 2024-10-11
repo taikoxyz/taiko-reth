@@ -102,6 +102,8 @@ where
 
         debug!(target: "payload_builder", parent_hash = ?parent_block.hash(), parent_number = parent_block.number, "building empty payload");
 
+        println!("brecht: empty payload builder for {}", chain_spec.chain.id());
+
         let state = client.state_by_block_hash(parent_block.hash()).map_err(|err| {
             warn!(target: "payload_builder",
                 parent_hash=%parent_block.hash(),
@@ -262,6 +264,8 @@ where
         let block = Block { header, body: vec![], ommers: vec![], withdrawals, requests };
         let sealed_block = block.seal_slow();
 
+        println!("empty payload done [{:?}]: {:?}", sealed_block.hash(), sealed_block.state_root);
+
         Ok(EthBuiltPayload::new(attributes.payload_id(), sealed_block, U256::ZERO))
     }
 }
@@ -323,7 +327,6 @@ where
 
     let block_number = initialized_block_env.number.to::<u64>();
 
-
     // apply eip-4788 pre block contract call
     pre_block_beacon_root_contract_call(
         &mut db,
@@ -358,6 +361,7 @@ where
     let mut receipts = Vec::new();
     while let Some(pool_tx) = best_txs.next() {
         // ensure we still have capacity for this transaction
+        println!("Brecht: pool tx! {:?}", pool_tx.hash());
         if cumulative_gas_used + pool_tx.gas_limit() > block_gas_limit {
             // we can't fit this transaction into the block, so we need to mark it as invalid
             // which also removes all dependent transaction from the iterator before we can
@@ -587,6 +591,8 @@ where
 
     let sealed_block = block.seal_slow();
     debug!(target: "payload_builder", ?sealed_block, "sealed built block");
+
+    println!("default payload done [{:?}]: {:?}", sealed_block.hash(), sealed_block.state_root);
 
     let mut payload = EthBuiltPayload::new(attributes.id, sealed_block, total_fees);
 
