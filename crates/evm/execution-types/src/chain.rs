@@ -512,8 +512,8 @@ pub enum ChainSplit {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use reth_primitives::{Receipt, Receipts, TxType, B256};
-    use revm::primitives::{AccountInfo, HashMap};
+    use reth_primitives::{constants::ETHEREUM_CHAIN_ID, Receipt, Receipts, TxType, B256};
+    use revm::primitives::{AccountInfo, ChainAddress, HashMap};
 
     #[test]
     fn chain_append() {
@@ -549,15 +549,13 @@ mod tests {
 
     #[test]
     fn test_number_split() {
+        let addr1 = ChainAddress(ETHEREUM_CHAIN_ID, Address::new([2; 20]));
+        let addr2 = ChainAddress(ETHEREUM_CHAIN_ID, Address::new([3; 20]));
         let execution_outcome1 = ExecutionOutcome::new(
+            None,
             BundleState::new(
-                vec![(
-                    Address::new([2; 20]),
-                    None,
-                    Some(AccountInfo::default()),
-                    HashMap::default(),
-                )],
-                vec![vec![(Address::new([2; 20]), None, vec![])]],
+                vec![(addr1, None, Some(AccountInfo::default()), HashMap::default())],
+                vec![vec![(addr1, None, vec![])]],
                 vec![],
             ),
             vec![vec![]].into(),
@@ -566,14 +564,10 @@ mod tests {
         );
 
         let execution_outcome2 = ExecutionOutcome::new(
+            None,
             BundleState::new(
-                vec![(
-                    Address::new([3; 20]),
-                    None,
-                    Some(AccountInfo::default()),
-                    HashMap::default(),
-                )],
-                vec![vec![(Address::new([3; 20]), None, vec![])]],
+                vec![(addr2, None, Some(AccountInfo::default()), HashMap::default())],
+                vec![vec![(addr2, None, vec![])]],
                 vec![],
             ),
             vec![vec![]].into(),
@@ -692,6 +686,7 @@ mod tests {
         // Create an ExecutionOutcome object with the created bundle, receipts, an empty requests
         // vector, and first_block set to 10
         let execution_outcome = ExecutionOutcome {
+            chain_id: ETHEREUM_CHAIN_ID,
             bundle: Default::default(),
             receipts,
             requests: vec![],
@@ -711,6 +706,7 @@ mod tests {
 
         // Create an ExecutionOutcome object with a single receipt vector containing receipt1
         let execution_outcome1 = ExecutionOutcome {
+            chain_id: ETHEREUM_CHAIN_ID,
             bundle: Default::default(),
             receipts: Receipts { receipt_vec: vec![vec![Some(receipt1)]] },
             requests: vec![],

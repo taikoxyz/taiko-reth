@@ -1,3 +1,40 @@
+# Gwyneth
+
+## Install
+
+```sh
+cd packages/protocol
+pnpm install
+make install
+```
+
+## Use
+
+Add custom networks to your wallet:
+
+```
+chain_id: 167010
+name: Gwyneth-1
+rpc: http://127.0.0.1:32005
+Currency: ETH
+Block explorer: http://127.0.0.1:64003
+```
+
+```
+chain_id: 160010
+name: Gwyneth L1
+rpc: http://127.0.0.1:32002
+Currency: ETH
+Block explorer: http://127.0.0.1:64001
+```
+
+Add test accounts that have some ETH to play with:
+- 0x8943545177806ED17B9F23F0a21ee5948eCaa776 (private key: bcdf20249abf0ed6d944c0288fad489e33f66b3960d9e6229c1cd214ed3bbe31)
+- 0xE25583099BA105D9ec0A67f5Ae86D90e50036425 (private key: 39725efee3fb28614de3bacaffe4cc4bd8c436257e2c8bb887c4b5c4be45e76d)
+- 0x614561D2d143621E126e87831AEF287678B442b8 (private key: 53321db7c1e331d93a11a41d16f004d7ff63972ec8ec7c25db329728ceeb1710)
+
+Rabby/Brave wallet works, but some issues with nonces so you may have to manually input the correct nonce.
+
 # reth
 
 [![CI status](https://github.com/paradigmxyz/reth/workflows/unit/badge.svg)][gh-ci]

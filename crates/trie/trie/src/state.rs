@@ -5,7 +5,10 @@ use crate::{
 use itertools::Itertools;
 use rayon::prelude::{IntoParallelIterator, ParallelIterator};
 use reth_primitives::{keccak256, Account, Address, B256, U256};
-use revm::db::{states::CacheAccount, AccountStatus, BundleAccount};
+use revm::{
+    db::{states::CacheAccount, AccountStatus, BundleAccount},
+    primitives::ChainAddress,
+};
 use std::{
     borrow::Cow,
     collections::{hash_map, HashMap, HashSet},
@@ -25,11 +28,12 @@ impl HashedPostState {
     /// Hashes all changed accounts and storage entries that are currently stored in the bundle
     /// state.
     pub fn from_bundle_state<'a>(
-        state: impl IntoParallelIterator<Item = (&'a Address, &'a BundleAccount)>,
+        state: impl IntoParallelIterator<Item = (&'a ChainAddress, &'a BundleAccount)>,
     ) -> Self {
         let hashed = state
             .into_par_iter()
             .map(|(address, account)| {
+                let address = address.1;
                 let hashed_address = keccak256(address);
                 let hashed_account = account.info.clone().map(Into::into);
                 let hashed_storage = HashedStorage::from_plain_storage(

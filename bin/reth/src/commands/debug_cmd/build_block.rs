@@ -31,7 +31,10 @@ use reth_provider::{
     ProviderFactory, StageCheckpointReader, StateProviderFactory,
 };
 use reth_prune::PruneModes;
-use reth_revm::{database::StateProviderDatabase, primitives::EnvKzgSettings};
+use reth_revm::{
+    database::{StateProviderDatabase, SyncStateProviderDatabase},
+    primitives::EnvKzgSettings,
+};
 use reth_rpc_types::engine::{BlobsBundleV1, PayloadAttributes};
 use reth_stages::StageId;
 use reth_transaction_pool::{
@@ -274,13 +277,17 @@ impl Command {
 
                 println!("debug_cmd build");
 
-                let db = StateProviderDatabase::new(blockchain_db.latest()?);
+                let chain_id = provider_factory.chain_spec().chain.id();
+                let db = SyncStateProviderDatabase::new(
+                    Some(chain_id),
+                    StateProviderDatabase::new(blockchain_db.latest()?),
+                );
                 let executor = block_executor!(provider_factory.chain_spec()).executor(db);
 
                 let block_execution_output =
                     executor.execute((&block_with_senders.clone().unseal(), U256::MAX).into())?;
                 let execution_outcome =
-                    ExecutionOutcome::from((block_execution_output, block.number));
+                    ExecutionOutcome::from((block_execution_output, chain_id, block.number));
                 debug!(target: "reth::cli", ?execution_outcome, "Executed block");
 
                 let hashed_post_state = execution_outcome.hash_state_slow();
