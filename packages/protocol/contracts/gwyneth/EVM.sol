@@ -5,10 +5,10 @@ pragma solidity >=0.8.12 <0.9.0;
 // EVM library
 library EVM {
     // precompile addresses
-    address constant xCallOptionsAddress = address(0x1100);
+    address constant xCallOptionsAddress = address(0x04D2);
 
     uint constant l1ChainId = 1;
-    uint constant version = 1;
+    uint16 constant version = 1;
 
     function xCallOnL1()
         public 
@@ -53,7 +53,7 @@ library EVM {
         require(chainID != l1ChainId);
 
         // Call the custom precompile
-        bytes memory input = abi.encodePacked(version, chainID, sandbox, txOrigin, msgSender, blockHash, proof);
+        bytes memory input = abi.encodePacked(version, uint64(chainID), sandbox, txOrigin, msgSender, blockHash, proof);
         (bool success, ) = xCallOptionsAddress.staticcall(input);
         require(success);
     }
