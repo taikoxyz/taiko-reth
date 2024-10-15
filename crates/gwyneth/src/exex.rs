@@ -104,7 +104,7 @@ impl<Node: reth_node_api::FullNodeComponents> Rollup<Node> {
         // Process all new chain state notifications
         while let Some(notification) = self.ctx.notifications.recv().await {
             if let Some(reverted_chain) = notification.reverted_chain() {
-                self.revert(&reverted_chain)?;
+                self.revert(&reverted_chain).await?;
             }
 
             if let Some(committed_chain) = notification.committed_chain() {
@@ -208,8 +208,35 @@ impl<Node: reth_node_api::FullNodeComponents> Rollup<Node> {
         Ok(())
     }
 
-    fn revert(&mut self, chain: &Chain) -> eyre::Result<()> {
-        unimplemented!()
+    pub async fn revert(&mut self, chain: &Chain) -> eyre::Result<()> {
+        // Find the oldest L1 block number (and subtract 1) in the given chain
+        let oldest_l1_block = chain.blocks().keys().min().copied()
+            .ok_or_else(|| eyre::eyre!("Chain is empty"))?
+            .saturating_sub(1);;
+
+        // Find the corresponding or closest prior L2 block
+        let l2_block_hash = self.find_l2_block_hash(oldest_l1_block);
+
+        // Update forkchoice
+        if let Some(block_hash) = l2_block_hash {
+            self.engine_api.update_forkchoice(block_hash, block_hash).await?;
+        } else {
+            return Err(eyre::eyre!("No suitable L2 block found for revert"));
+        }
+
+        // Remove all mappings newer than the reverted block
+        self.l1_l2_ring_buffer.retain(|mapping| mapping.l1_block <= oldest_l1_block);
+
+        Ok(())
+    }
+
+    fn find_l2_block_hash(&self, l1_block: u64) -> Option<B256> {
+        // Find the exact match or the closest prior L2 block
+        self.l1_l2_ring_buffer
+            .iter()
+            .rev()
+            .find(|mapping| mapping.l1_block <= l1_block)
+            .map(|mapping| mapping.l2_hash)
     }
 
     fn update_l1_l2_ring_buffer(&mut self, l1_block: u64, l2_block: u64, l2_hash: B256) {
