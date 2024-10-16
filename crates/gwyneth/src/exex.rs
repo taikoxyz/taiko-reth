@@ -202,6 +202,13 @@ impl<Node: reth_node_api::FullNodeComponents> Rollup<Node> {
 
                 // trigger forkchoice update via engine api to commit the block to the blockchain
                 self.engine_api.update_forkchoice(block_hash, block_hash).await?;
+
+                // TEST CODE!! 
+                println!("Dani:about to revert, but checking get l2_block_u64: {}", l2_block_u64);
+                if (l2_block_u64 == 3u64) {
+                    //Check reverting back to state 1, which shall be proposed before block nr 40.. and we will go back to that.
+                    self.revert_test(40).await?;
+                }
             }
         }
 
@@ -212,7 +219,7 @@ impl<Node: reth_node_api::FullNodeComponents> Rollup<Node> {
         // Find the oldest L1 block number (and subtract 1) in the given chain
         let oldest_l1_block = chain.blocks().keys().min().copied()
             .ok_or_else(|| eyre::eyre!("Chain is empty"))?
-            .saturating_sub(1);;
+            .saturating_sub(1);
 
         // Find the corresponding or closest prior L2 block
         let l2_block_hash = self.find_l2_block_hash(oldest_l1_block);
@@ -220,12 +227,36 @@ impl<Node: reth_node_api::FullNodeComponents> Rollup<Node> {
         // Update forkchoice
         if let Some(block_hash) = l2_block_hash {
             self.engine_api.update_forkchoice(block_hash, block_hash).await?;
-        } else {
-            return Err(eyre::eyre!("No suitable L2 block found for revert"));
+             // Remove all mappings newer than the reverted block
+            self.l1_l2_ring_buffer.retain(|mapping| mapping.l1_block <= oldest_l1_block);
         }
 
         // Remove all mappings newer than the reverted block
         self.l1_l2_ring_buffer.retain(|mapping| mapping.l1_block <= oldest_l1_block);
+
+        Ok(())
+    }
+
+    pub async fn revert_test(&mut self, oldest_l1_block: u64) -> eyre::Result<()> {
+        // Simulate to: find the oldest L1 block number (and subtract 1) in the given chain
+        let revertTo = oldest_l1_block-1;
+
+        // Find the corresponding or closest prior L2 block
+        let l2_block_hash = self.find_l2_block_hash(oldest_l1_block);
+
+        println!("Dani: l1_block we need a snapshot from {}", oldest_l1_block);
+        println!("Dani: l2_blockhash we found {:?}", l2_block_hash);
+
+        // Update forkchoice
+        if let Some(block_hash) = l2_block_hash {
+
+            println!("Dani: reverting to: {}", block_hash);
+            self.engine_api.update_forkchoice(block_hash, block_hash).await?;
+
+            println!("Dani: reverted");
+             // Remove all mappings newer than the reverted block
+            self.l1_l2_ring_buffer.retain(|mapping| mapping.l1_block <= oldest_l1_block);
+        }
 
         Ok(())
     }
