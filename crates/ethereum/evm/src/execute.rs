@@ -5,9 +5,10 @@ use crate::{
     taiko::{check_anchor_tx, check_anchor_tx_ontake, TaikoData},
     EthEvmConfig,
 };
+use anyhow::Result;
 use reth_chainspec::{ChainSpec, MAINNET};
 pub use reth_consensus::Consensus;
-pub use reth_ethereum_consensus::{EthBeaconConsensus, validate_block_post_execution};
+pub use reth_ethereum_consensus::{validate_block_post_execution, EthBeaconConsensus};
 use reth_evm::{
     execute::{
         BatchExecutor, BlockExecutionError, BlockExecutionInput, BlockExecutionOutput,
@@ -28,15 +29,14 @@ use reth_revm::{
         apply_beacon_root_contract_call, apply_blockhashes_update,
         apply_withdrawal_requests_contract_call, post_block_balance_increments,
     },
-    Evm, State,
-    JournaledState,
+    Evm, JournaledState, State,
 };
 use revm_primitives::{
-    db::{Database, DatabaseCommit}, Address, BlockEnv, CfgEnvWithHandlerCfg, EnvWithHandlerCfg, ResultAndState,
-    EVMError, HashSet, SpecId,
+    db::{Database, DatabaseCommit},
+    Address, BlockEnv, CfgEnvWithHandlerCfg, EVMError, EnvWithHandlerCfg, HashSet, ResultAndState,
+    SpecId,
 };
 use std::sync::Arc;
-use anyhow::Result;
 
 /// Provides executors to execute regular ethereum blocks
 #[derive(Debug, Clone)]
@@ -210,7 +210,9 @@ where
                     continue;
                 }
                 // In all other cases, the tx needs to have a valid signature
-                return Err(BlockExecutionError::CanonicalRevert { inner: "invalid tx".to_string() });
+                return Err(BlockExecutionError::CanonicalRevert {
+                    inner: "invalid tx".to_string(),
+                });
             }
 
             // The sum of the transaction’s gas limit, Tg, and the gas utilized in this block prior,
@@ -224,7 +226,7 @@ where
                     transaction_gas_limit: transaction.gas_limit(),
                     block_available_gas,
                 }
-                .into())
+                .into());
             }
 
             EvmConfig::fill_tx_env(evm.tx_mut(), transaction, *sender);
@@ -233,8 +235,10 @@ where
             evm.tx_mut().taiko.is_anchor = is_anchor;
             // set the treasury address
             evm.tx_mut().taiko.treasury = taiko_data.clone().unwrap().l2_contract;
-            evm.tx_mut().taiko.basefee_ratio = taiko_data.clone().unwrap().base_fee_config.sharing_pctg;
+            evm.tx_mut().taiko.basefee_ratio =
+                taiko_data.clone().unwrap().base_fee_config.sharing_pctg;
 
+            let prev_state = evm.context.evm.journaled_state.clone();
             // Execute transaction.
             let res = evm.transact().map_err(move |err| {
                 // Ensure hash is calculated for error log, if not already done
@@ -245,7 +249,7 @@ where
             });
             if res.is_err() {
                 // Clear the state for the next tx
-                evm.context.evm.journaled_state = JournaledState::new(evm.context.evm.journaled_state.spec, HashSet::new());
+                evm.context.evm.journaled_state = prev_state;
 
                 if optimistic {
                     continue;
@@ -262,11 +266,13 @@ where
                             println!("Invalid tx at {}: {:?}", idx, invalid_transaction);
                             // skip the tx
                             continue;
-                        },
+                        }
                         _ => {
                             // any other error is not allowed
-                            return Err(BlockExecutionError::Validation(BlockValidationError::EVM { hash, error }));
-                        },
+                            return Err(BlockExecutionError::Validation(
+                                BlockValidationError::EVM { hash, error },
+                            ));
+                        }
                     },
                     _ => {
                         // Any other type of error is not allowed
@@ -312,7 +318,12 @@ where
             vec![]
         };
 
-        Ok(EthExecuteOutput { receipts, requests, gas_used: cumulative_gas_used, valid_transaction_indices })
+        Ok(EthExecuteOutput {
+            receipts,
+            requests,
+            gas_used: cumulative_gas_used,
+            valid_transaction_indices,
+        })
     }
 }
 
@@ -336,7 +347,12 @@ pub struct EthBlockExecutor<EvmConfig, DB> {
 impl<EvmConfig, DB> EthBlockExecutor<EvmConfig, DB> {
     /// Creates a new Ethereum block executor.
     pub const fn new(chain_spec: Arc<ChainSpec>, evm_config: EvmConfig, state: State<DB>) -> Self {
-        Self { executor: EthEvmExecutor { chain_spec, evm_config }, state, optimistic: false, taiko_data: None }
+        Self {
+            executor: EthEvmExecutor { chain_spec, evm_config },
+            state,
+            optimistic: false,
+            taiko_data: None,
+        }
     }
 
     /// Optimistic execution
@@ -405,7 +421,12 @@ where
         let env = self.evm_env_for_block(&block.header, total_difficulty);
         let output = {
             let evm = self.executor.evm_config.evm_with_env(&mut self.state, env);
-            self.executor.execute_state_transitions(block, evm, self.optimistic, self.taiko_data.clone())
+            self.executor.execute_state_transitions(
+                block,
+                evm,
+                self.optimistic,
+                self.taiko_data.clone(),
+            )
         }?;
 
         // 3. apply post execution changes
@@ -485,7 +506,14 @@ where
         // NOTE: we need to merge keep the reverts for the bundle retention
         self.state.merge_transitions(BundleRetention::Reverts);
 
-        Ok(BlockExecutionOutput { state: self.state.take_bundle(), receipts, requests, gas_used, db: self.state, valid_transaction_indices })
+        Ok(BlockExecutionOutput {
+            state: self.state.take_bundle(),
+            receipts,
+            requests,
+            gas_used,
+            db: self.state,
+            valid_transaction_indices,
+        })
     }
 }
 
