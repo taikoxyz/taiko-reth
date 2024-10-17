@@ -122,7 +122,7 @@ impl<Node: reth_node_api::FullNodeComponents> Rollup<Node> {
 
                 let attrs = GwynethPayloadAttributes {
                     inner: EthPayloadAttributes {
-                        timestamp: INITIAL_TIMESTAMP,
+                        timestamp: block.timestamp,
                         prev_randao: B256::ZERO,
                         suggested_fee_recipient: Address::ZERO,
                         withdrawals: Some(vec![]),
@@ -154,10 +154,22 @@ impl<Node: reth_node_api::FullNodeComponents> Rollup<Node> {
                 let mut payload =
                     EthBuiltPayload::new(payload_id, SealedBlock::default(), U256::ZERO);
                 loop {
-                    payload =
-                        self.node.payload_builder.best_payload(payload_id).await.unwrap().unwrap();
-                    if payload.block().body.is_empty() {
-                        tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+                    let result = self.node.payload_builder.best_payload(payload_id).await;
+
+                    // TODO: There seems to be no result when there's an empty tx list
+                    if let Some(result) = result {
+                        if let Ok(new_payload) = result {
+                            payload = new_payload;
+                            if payload.block().body.is_empty() {
+                                tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+                                continue;
+                            }
+                        } else {
+                            println!("Gwyneth: No payload?");
+                            continue;
+                        }
+                    } else {
+                        println!("Gwyneth: No block?");
                         continue;
                     }
                     break;
@@ -223,7 +235,7 @@ fn decode_chain_into_rollup_events(
         .collect()
 }
 
-pub fn decode_transactions(tx_list: &[u8]) -> Vec<TransactionSigned> {
+fn decode_transactions(tx_list: &[u8]) -> Vec<TransactionSigned> {
     #[allow(clippy::useless_asref)]
     Vec::<TransactionSigned>::decode(&mut tx_list.as_ref()).unwrap_or_else(|e| {
         // If decoding fails we need to make an empty block
