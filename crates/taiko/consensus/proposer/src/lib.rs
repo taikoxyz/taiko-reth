@@ -258,14 +258,13 @@ impl Storage {
         transactions: Vec<TransactionSigned>,
         ommers: Vec<Header>,
         provider: &Provider,
-        chain_spec: Arc<ChainSpec>,
+        chain_spec: &ChainSpec,
         executor: &Executor,
         beneficiary: Address,
         block_max_gas_limit: u64,
         max_bytes_per_tx_list: u64,
-        max_transactions_lists: u64,
         base_fee: u64,
-    ) -> Result<Vec<TaskResult>, RethError>
+    ) -> Result<TaskResult, RethError>
     where
         Executor: BlockExecutorProvider,
         Provider: StateProviderFactory + BlockReaderIdExt,
@@ -286,7 +285,7 @@ impl Storage {
             provider,
             withdrawals.as_ref(),
             requests.as_ref(),
-            &chain_spec,
+            chain_spec,
             beneficiary,
             block_max_gas_limit,
             base_fee,
@@ -309,60 +308,31 @@ impl Storage {
 
         debug!(target: "taiko::proposer", transactions=?body, "after executing transactions");
 
-        let mut tx_lists = vec![];
-        let mut chunk_start = 0;
         let mut last_compressed_buf = None;
-        let mut gas_used_start = 0;
+        let mut index = 0;
         for idx in 0..body.len() {
-            if let Some((txs_range, estimated_gas_used, compressed_buf)) = {
-                let compressed_buf = encode_and_compress_tx_list(&body[chunk_start..=idx])
-                    .map_err(BlockExecutionError::other)?;
-
-                if compressed_buf.len() > max_bytes_per_tx_list as usize {
-                    // the first transaction in chunk is too large, so we need to skip it
-                    if idx == chunk_start {
-                        gas_used_start = receipts[idx].cumulative_gas_used;
-                        chunk_start += 1;
-                        // the first transaction in chunk is too large, so we need to skip it
-                        None
-                    } else {
-                        // current chunk reaches the max_transactions_lists or max_bytes_per_tx_list
-                        // and use previous transaction's data
-                        let estimated_gas_used =
-                            receipts[idx - 1].cumulative_gas_used - gas_used_start;
-                        gas_used_start = receipts[idx - 1].cumulative_gas_used;
-                        let range = chunk_start..idx;
-                        chunk_start = idx;
-                        Some((range, estimated_gas_used, last_compressed_buf.clone()))
-                    }
-                }
-                // reach the limitation of max_transactions_lists or max_bytes_per_tx_list
-                else if idx - chunk_start + 1 == max_transactions_lists as usize {
-                    let estimated_gas_used = receipts[idx].cumulative_gas_used - gas_used_start;
-                    gas_used_start = receipts[idx].cumulative_gas_used;
-                    let range = chunk_start..idx + 1;
-                    chunk_start = idx + 1;
-                    Some((range, estimated_gas_used, Some(compressed_buf)))
-                } else {
-                    last_compressed_buf = Some(compressed_buf);
-                    None
-                }
-            } {
-                tx_lists.push(TaskResult {
-                    txs: body[txs_range]
-                        .iter()
-                        .cloned()
-                        .map(|tx| reth_rpc_types_compat::transaction::from_signed(tx).unwrap())
-                        .collect(),
-                    estimated_gas_used,
-                    bytes_length: compressed_buf.map_or(0, |b| b.len() as u64),
-                });
+            let compressed_buf = encode_and_compress_tx_list(&body[..=idx])
+                .map_err(BlockExecutionError::other)?;
+            if compressed_buf.len() <= max_bytes_per_tx_list as usize {
+                last_compressed_buf = Some(compressed_buf);
+                index = idx;
+            } else {
+                break;
             }
         }
-
-        Ok(tx_lists)
+        
+        Ok(TaskResult {
+            txs: body[0..=index]
+                .iter()
+                .cloned()
+                .map(|tx| reth_rpc_types_compat::transaction::from_signed(tx).unwrap())
+                .collect(),
+            estimated_gas_used: receipts[index].cumulative_gas_used,
+            bytes_length: last_compressed_buf.map_or(0, |b| b.len() as u64),
+        })
     }
 }
+
 
 fn encode_and_compress_tx_list(txs: &[TransactionSigned]) -> io::Result<Vec<u8>> {
     let encoded_buf = alloy_rlp::encode(TransactionSignedList(txs));
