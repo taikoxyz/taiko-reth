@@ -1,5 +1,6 @@
 //! Traits for execution.
 
+use alloy_rpc_types_eth::transaction::Transaction;
 use reth_execution_types::ExecutionOutcome;
 use reth_primitives::{BlockNumber, BlockWithSenders, Receipt, Request, U256};
 use reth_prune_types::PruneModes;
@@ -90,6 +91,17 @@ pub trait BatchExecutor<DB> {
     fn size_hint(&self) -> Option<usize>;
 }
 
+/// Result of the trigger
+#[derive(Debug, Clone)]
+pub struct TaskResult {
+    /// Transactions
+    pub txs: Vec<Transaction>,
+    /// Estimated gas used
+    pub estimated_gas_used: u64,
+    /// Bytes length
+    pub bytes_length: u64,
+}
+
 /// The output of an ethereum block.
 ///
 /// Contains the state changes, transaction receipts, and total gas used in the block.
@@ -105,6 +117,8 @@ pub struct BlockExecutionOutput<T> {
     pub requests: Vec<Request>,
     /// The total gas used by the block.
     pub gas_used: u64,
+    /// The target list.
+    pub target_list: Vec<TaskResult>,
 }
 
 /// A helper type for ethereum block inputs that consists of a block and the total difficulty.
@@ -118,12 +132,26 @@ pub struct BlockExecutionInput<'a, Block> {
     pub enable_anchor: bool,
     /// Enable skip invalid transaction.
     pub enable_skip: bool,
+    /// Enable build transaction lists.
+    pub enable_build: bool,
+    /// Max compressed bytes.
+    pub max_bytes_per_tx_list: u64,
+    /// Max length of transactions list.
+    pub max_transactions_lists: u64,
 }
 
 impl<'a, Block> BlockExecutionInput<'a, Block> {
     /// Creates a new input.
     pub fn new(block: &'a mut Block, total_difficulty: U256) -> Self {
-        Self { block, total_difficulty, enable_anchor: true, enable_skip: true }
+        Self {
+            block,
+            total_difficulty,
+            enable_anchor: true,
+            enable_skip: true,
+            enable_build: false,
+            max_bytes_per_tx_list: 0,
+            max_transactions_lists: 0,
+        }
     }
 }
 
@@ -135,7 +163,15 @@ impl<'a, Block> From<(&'a mut Block, U256)> for BlockExecutionInput<'a, Block> {
 
 impl<'a, Block> From<(&'a mut Block, U256, bool)> for BlockExecutionInput<'a, Block> {
     fn from((block, total_difficulty, enable_anchor): (&'a mut Block, U256, bool)) -> Self {
-        Self { block, total_difficulty, enable_anchor, enable_skip: true }
+        Self {
+            block,
+            total_difficulty,
+            enable_anchor,
+            enable_skip: true,
+            enable_build: false,
+            max_bytes_per_tx_list: 0,
+            max_transactions_lists: 0,
+        }
     }
 }
 
@@ -143,7 +179,15 @@ impl<'a, Block> From<(&'a mut Block, U256, bool, bool)> for BlockExecutionInput<
     fn from(
         (block, total_difficulty, enable_anchor, enable_skip): (&'a mut Block, U256, bool, bool),
     ) -> Self {
-        Self { block, total_difficulty, enable_anchor, enable_skip }
+        Self {
+            block,
+            total_difficulty,
+            enable_anchor,
+            enable_skip,
+            enable_build: false,
+            max_bytes_per_tx_list: 0,
+            max_transactions_lists: 0,
+        }
     }
 }
 

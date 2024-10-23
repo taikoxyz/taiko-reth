@@ -167,7 +167,7 @@ where
     .ok_or(BlockExecutionError::Validation(BlockValidationError::SenderRecoveryError))?;
 
     // execute the block
-    let BlockExecutionOutput { state, receipts, requests, gas_used } =
+    let BlockExecutionOutput { state, receipts, requests, gas_used, .. } =
         executor.executor(&mut db).execute((&mut block, U256::ZERO).into())?;
 
     let execution_outcome =

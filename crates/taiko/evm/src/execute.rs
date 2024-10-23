@@ -4,6 +4,8 @@ use crate::{
     dao_fork::{DAO_HARDFORK_BENEFICIARY, DAO_HARDKFORK_ACCOUNTS},
     TaikoEvmConfig,
 };
+use flate2::write::ZlibEncoder;
+use flate2::Compression;
 use reth_chainspec::{ChainSpec, TAIKO_HEKLA, TAIKO_MAINNET};
 use reth_consensus::ConsensusError;
 use reth_evm::{
@@ -15,7 +17,8 @@ use reth_evm::{
 };
 use reth_execution_types::ExecutionOutcome;
 use reth_primitives::{
-    BlockNumber, BlockWithSenders, Hardfork, Header, Receipt, Request, Withdrawals, U256,
+    BlockNumber, BlockWithSenders, Hardfork, Header, Receipt, Request, TransactionSigned,
+    Withdrawals, U256,
 };
 use reth_prune_types::PruneModes;
 use reth_revm::{
@@ -37,8 +40,14 @@ use taiko_reth_beacon_consensus::{
 
 #[cfg(not(feature = "std"))]
 use alloc::{sync::Arc, vec, vec::Vec};
+use std::io;
+use std::io::Write;
 use tracing::debug;
 
+use reth_evm::execute::TaskResult;
+use reth_primitives::transaction::TransactionSignedList;
+use reth_revm::interpreter::Host;
+use revm_primitives::alloy_primitives::private::alloy_rlp;
 #[cfg(feature = "std")]
 use std::sync::Arc;
 
@@ -341,6 +350,13 @@ impl<EvmConfig, DB> TaikoBlockExecutor<EvmConfig, DB> {
     }
 }
 
+fn encode_and_compress_tx_list(txs: &[TransactionSigned]) -> io::Result<Vec<u8>> {
+    let encoded_buf = alloy_rlp::encode(TransactionSignedList(txs));
+    let mut encoder = ZlibEncoder::new(Vec::new(), Compression::default());
+    encoder.write_all(&encoded_buf)?;
+    encoder.finish()
+}
+
 impl<EvmConfig, DB> TaikoBlockExecutor<EvmConfig, DB>
 where
     EvmConfig: ConfigureEvm,
@@ -392,6 +408,95 @@ where
         self.post_execution(block, total_difficulty)?;
 
         Ok(output)
+    }
+
+    fn build_transaction_list(
+        &mut self,
+        block: &BlockWithSenders,
+        max_bytes_per_tx_list: u64,
+        max_transactions_lists: u64,
+    ) -> Result<Vec<TaskResult>, BlockExecutionError> {
+        let env = self.evm_env_for_block(&block.header, U256::ZERO);
+        let mut evm = self.executor.evm_config.evm_with_env(&mut self.state, env);
+        // 2. configure the evm and execute
+        // apply pre execution changes
+        apply_beacon_root_contract_call(
+            &self.executor.chain_spec,
+            block.timestamp,
+            block.number,
+            block.parent_beacon_block_root,
+            &mut evm,
+        )?;
+
+        apply_blockhashes_update(
+            evm.db_mut(),
+            &self.executor.chain_spec,
+            block.timestamp,
+            block.number,
+            block.parent_hash,
+        )?;
+
+        let mut target_list: Vec<TaskResult> = vec![];
+        // get previous env
+        let previous_env = Box::new(evm.context.env().clone());
+
+        for _ in 0..max_transactions_lists {
+            // evm.context.evm.db.commit(state);
+            // re-set the previous env
+            evm.context.evm.env = previous_env.clone();
+
+            let mut cumulative_gas_used = 0;
+            let mut tx_list: Vec<TransactionSigned> = vec![];
+            let mut buf_len: u64 = 0;
+
+            let length = block.body.len();
+            for i in 0..length {
+                let transaction = block.body.get(i).unwrap();
+                let sender = block.senders.get(i).unwrap();
+                let block_available_gas = block.header.gas_limit - cumulative_gas_used;
+                if transaction.gas_limit() > block_available_gas {
+                    break;
+                }
+
+                EvmConfig::fill_tx_env(evm.tx_mut(), transaction, *sender);
+
+                // Execute transaction.
+                let ResultAndState { result, state } = match evm.transact() {
+                    Ok(res) => res,
+                    Err(_) => continue,
+                };
+                tx_list.push(transaction.clone());
+
+                let compressed_buf =
+                    encode_and_compress_tx_list(&tx_list).map_err(BlockExecutionError::other)?;
+                if compressed_buf.len() > max_bytes_per_tx_list as usize {
+                    tx_list.pop();
+                    break;
+                }
+
+                buf_len = compressed_buf.len() as u64;
+                // append gas used
+                cumulative_gas_used += result.gas_used();
+
+                // collect executed transaction state
+                evm.db_mut().commit(state);
+            }
+
+            if tx_list.is_empty() {
+                break;
+            }
+            target_list.push(TaskResult {
+                txs: tx_list[..]
+                    .iter()
+                    .cloned()
+                    .map(|tx| reth_rpc_types_compat::transaction::from_signed(tx).unwrap())
+                    .collect(),
+                estimated_gas_used: cumulative_gas_used,
+                bytes_length: buf_len,
+            });
+        }
+
+        Ok(target_list)
     }
 
     /// Apply settings before a new block is executed.
@@ -458,14 +563,44 @@ where
     ///
     /// State changes are committed to the database.
     fn execute(mut self, input: Self::Input<'_>) -> Result<Self::Output, Self::Error> {
-        let BlockExecutionInput { block, total_difficulty, enable_anchor, enable_skip } = input;
-        let TaikoExecuteOutput { receipts, requests, gas_used } =
-            self.execute_without_verification(block, total_difficulty, enable_anchor, enable_skip)?;
+        let BlockExecutionInput {
+            block,
+            total_difficulty,
+            enable_anchor,
+            enable_skip,
+            enable_build,
+            max_bytes_per_tx_list,
+            max_transactions_lists,
+        } = input;
+        if enable_build {
+            let target_list =
+                self.build_transaction_list(block, max_bytes_per_tx_list, max_transactions_lists)?;
+            Ok(BlockExecutionOutput {
+                state: Default::default(),
+                receipts: vec![],
+                requests: vec![],
+                gas_used: 0,
+                target_list,
+            })
+        } else {
+            let TaikoExecuteOutput { receipts, requests, gas_used } = self
+                .execute_without_verification(
+                    block,
+                    total_difficulty,
+                    enable_anchor,
+                    enable_skip,
+                )?;
 
-        // NOTE: we need to merge keep the reverts for the bundle retention
-        self.state.merge_transitions(BundleRetention::Reverts);
-
-        Ok(BlockExecutionOutput { state: self.state.take_bundle(), receipts, requests, gas_used })
+            // NOTE: we need to merge keep the reverts for the bundle retention
+            self.state.merge_transitions(BundleRetention::Reverts);
+            Ok(BlockExecutionOutput {
+                state: self.state.take_bundle(),
+                receipts,
+                requests,
+                gas_used,
+                target_list: vec![],
+            })
+        }
     }
 }
 
@@ -501,7 +636,7 @@ where
     type Error = BlockExecutionError;
 
     fn execute_and_verify_one(&mut self, input: Self::Input<'_>) -> Result<(), Self::Error> {
-        let BlockExecutionInput { block, total_difficulty, enable_anchor, enable_skip } = input;
+        let BlockExecutionInput { block, total_difficulty, enable_anchor, enable_skip, .. } = input;
         let TaikoExecuteOutput { receipts, requests, gas_used: _ } = self
             .executor
             .execute_without_verification(block, total_difficulty, enable_anchor, enable_skip)?;

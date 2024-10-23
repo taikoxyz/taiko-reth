@@ -12,26 +12,19 @@
     html_favicon_url = "https://avatars0.githubusercontent.com/u/97369466?s=256",
     issue_tracker_base_url = "https://github.com/paradigmxyz/reth/issues/"
 )]
-#![cfg_attr(not(test), warn(unused_crate_dependencies))]
-#![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
 
-use flate2::write::ZlibEncoder;
-use flate2::Compression;
 use reth_chainspec::ChainSpec;
 use reth_consensus::{Consensus, ConsensusError, PostExecutionInput};
 use reth_errors::RethError;
 use reth_execution_errors::{BlockExecutionError, BlockValidationError};
 use reth_primitives::{
-    eip4844::calculate_excess_blob_gas, proofs, transaction::TransactionSignedList, Address, Block,
-    BlockWithSenders, Header, Requests, SealedBlock, SealedHeader, TransactionSigned, Withdrawals,
-    U256,
+    eip4844::calculate_excess_blob_gas, proofs, Address, Block, BlockWithSenders, Header, Requests,
+    SealedBlock, SealedHeader, TransactionSigned, Withdrawals, U256,
 };
 use reth_provider::{BlockReaderIdExt, StateProviderFactory};
 use reth_revm::database::StateProviderDatabase;
-use reth_rpc_types::Transaction;
 use reth_transaction_pool::TransactionPool;
 use std::{
-    io::{self, Write},
     sync::Arc,
     time::{SystemTime, UNIX_EPOCH},
 };
@@ -42,7 +35,9 @@ mod client;
 mod task;
 
 pub use crate::client::ProposerClient;
-use reth_evm::execute::{BlockExecutionOutput, BlockExecutorProvider, Executor};
+use reth_evm::execute::{
+    BlockExecutionInput, BlockExecutionOutput, BlockExecutorProvider, Executor, TaskResult,
+};
 pub use task::ProposerTask;
 
 /// A consensus implementation intended for local development and testing purposes.
@@ -155,17 +150,6 @@ pub struct TaskArgs {
     pub min_tip: u64,
 
     tx: oneshot::Sender<Result<Vec<TaskResult>, RethError>>,
-}
-
-/// Result of the trigger
-#[derive(Debug)]
-pub struct TaskResult {
-    /// Transactions
-    pub txs: Vec<Transaction>,
-    /// Estimated gas used
-    pub estimated_gas_used: u64,
-    /// Bytes length
-    pub bytes_length: u64,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -303,70 +287,18 @@ impl Storage {
         );
 
         // execute the block
-        let BlockExecutionOutput { receipts, .. } =
-            executor.executor(&mut db).execute((&mut block, U256::ZERO, false).into())?;
-        let Block { body, .. } = block.block;
+        let block_input = BlockExecutionInput {
+            block: &mut block,
+            total_difficulty: U256::ZERO,
+            enable_anchor: false,
+            enable_skip: false,
+            enable_build: true,
+            max_bytes_per_tx_list,
+            max_transactions_lists,
+        };
+        let BlockExecutionOutput { target_list, .. } =
+            executor.executor(&mut db).execute(block_input.into())?;
 
-        debug!(target: "taiko::proposer", transactions=?body, "after executing transactions");
-
-        let mut tx_lists = vec![];
-        let mut chunk_start = 0;
-        let mut last_compressed_buf = None;
-        let mut gas_used_start = 0;
-        for idx in 0..body.len() {
-            if let Some((txs_range, estimated_gas_used, compressed_buf)) = {
-                let compressed_buf = encode_and_compress_tx_list(&body[chunk_start..=idx])
-                    .map_err(BlockExecutionError::other)?;
-
-                if compressed_buf.len() > max_bytes_per_tx_list as usize {
-                    // the first transaction in chunk is too large, so we need to skip it
-                    if idx == chunk_start {
-                        gas_used_start = receipts[idx].cumulative_gas_used;
-                        chunk_start += 1;
-                        // the first transaction in chunk is too large, so we need to skip it
-                        None
-                    } else {
-                        // current chunk reaches the max_transactions_lists or max_bytes_per_tx_list
-                        // and use previous transaction's data
-                        let estimated_gas_used =
-                            receipts[idx - 1].cumulative_gas_used - gas_used_start;
-                        gas_used_start = receipts[idx - 1].cumulative_gas_used;
-                        let range = chunk_start..idx;
-                        chunk_start = idx;
-                        Some((range, estimated_gas_used, last_compressed_buf.clone()))
-                    }
-                }
-                // reach the limitation of max_transactions_lists or max_bytes_per_tx_list
-                else if idx - chunk_start + 1 == max_transactions_lists as usize {
-                    let estimated_gas_used = receipts[idx].cumulative_gas_used - gas_used_start;
-                    gas_used_start = receipts[idx].cumulative_gas_used;
-                    let range = chunk_start..idx + 1;
-                    chunk_start = idx + 1;
-                    Some((range, estimated_gas_used, Some(compressed_buf)))
-                } else {
-                    last_compressed_buf = Some(compressed_buf);
-                    None
-                }
-            } {
-                tx_lists.push(TaskResult {
-                    txs: body[txs_range]
-                        .iter()
-                        .cloned()
-                        .map(|tx| reth_rpc_types_compat::transaction::from_signed(tx).unwrap())
-                        .collect(),
-                    estimated_gas_used,
-                    bytes_length: compressed_buf.map_or(0, |b| b.len() as u64),
-                });
-            }
-        }
-
-        Ok(tx_lists)
+        Ok(target_list)
     }
-}
-
-fn encode_and_compress_tx_list(txs: &[TransactionSigned]) -> io::Result<Vec<u8>> {
-    let encoded_buf = alloy_rlp::encode(TransactionSignedList(txs));
-    let mut encoder = ZlibEncoder::new(Vec::new(), Compression::default());
-    encoder.write_all(&encoded_buf)?;
-    encoder.finish()
 }
