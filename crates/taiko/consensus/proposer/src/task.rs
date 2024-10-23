@@ -3,7 +3,7 @@ use reth_chainspec::ChainSpec;
 use reth_evm::execute::BlockExecutorProvider;
 use reth_primitives::IntoRecoveredTransaction;
 use reth_provider::{BlockReaderIdExt, StateProviderFactory};
-use reth_transaction_pool::{TransactionPool};
+use reth_transaction_pool::TransactionPool;
 use std::{
     future::Future,
     pin::Pin,
@@ -38,13 +38,7 @@ impl<Executor, Provider, Pool: TransactionPool> ProposerTask<Provider, Pool, Exe
         block_executor: Executor,
         trigger_args_rx: UnboundedReceiver<TaskArgs>,
     ) -> Self {
-        Self {
-            chain_spec,
-            provider,
-            pool,
-            block_executor,
-            trigger_args_rx,
-        }
+        Self { chain_spec, provider, pool, block_executor, trigger_args_rx }
     }
 }
 
@@ -75,8 +69,7 @@ where
                                 .map_or(false, |tip| tip >= args.min_tip as u128)
                         })
                         .partition(|tx| {
-                            args
-                                .local_accounts
+                            args.local_accounts
                                 .as_ref()
                                 .map(|local_accounts| local_accounts.contains(&tx.sender()))
                                 .unwrap_or_default()
@@ -126,7 +119,7 @@ where
 }
 
 impl<Client, Pool: TransactionPool, EvmConfig: std::fmt::Debug> std::fmt::Debug
-for ProposerTask<Client, Pool, EvmConfig>
+    for ProposerTask<Client, Pool, EvmConfig>
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("MiningTask").finish_non_exhaustive()

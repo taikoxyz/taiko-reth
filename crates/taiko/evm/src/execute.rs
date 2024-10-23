@@ -16,7 +16,10 @@ use reth_evm::{
     ConfigureEvm,
 };
 use reth_execution_types::ExecutionOutcome;
-use reth_primitives::{BlockNumber, BlockWithSenders, Hardfork, Header, Receipt, Request, TransactionSigned, Withdrawals, U256};
+use reth_primitives::{
+    BlockNumber, BlockWithSenders, Hardfork, Header, Receipt, Request, TransactionSigned,
+    Withdrawals, U256,
+};
 use reth_prune_types::PruneModes;
 use reth_revm::{
     batch::{BlockBatchRecord, BlockExecutorStats},
@@ -27,7 +30,10 @@ use reth_revm::{
     },
     Evm, JournaledState,
 };
-use revm_primitives::{db::{Database, DatabaseCommit}, Address, BlockEnv, CfgEnvWithHandlerCfg, EnvWithHandlerCfg, HashSet, ResultAndState};
+use revm_primitives::{
+    db::{Database, DatabaseCommit},
+    Address, BlockEnv, CfgEnvWithHandlerCfg, EnvWithHandlerCfg, HashSet, ResultAndState,
+};
 use taiko_reth_beacon_consensus::{
     check_anchor_tx, decode_ontake_extra_data, validate_block_post_execution,
 };
@@ -38,12 +44,12 @@ use std::io;
 use std::io::Write;
 use tracing::debug;
 
-#[cfg(feature = "std")]
-use std::sync::Arc;
-use revm_primitives::alloy_primitives::private::alloy_rlp;
 use reth_evm::execute::TaskResult;
 use reth_primitives::transaction::TransactionSignedList;
 use reth_revm::interpreter::Host;
+use revm_primitives::alloy_primitives::private::alloy_rlp;
+#[cfg(feature = "std")]
+use std::sync::Arc;
 
 /// Provides executors to execute regular ethereum blocks
 #[derive(Debug, Clone)]
@@ -204,7 +210,7 @@ where
                     block.base_fee_per_gas.unwrap_or_default(),
                     treasury,
                 )
-                    .map_err(|e| BlockExecutionError::CanonicalRevert { inner: e.to_string() })?;
+                .map_err(|e| BlockExecutionError::CanonicalRevert { inner: e.to_string() })?;
             }
 
             // If the signature was not valid, the sender address will have been set to zero
@@ -354,7 +360,7 @@ fn encode_and_compress_tx_list(txs: &[TransactionSigned]) -> io::Result<Vec<u8>>
 impl<EvmConfig, DB> TaikoBlockExecutor<EvmConfig, DB>
 where
     EvmConfig: ConfigureEvm,
-    DB: Database<Error=ProviderError>,
+    DB: Database<Error = ProviderError>,
 {
     /// Configures a new evm configuration and block environment for the given block.
     ///
@@ -461,8 +467,8 @@ where
                 };
                 tx_list.push(transaction.clone());
 
-                let compressed_buf = encode_and_compress_tx_list(&tx_list)
-                    .map_err(BlockExecutionError::other)?;
+                let compressed_buf =
+                    encode_and_compress_tx_list(&tx_list).map_err(BlockExecutionError::other)?;
                 if compressed_buf.len() > max_bytes_per_tx_list as usize {
                     tx_list.pop();
                     break;
@@ -480,7 +486,8 @@ where
                 break;
             }
             target_list.push(TaskResult {
-                txs: tx_list[..].iter()
+                txs: tx_list[..]
+                    .iter()
                     .cloned()
                     .map(|tx| reth_rpc_types_compat::transaction::from_signed(tx).unwrap())
                     .collect(),
@@ -491,7 +498,6 @@ where
 
         Ok(target_list)
     }
-
 
     /// Apply settings before a new block is executed.
     pub(crate) fn on_new_block(&mut self, header: &Header) {
@@ -543,7 +549,7 @@ where
 impl<EvmConfig, DB> Executor<DB> for TaikoBlockExecutor<EvmConfig, DB>
 where
     EvmConfig: ConfigureEvm,
-    DB: Database<Error=ProviderError>,
+    DB: Database<Error = ProviderError>,
 {
     type Input<'a> = BlockExecutionInput<'a, BlockWithSenders>;
     type Output = BlockExecutionOutput<Receipt>;
@@ -564,18 +570,36 @@ where
             enable_skip,
             enable_build,
             max_bytes_per_tx_list,
-            max_transactions_lists
+            max_transactions_lists,
         } = input;
         if enable_build {
-            let target_list = self.build_transaction_list(block, max_bytes_per_tx_list, max_transactions_lists)?;
-            Ok(BlockExecutionOutput { state: Default::default(), receipts: vec![], requests: vec![], gas_used: 0, target_list })
+            let target_list =
+                self.build_transaction_list(block, max_bytes_per_tx_list, max_transactions_lists)?;
+            Ok(BlockExecutionOutput {
+                state: Default::default(),
+                receipts: vec![],
+                requests: vec![],
+                gas_used: 0,
+                target_list,
+            })
         } else {
-            let TaikoExecuteOutput { receipts, requests, gas_used } =
-                self.execute_without_verification(block, total_difficulty, enable_anchor, enable_skip)?;
+            let TaikoExecuteOutput { receipts, requests, gas_used } = self
+                .execute_without_verification(
+                    block,
+                    total_difficulty,
+                    enable_anchor,
+                    enable_skip,
+                )?;
 
             // NOTE: we need to merge keep the reverts for the bundle retention
             self.state.merge_transitions(BundleRetention::Reverts);
-            Ok(BlockExecutionOutput { state: self.state.take_bundle(), receipts, requests, gas_used, target_list: vec![] })
+            Ok(BlockExecutionOutput {
+                state: self.state.take_bundle(),
+                receipts,
+                requests,
+                gas_used,
+                target_list: vec![],
+            })
         }
     }
 }

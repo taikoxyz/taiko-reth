@@ -18,9 +18,8 @@ use reth_consensus::{Consensus, ConsensusError, PostExecutionInput};
 use reth_errors::RethError;
 use reth_execution_errors::{BlockExecutionError, BlockValidationError};
 use reth_primitives::{
-    eip4844::calculate_excess_blob_gas, proofs, Address, Block,
-    BlockWithSenders, Header, Requests, SealedBlock, SealedHeader, TransactionSigned, Withdrawals,
-    U256,
+    eip4844::calculate_excess_blob_gas, proofs, Address, Block, BlockWithSenders, Header, Requests,
+    SealedBlock, SealedHeader, TransactionSigned, Withdrawals, U256,
 };
 use reth_provider::{BlockReaderIdExt, StateProviderFactory};
 use reth_revm::database::StateProviderDatabase;
@@ -36,7 +35,9 @@ mod client;
 mod task;
 
 pub use crate::client::ProposerClient;
-use reth_evm::execute::{BlockExecutionInput, BlockExecutionOutput, BlockExecutorProvider, Executor, TaskResult};
+use reth_evm::execute::{
+    BlockExecutionInput, BlockExecutionOutput, BlockExecutorProvider, Executor, TaskResult,
+};
 pub use task::ProposerTask;
 
 /// A consensus implementation intended for local development and testing purposes.
