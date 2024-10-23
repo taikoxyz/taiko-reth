@@ -5,6 +5,7 @@ use reth_primitives::{BlockNumber, BlockWithSenders, Receipt, Request, U256};
 use reth_prune_types::PruneModes;
 use revm::db::BundleState;
 use revm_primitives::db::Database;
+use alloy_rpc_types_eth::transaction::Transaction;
 
 #[cfg(not(feature = "std"))]
 use alloc::vec::Vec;
@@ -55,7 +56,7 @@ pub trait BatchExecutor<DB> {
     /// for each input.
     fn execute_and_verify_many<'a, I>(&mut self, inputs: I) -> Result<(), Self::Error>
     where
-        I: IntoIterator<Item = Self::Input<'a>>,
+        I: IntoIterator<Item=Self::Input<'a>>,
     {
         for input in inputs {
             self.execute_and_verify_one(input)?;
@@ -69,7 +70,7 @@ pub trait BatchExecutor<DB> {
     /// and [`BatchExecutor::finalize`].
     fn execute_and_verify_batch<'a, I>(mut self, batch: I) -> Result<Self::Output, Self::Error>
     where
-        I: IntoIterator<Item = Self::Input<'a>>,
+        I: IntoIterator<Item=Self::Input<'a>>,
         Self: Sized,
     {
         self.execute_and_verify_many(batch)?;
@@ -90,6 +91,17 @@ pub trait BatchExecutor<DB> {
     fn size_hint(&self) -> Option<usize>;
 }
 
+/// Result of the trigger
+#[derive(Debug, Clone)]
+pub struct TaskResult {
+    /// Transactions
+    pub txs: Vec<Transaction>,
+    /// Estimated gas used
+    pub estimated_gas_used: u64,
+    /// Bytes length
+    pub bytes_length: u64,
+}
+
 /// The output of an ethereum block.
 ///
 /// Contains the state changes, transaction receipts, and total gas used in the block.
@@ -105,6 +117,8 @@ pub struct BlockExecutionOutput<T> {
     pub requests: Vec<Request>,
     /// The total gas used by the block.
     pub gas_used: u64,
+    /// The target list.
+    pub target_list: Vec<TaskResult>,
 }
 
 /// A helper type for ethereum block inputs that consists of a block and the total difficulty.
@@ -118,12 +132,18 @@ pub struct BlockExecutionInput<'a, Block> {
     pub enable_anchor: bool,
     /// Enable skip invalid transaction.
     pub enable_skip: bool,
+    /// Enable build transaction lists.
+    pub enable_build: bool,
+    /// Max compressed bytes.
+    pub max_bytes_per_tx_list: u64,
+    /// Max length of transactions list.
+    pub max_transactions_lists: u64,
 }
 
 impl<'a, Block> BlockExecutionInput<'a, Block> {
     /// Creates a new input.
     pub fn new(block: &'a mut Block, total_difficulty: U256) -> Self {
-        Self { block, total_difficulty, enable_anchor: true, enable_skip: true }
+        Self { block, total_difficulty, enable_anchor: true, enable_skip: true, enable_build: false, max_bytes_per_tx_list: 0, max_transactions_lists: 0 }
     }
 }
 
@@ -135,7 +155,7 @@ impl<'a, Block> From<(&'a mut Block, U256)> for BlockExecutionInput<'a, Block> {
 
 impl<'a, Block> From<(&'a mut Block, U256, bool)> for BlockExecutionInput<'a, Block> {
     fn from((block, total_difficulty, enable_anchor): (&'a mut Block, U256, bool)) -> Self {
-        Self { block, total_difficulty, enable_anchor, enable_skip: true }
+        Self { block, total_difficulty, enable_anchor, enable_skip: true, enable_build: false, max_bytes_per_tx_list: 0, max_transactions_lists: 0 }
     }
 }
 
@@ -143,7 +163,7 @@ impl<'a, Block> From<(&'a mut Block, U256, bool, bool)> for BlockExecutionInput<
     fn from(
         (block, total_difficulty, enable_anchor, enable_skip): (&'a mut Block, U256, bool, bool),
     ) -> Self {
-        Self { block, total_difficulty, enable_anchor, enable_skip }
+        Self { block, total_difficulty, enable_anchor, enable_skip, enable_build: false, max_bytes_per_tx_list: 0, max_transactions_lists: 0 }
     }
 }
 
@@ -160,19 +180,19 @@ pub trait BlockExecutorProvider: Send + Sync + Clone + Unpin + 'static {
     ///
     /// It is not expected to validate the state trie root, this must be done by the caller using
     /// the returned state.
-    type Executor<DB: Database<Error = ProviderError>>: for<'a> Executor<
+    type Executor<DB: Database<Error=ProviderError>>: for<'a> Executor<
         DB,
-        Input<'a> = BlockExecutionInput<'a, BlockWithSenders>,
-        Output = BlockExecutionOutput<Receipt>,
-        Error = BlockExecutionError,
+        Input<'a>=BlockExecutionInput<'a, BlockWithSenders>,
+        Output=BlockExecutionOutput<Receipt>,
+        Error=BlockExecutionError,
     >;
 
     /// An executor that can execute a batch of blocks given a database.
-    type BatchExecutor<DB: Database<Error = ProviderError>>: for<'a> BatchExecutor<
+    type BatchExecutor<DB: Database<Error=ProviderError>>: for<'a> BatchExecutor<
         DB,
-        Input<'a> = BlockExecutionInput<'a, BlockWithSenders>,
-        Output = ExecutionOutcome,
-        Error = BlockExecutionError,
+        Input<'a>=BlockExecutionInput<'a, BlockWithSenders>,
+        Output=ExecutionOutcome,
+        Error=BlockExecutionError,
     >;
 
     /// Creates a new executor for single block execution.
@@ -180,7 +200,7 @@ pub trait BlockExecutorProvider: Send + Sync + Clone + Unpin + 'static {
     /// This is used to execute a single block and get the changed state.
     fn executor<DB>(&self, db: DB) -> Self::Executor<DB>
     where
-        DB: Database<Error = ProviderError>;
+        DB: Database<Error=ProviderError>;
 
     /// Creates a new batch executor with the given database and pruning modes.
     ///
@@ -191,7 +211,7 @@ pub trait BlockExecutorProvider: Send + Sync + Clone + Unpin + 'static {
     /// execution.
     fn batch_executor<DB>(&self, db: DB, prune_modes: PruneModes) -> Self::BatchExecutor<DB>
     where
-        DB: Database<Error = ProviderError>;
+        DB: Database<Error=ProviderError>;
 }
 
 #[cfg(test)]
@@ -205,19 +225,19 @@ mod tests {
     struct TestExecutorProvider;
 
     impl BlockExecutorProvider for TestExecutorProvider {
-        type Executor<DB: Database<Error = ProviderError>> = TestExecutor<DB>;
-        type BatchExecutor<DB: Database<Error = ProviderError>> = TestExecutor<DB>;
+        type Executor<DB: Database<Error=ProviderError>> = TestExecutor<DB>;
+        type BatchExecutor<DB: Database<Error=ProviderError>> = TestExecutor<DB>;
 
         fn executor<DB>(&self, _db: DB) -> Self::Executor<DB>
         where
-            DB: Database<Error = ProviderError>,
+            DB: Database<Error=ProviderError>,
         {
             TestExecutor(PhantomData)
         }
 
         fn batch_executor<DB>(&self, _db: DB, _prune_modes: PruneModes) -> Self::BatchExecutor<DB>
         where
-            DB: Database<Error = ProviderError>,
+            DB: Database<Error=ProviderError>,
         {
             TestExecutor(PhantomData)
         }

@@ -7203,6 +7203,7 @@ dependencies = [
 name = "reth-evm"
 version = "1.0.0"
 dependencies = [
+ "alloy-rpc-types-eth",
  "auto_impl",
  "futures-util",
  "parking_lot 0.12.3",
@@ -9793,6 +9794,7 @@ version = "1.0.0"
 dependencies = [
  "alloy-eips",
  "alloy-sol-types",
+ "flate2",
  "reth-chainspec",
  "reth-consensus",
  "reth-evm",
@@ -9800,6 +9802,7 @@ dependencies = [
  "reth-primitives",
  "reth-prune-types",
  "reth-revm",
+ "reth-rpc-types-compat",
  "reth-testing-utils",
  "revm-primitives",
  "secp256k1",
@@ -9880,7 +9883,6 @@ name = "taiko-reth-proposer-consensus"
 version = "1.0.0"
 dependencies = [
  "alloy-rlp",
- "flate2",
  "futures-util",
  "reth-chainspec",
  "reth-consensus",
@@ -9890,8 +9892,6 @@ dependencies = [
  "reth-primitives",
  "reth-provider",
  "reth-revm",
- "reth-rpc-types",
- "reth-rpc-types-compat",
  "reth-transaction-pool",
  "tokio",
  "tracing",
