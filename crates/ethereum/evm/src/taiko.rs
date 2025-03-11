@@ -301,10 +301,6 @@ pub fn check_anchor_tx_pacaya(
 
     // Okay now let's decode the anchor tx to verify the inputs
     let anchor_call = decode_anchor_pacaya(&anchor.input)?;
-    ensure!(
-        anchor_call._anchorStateRoot == taiko_data.l1_header.state_root,
-        "L1 state root mismatch"
-    );
     ensure!(anchor_call._anchorBlockId == taiko_data.l1_header.number, "L1 block number mismatch");
     ensure!(
         anchor_call._anchorStateRoot == taiko_data.l1_header.state_root,
