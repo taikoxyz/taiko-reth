@@ -246,7 +246,6 @@ where
             evm.tx_mut().taiko.treasury = taiko_data.clone().unwrap().l2_contract;
             evm.tx_mut().taiko.basefee_ratio = taiko_data.clone().unwrap().base_fee_config.sharing_pctg;
 
-
             // Execute transaction.
             let res = evm.transact().map_err(move |err| {
                 // Ensure hash is calculated for error log, if not already done

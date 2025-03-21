@@ -71,7 +71,7 @@ pub enum Hardfork {
     /// Ontake: the 2nd taiko mainnet fork: <>
     #[cfg(feature = "taiko")]
     Ontake,
-    /// Ontake: the 3nd taiko mainnet fork: <>
+    /// Pacaya: the 3rd taiko mainnet fork: <>
     #[cfg(feature = "taiko")]
     Pacaya,
     /// Canyon:
