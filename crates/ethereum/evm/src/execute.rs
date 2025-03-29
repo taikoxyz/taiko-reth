@@ -300,6 +300,9 @@ where
             // append gas used
             cumulative_gas_used += result.gas_used();
             if is_taiko {
+                if is_anchor && !result.is_success() {
+                    return Err(BlockExecutionError::Other("anchor transaction must be success"));
+                }
                 let mining_gas_limit = taiko_data.clone().unwrap().gas_limit;
                 if cumulative_gas_used > mining_gas_limit {
                     warn!(
