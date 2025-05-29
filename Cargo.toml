@@ -354,9 +354,9 @@ revm-inspectors = { git = "https://github.com/paradigmxyz/revm-inspectors", rev 
 
 # eth
 alloy-chains = "0.1.15"
-alloy-primitives = "0.7.2"
-alloy-dyn-abi = "0.7.2"
-alloy-sol-types = "0.7.2"
+alloy-primitives = "0.8"
+alloy-dyn-abi = "0.8"
+alloy-sol-types = "0.8"
 alloy-rlp = "0.3.4"
 alloy-trie = "0.4"
 alloy-rpc-types = { version = "0.3", default-features = false, features = [
