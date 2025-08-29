@@ -134,6 +134,14 @@ pub static TAIKO_A7: Lazy<Arc<ChainSpec>> = Lazy::new(|| {
                         .map_or(1299888, |h| h.parse().unwrap_or(1299888)),
                 ),
             ),
+            #[cfg(feature = "taiko")]
+            (
+                Hardfork::Shasta, 
+                ForkCondition::Block(
+                    std::env::var("HEKLA_SHASTA_HEIGHT")
+                        .map_or(9999888, |h| h.parse().unwrap_or(9999888)),
+                ),
+            ),
         ]),
         deposit_contract: None,
         ..Default::default()
@@ -178,6 +186,14 @@ pub static TAIKO_DEV: Lazy<Arc<ChainSpec>> = Lazy::new(|| {
                 Hardfork::Pacaya,
                 ForkCondition::Block(
                     std::env::var("DEV_PACAYA_HEIGHT").map_or(0, |h| h.parse().unwrap_or(0)),
+                ),
+            ),
+            #[cfg(feature = "taiko")]
+            (
+                Hardfork::Shasta, 
+                ForkCondition::Block(
+                    std::env::var("DEV_SHASTA_HEIGHT")
+                        .map_or(9999888, |h| h.parse().unwrap_or(9999888)),
                 ),
             ),
         ]),
@@ -226,6 +242,14 @@ pub static TAIKO_MAINNET: Lazy<Arc<ChainSpec>> = Lazy::new(|| {
                 ForkCondition::Block(
                     std::env::var("MAINNET_PACAYA_HEIGHT")
                         .map_or(1166000, |h| h.parse().unwrap_or(1166000)),
+                ),
+            ),
+            #[cfg(feature = "taiko")]
+            (
+                Hardfork::Shasta, 
+                ForkCondition::Block(
+                    std::env::var("MAINNET_SHASTA_HEIGHT")
+                        .map_or(9999888, |h| h.parse().unwrap_or(9999888)),
                 ),
             ),
         ]),

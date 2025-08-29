@@ -337,3 +337,12 @@ pub fn check_anchor_tx_pacaya(
 
     Ok(())
 }
+
+pub fn check_anchor_tx_shasta(
+    tx: &TransactionSigned,
+    from: &Address,
+    block: &Block,
+    taiko_data: TaikoData,
+) -> Result<()> {
+    todo!("check_anchor_tx_shasta");
+}

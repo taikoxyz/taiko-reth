@@ -54,7 +54,9 @@ pub fn revm_spec(chain_spec: &ChainSpec, block: Head) -> revm_primitives::SpecId
 
     #[cfg(feature = "taiko")]
     if chain_spec.is_taiko() {
-        if chain_spec.fork(Hardfork::Pacaya).active_at_head(&block) {
+        if chain_spec.fork(Hardfork::Shasta).active_at_head(&block) {
+            return revm_primitives::SHASTA;
+        }else if chain_spec.fork(Hardfork::Pacaya).active_at_head(&block) {
             return revm_primitives::PACAYA;
         } else if chain_spec.fork(Hardfork::Ontake).active_at_head(&block) {
             return revm_primitives::ONTAKE;
