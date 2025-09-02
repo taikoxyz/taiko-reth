@@ -2,7 +2,7 @@
 
 use crate::{
     dao_fork::{DAO_HARDFORK_BENEFICIARY, DAO_HARDKFORK_ACCOUNTS},
-    taiko::{check_anchor_tx, check_anchor_tx_ontake, check_anchor_tx_pacaya, TaikoData},
+    taiko::{check_anchor_tx, check_anchor_tx_ontake, check_anchor_tx_pacaya, check_anchor_tx_shasta, TaikoData},
     EthEvmConfig,
 };
 use reth_chainspec::{ChainSpec, MAINNET};
@@ -185,7 +185,15 @@ where
                     &self.chain_spec,
                     Head { number: block.number, ..Default::default() },
                 );
-                if spec_id.is_enabled_in(SpecId::PACAYA) {
+                if spec_id.is_enabled_in(SpecId::SHASTA) {
+                    check_anchor_tx_shasta(
+                        transaction,
+                        sender,
+                        &block.block,
+                        taiko_data.clone().unwrap(),
+                    )
+                    .map_err(|e| BlockExecutionError::CanonicalRevert { inner: e.to_string() })?;
+                } else if spec_id.is_enabled_in(SpecId::PACAYA) {
                     check_anchor_tx_pacaya(
                         transaction,
                         sender,

@@ -111,6 +111,7 @@ sol! {
         uint32 maxGasIssuancePerBlock;
     }
 
+    /// AnchorV2 call
     function anchorV2(
         /// The anchor L1 block
         uint64 _anchorBlockId,
@@ -125,6 +126,7 @@ sol! {
         nonReentrant
     {}
 
+    /// AnchorV3 call
     function anchorV3(
         uint64 _anchorBlockId,
         bytes32 _anchorStateRoot,
@@ -134,6 +136,55 @@ sol! {
     )
         external
         nonReentrant
+    {}
+
+    /// Bond type
+    enum BondType {
+        NONE,
+        PROVABILITY,
+        LIVENESS
+    }
+
+    /// Bond instruction
+    struct BondInstruction {
+        uint48 proposalId;
+        BondType bondType;
+        address payer;
+        address receiver;
+    }
+
+    /// @notice Processes a block within a proposal, handling bond instructions and L1 data
+    /// anchoring.
+    /// @dev Core function that processes blocks sequentially within a proposal:
+    ///      1. Designates prover on first block (blockIndex == 0)
+    ///      2. Processes bond transfers with cumulative hash verification
+    ///      3. Anchors L1 block data for cross-chain verification
+    ///      4. Tracks parent block hash to prevent duplicate calls
+    /// @param _proposalId Unique identifier of the proposal being anchored.
+    /// @param _proposer Address of the entity that proposed this batch of blocks.
+    /// @param _proverAuth Encoded ProverAuth for prover designation (empty after block 0).
+    /// @param _bondInstructionsHash Expected cumulative hash after processing instructions.
+    /// @param _bondInstructions Bond credit instructions to process for this block.
+    /// @param _blockIndex Current block index within the proposal (0-based).
+    /// @param _anchorBlockNumber L1 block number to anchor (0 to skip anchoring).
+    /// @param _anchorBlockHash L1 block hash at _anchorBlockNumber.
+    /// @param _anchorStateRoot L1 state root at _anchorBlockNumber.
+    /// @return isLowBondProposal_ True if proposer has insufficient bonds.
+    /// @return designatedProver_ Address of the designated prover.
+    function updateState(
+        // Proposal level fields - define the overall batch
+        uint48 _proposalId,
+        address _proposer,
+        bytes calldata _proverAuth,
+        bytes32 _bondInstructionsHash,
+        BondInstruction[] calldata _bondInstructions,
+        // Block level fields - specific to this block in the proposal
+        uint16 _blockIndex,
+        uint48 _anchorBlockNumber,
+        bytes32 _anchorBlockHash,
+        bytes32 _anchorStateRoot
+    )
+        returns (bool isLowBondProposal_, address designatedProver_)
     {}
 }
 
@@ -338,11 +389,47 @@ pub fn check_anchor_tx_pacaya(
     Ok(())
 }
 
+/// Decode anchor tx data for shasta fork, using updateState
+pub fn decode_anchor_shasta(bytes: &[u8]) -> Result<updateStateCall> {
+    updateStateCall::abi_decode(bytes, true).map_err(|e| anyhow!(e))
+}
+
+/// Verifies the anchor tx correctness in shasta fork
 pub fn check_anchor_tx_shasta(
     tx: &TransactionSigned,
     from: &Address,
     block: &Block,
     taiko_data: TaikoData,
 ) -> Result<()> {
-    todo!("check_anchor_tx_shasta");
+    let anchor: &reth_primitives::TxEip1559 =
+        tx.as_eip1559().context(anyhow!("anchor tx is not an EIP1559 tx"))?;
+
+    // Check the signature
+    check_anchor_signature(tx).context(anyhow!("failed to check anchor signature"))?;
+
+    // Extract the `to` address
+    let TxKind::Call(to) = anchor.to else { panic!("anchor tx not a smart contract call") };
+    // Check that it's from the golden touch address
+    ensure!(*from == *GOLDEN_TOUCH_ACCOUNT, "anchor transaction from mismatch");
+    // Check that the L2 contract is being called
+    ensure!(to == taiko_data.l2_contract, "anchor transaction to mismatch");
+    // Tx can't have any ETH attached
+    ensure!(anchor.value == U256::from(0), "anchor transaction value mismatch");
+    // Tx needs to have the expected gas limit
+    ensure!(anchor.gas_limit == ANCHOR_V3_GAS_LIMIT, "anchor transaction gas price mismatch");
+    // Check needs to have the base fee set to the block base fee
+    ensure!(
+        anchor.max_fee_per_gas == block.header.base_fee_per_gas.unwrap().into(),
+        "anchor transaction gas mismatch"
+    );
+
+    // Okay now let's decode the anchor tx to verify the inputs
+    let anchor_call = decode_anchor_shasta(&anchor.input)?;
+    ensure!(
+        anchor_call._anchorStateRoot == taiko_data.l1_header.state_root,
+        "L1 state root mismatch"
+    );
+    todo!("keep checking shasta anchor");
+
+    //  Ok(())
 }
