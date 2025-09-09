@@ -21,6 +21,15 @@ pub struct ProtocolBaseFeeConfig {
     pub max_gas_issuance_per_block: u32,
 }
 
+/// Shasta specific data
+#[derive(Clone, Debug, Default)]
+pub struct ShastaData {
+    /// isLowBondProposal_
+    pub is_low_bond_proposal: bool,
+    /// designatedProver_
+    pub designated_prover: Address,
+}
+
 /// Data required to validate a Taiko Block
 #[derive(Clone, Debug, Default)]
 pub struct TaikoData {
@@ -35,6 +44,8 @@ pub struct TaikoData {
     /// gas limit to invalidate some extra txs
     /// to align with the client's mining rule
     pub gas_limit: u64,
+    /// shasta specific data
+    pub shasta_data: Option<ShastaData>,
 }
 
 /// Anchor tx gas limit
@@ -186,6 +197,13 @@ sol! {
     )
         returns (bool isLowBondProposal_, address designatedProver_)
     {}
+
+    /// Return type for updateState function
+    /// A helper unit for taiko reth return value checking.
+    struct UpdateStateReturn {
+        bool isLowBondProposal;
+        address designatedProver;
+    }
 }
 
 // todo, use compiled abi once test passes
@@ -429,7 +447,7 @@ pub fn check_anchor_tx_shasta(
         anchor_call._anchorStateRoot == taiko_data.l1_header.state_root,
         "L1 state root mismatch"
     );
-    todo!("keep checking shasta anchor");
 
-    //  Ok(())
+    // todo: add missing fields check
+    Ok(())
 }

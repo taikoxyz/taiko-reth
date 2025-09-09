@@ -139,7 +139,7 @@ pub static TAIKO_A7: Lazy<Arc<ChainSpec>> = Lazy::new(|| {
                 Hardfork::Shasta, 
                 ForkCondition::Block(
                     std::env::var("HEKLA_SHASTA_HEIGHT")
-                        .map_or(9999888, |h| h.parse().unwrap_or(9999888)),
+                        .map_or(9999999, |h| h.parse().unwrap_or(9999999)),
                 ),
             ),
         ]),
@@ -249,7 +249,7 @@ pub static TAIKO_MAINNET: Lazy<Arc<ChainSpec>> = Lazy::new(|| {
                 Hardfork::Shasta, 
                 ForkCondition::Block(
                     std::env::var("MAINNET_SHASTA_HEIGHT")
-                        .map_or(9999888, |h| h.parse().unwrap_or(9999888)),
+                        .map_or(9999999, |h| h.parse().unwrap_or(9999999)),
                 ),
             ),
         ]),

@@ -2,9 +2,10 @@
 
 use crate::{
     dao_fork::{DAO_HARDFORK_BENEFICIARY, DAO_HARDKFORK_ACCOUNTS},
-    taiko::{check_anchor_tx, check_anchor_tx_ontake, check_anchor_tx_pacaya, check_anchor_tx_shasta, TaikoData},
+    taiko::{check_anchor_tx, check_anchor_tx_ontake, check_anchor_tx_pacaya, check_anchor_tx_shasta, TaikoData, UpdateStateReturn},
     EthEvmConfig,
 };
+use alloy_sol_types::SolValue;
 use reth_chainspec::{ChainSpec, MAINNET};
 pub use reth_consensus::Consensus;
 pub use reth_ethereum_consensus::{EthBeaconConsensus, validate_block_post_execution};
@@ -193,6 +194,10 @@ where
                         taiko_data.clone().unwrap(),
                     )
                     .map_err(|e| BlockExecutionError::CanonicalRevert { inner: e.to_string() })?;
+                    assert!(
+                        taiko_data.clone().unwrap().shasta_data.is_some(),
+                        "no shasta data in shasta fork"
+                    );
                 } else if spec_id.is_enabled_in(SpecId::PACAYA) {
                     check_anchor_tx_pacaya(
                         transaction,
@@ -308,9 +313,44 @@ where
             // append gas used
             cumulative_gas_used += result.gas_used();
             if is_taiko {
-                if is_anchor && !optimistic && !result.is_success() {
-                    return Err(BlockExecutionError::msg("anchor transaction must be success"));
+                if is_anchor && !optimistic {
+                    if !result.is_success() {
+                        return Err(BlockExecutionError::msg("anchor transaction must be success"));
+                    } else {
+                        // if it's shasta
+                        if let Some(shasta_data) = taiko_data.clone().unwrap().shasta_data {
+                            match result.output() {
+                                None => {
+                                    return Err(BlockExecutionError::msg(
+                                        "shasta anchor transaction must return extra data",
+                                    ));
+                                }
+                                Some(output) => {
+                                    // Decode the output from the updateState call using Alloy ABI decode
+                                    let decoded: UpdateStateReturn = UpdateStateReturn::abi_decode(
+                                        output, true,
+                                    )
+                                    .map_err(|e| {
+                                        BlockExecutionError::msg(format!(
+                                            "Failed to decode updateState output: {}",
+                                            e
+                                        ))
+                                    })?;
+
+                                    assert_eq!(
+                                        shasta_data.designated_prover,
+                                        decoded.designatedProver
+                                    );
+                                    assert_eq!(
+                                        shasta_data.is_low_bond_proposal,
+                                        decoded.isLowBondProposal
+                                    );
+                                }
+                            }
+                        }
+                    }
                 }
+
                 let mining_gas_limit = taiko_data.clone().unwrap().gas_limit;
                 if cumulative_gas_used > mining_gas_limit {
                     warn!(
