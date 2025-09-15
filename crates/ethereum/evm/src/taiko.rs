@@ -193,7 +193,8 @@ sol! {
         uint16 _blockIndex,
         uint48 _anchorBlockNumber,
         bytes32 _anchorBlockHash,
-        bytes32 _anchorStateRoot
+        bytes32 _anchorStateRoot,
+        uint48 _endOfSubmissionWindowTimestamp
     )
         returns (bool isLowBondProposal_, address designatedProver_)
     {}
