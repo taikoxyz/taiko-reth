@@ -178,7 +178,9 @@ where
         for (idx, (sender, transaction)) in block.transactions_with_sender().enumerate() {
             let is_anchor = is_taiko && idx == 0;
 
-            debug!("Executing {} tx {:?}", idx, transaction.hash);
+            if !optimistic {
+                tracing::debug!("Executing {}/{} tx {:?}", idx, block.body.len(), transaction.hash);
+            }
 
             // verify the anchor tx
             if is_anchor {
@@ -339,11 +341,11 @@ where
 
                                     assert_eq!(
                                         shasta_data.designated_prover,
-                                        decoded.designatedProver
+                                        decoded.newState.designatedProver
                                     );
                                     assert_eq!(
                                         shasta_data.is_low_bond_proposal,
-                                        decoded.isLowBondProposal
+                                        decoded.newState.isLowBondProposal
                                     );
                                 }
                             }

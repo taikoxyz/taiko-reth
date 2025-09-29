@@ -183,7 +183,7 @@ pub static TAIKO_TOLBA: Lazy<Arc<ChainSpec>> = Lazy::new(|| {
             (
                 Hardfork::Shasta, 
                 ForkCondition::Block(
-                    std::env::var("HEKLA_SHASTA_HEIGHT")
+                    std::env::var("TOLBA_SHASTA_HEIGHT")
                         .map_or(9999999, |h| h.parse().unwrap_or(9999999)),
                 ),
             ),

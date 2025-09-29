@@ -164,6 +164,17 @@ sol! {
         address receiver;
     }
 
+    /// @notice Stores the current state of an anchor proposal being processed.
+    /// @dev This state is updated incrementally as each block in a proposal is processed.
+    struct State {
+        bytes32 bondInstructionsHash; // Cumulative hash of all bond instructions processed
+        uint48 anchorBlockNumber; // Latest L1 block number anchored to L2
+        address designatedProver; // The prover designated for the current batch
+        bool isLowBondProposal; // Indicates if the proposal has insufficient bonds
+        uint48 endOfSubmissionWindowTimestamp; // The timestamp of the last slot where the current
+            // preconfer can submit preconf-ed blocks to the L2 network.
+    }
+
     /// @notice Processes a block within a proposal, handling bond instructions and L1 data
     /// anchoring.
     /// @dev Core function that processes blocks sequentially within a proposal:
@@ -196,14 +207,15 @@ sol! {
         bytes32 _anchorStateRoot,
         uint48 _endOfSubmissionWindowTimestamp
     )
-        returns (bool isLowBondProposal_, address designatedProver_)
+        returns (State memory previousState_, State memory newState_)
     {}
 
     /// Return type for updateState function
     /// A helper unit for taiko reth return value checking.
+    /// This matches the actual return type of updateState: (State, State)
     struct UpdateStateReturn {
-        bool isLowBondProposal;
-        address designatedProver;
+        State previousState;
+        State newState;
     }
 }
 
