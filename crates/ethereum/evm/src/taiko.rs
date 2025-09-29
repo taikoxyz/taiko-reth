@@ -430,7 +430,7 @@ pub fn check_anchor_tx_shasta(
     tx: &TransactionSigned,
     from: &Address,
     block: &Block,
-    taiko_data: TaikoData,
+    taiko_data: &TaikoData,
 ) -> Result<()> {
     let anchor: &reth_primitives::TxEip1559 =
         tx.as_eip1559().context(anyhow!("anchor tx is not an EIP1559 tx"))?;

@@ -189,17 +189,12 @@ where
                     Head { number: block.number, ..Default::default() },
                 );
                 if spec_id.is_enabled_in(SpecId::SHASTA) {
-                    check_anchor_tx_shasta(
-                        transaction,
-                        sender,
-                        &block.block,
-                        taiko_data.clone().unwrap(),
-                    )
-                    .map_err(|e| BlockExecutionError::CanonicalRevert { inner: e.to_string() })?;
-                    assert!(
-                        taiko_data.clone().unwrap().shasta_data.is_some(),
-                        "no shasta data in shasta fork"
-                    );
+                    let taiko_data = taiko_data.clone().unwrap();
+                    check_anchor_tx_shasta(transaction, sender, &block.block, &taiko_data)
+                        .map_err(|e| BlockExecutionError::CanonicalRevert {
+                            inner: e.to_string(),
+                        })?;
+                    assert!(taiko_data.shasta_data.is_some(), "no shasta data in shasta fork");
                 } else if spec_id.is_enabled_in(SpecId::PACAYA) {
                     check_anchor_tx_pacaya(
                         transaction,
@@ -258,8 +253,9 @@ where
             // Set taiko specific data
             evm.tx_mut().taiko.is_anchor = is_anchor;
             // set the treasury address
-            evm.tx_mut().taiko.treasury = taiko_data.clone().unwrap().l2_contract;
-            evm.tx_mut().taiko.basefee_ratio = taiko_data.clone().unwrap().base_fee_config.sharing_pctg;
+            let taiko_data = taiko_data.clone().unwrap();
+            evm.tx_mut().taiko.treasury = taiko_data.l2_contract;
+            evm.tx_mut().taiko.basefee_ratio = taiko_data.base_fee_config.sharing_pctg;
 
             // Execute transaction.
             let res = evm.transact().map_err(move |err| {
@@ -320,7 +316,7 @@ where
                         return Err(BlockExecutionError::msg("anchor transaction must be success"));
                     } else {
                         // if it's shasta
-                        if let Some(shasta_data) = taiko_data.clone().unwrap().shasta_data {
+                        if let Some(shasta_data) = taiko_data.shasta_data {
                             match result.output() {
                                 None => {
                                     return Err(BlockExecutionError::msg(
@@ -353,7 +349,7 @@ where
                     }
                 }
 
-                let mining_gas_limit = taiko_data.clone().unwrap().gas_limit;
+                let mining_gas_limit = taiko_data.gas_limit;
                 if cumulative_gas_used > mining_gas_limit {
                     warn!(
                         "mining gas limit exceeded: {} > {}",
