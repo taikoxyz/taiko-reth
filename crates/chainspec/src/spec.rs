@@ -153,7 +153,7 @@ pub static TAIKO_A7: Lazy<Arc<ChainSpec>> = Lazy::new(|| {
 /// The Taiko TOLBA spec
 pub static TAIKO_TOLBA: Lazy<Arc<ChainSpec>> = Lazy::new(|| {
     ChainSpec {
-        chain: 167012.into(),
+        chain: 167013.into(),
         genesis_hash: None,
         paris_block_and_final_difficulty: None,
         hardforks: BTreeMap::from([
