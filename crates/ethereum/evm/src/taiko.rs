@@ -164,15 +164,22 @@ sol! {
         address receiver;
     }
 
-    /// @notice Stores the current state of an anchor proposal being processed.
-    /// @dev This state is updated incrementally as each block in a proposal is processed.
-    struct State {
-        bytes32 bondInstructionsHash; // Cumulative hash of all bond instructions processed
-        uint48 anchorBlockNumber; // Latest L1 block number anchored to L2
-        address designatedProver; // The prover designated for the current batch
-        bool isLowBondProposal; // Indicates if the proposal has insufficient bonds
-        uint48 endOfSubmissionWindowTimestamp; // The timestamp of the last slot where the current
-            // preconfer can submit preconf-ed blocks to the L2 network.
+
+    /// @notice Proposal-level data that applies to the entire batch of blocks.
+    struct ProposalParams {
+        uint48 proposalId; // Unique identifier of the proposal
+        address proposer; // Address of the entity that proposed this batch
+        bytes proverAuth; // Encoded ProverAuth for prover designation
+        bytes32 bondInstructionsHash; // Expected hash of bond instructions
+        BondInstruction[] bondInstructions; // Bond credit instructions to process
+    }
+
+    /// @notice Block-level data specific to a single block within a proposal.
+    struct BlockParams {
+        uint16 blockIndex; // Current block index within the proposal (0-based)
+        uint48 anchorBlockNumber; // L1 block number to anchor (0 to skip)
+        bytes32 anchorBlockHash; // L1 block hash at anchorBlockNumber
+        bytes32 anchorStateRoot; // L1 state root at anchorBlockNumber
     }
 
     /// @notice Processes a block within a proposal, handling bond instructions and L1 data
@@ -181,42 +188,25 @@ sol! {
     ///      1. Designates prover on first block (blockIndex == 0)
     ///      2. Processes bond transfers with cumulative hash verification
     ///      3. Anchors L1 block data for cross-chain verification
-    ///      4. Tracks parent block hash to prevent duplicate calls
-    /// @param _proposalId Unique identifier of the proposal being anchored.
-    /// @param _proposer Address of the entity that proposed this batch of blocks.
-    /// @param _proverAuth Encoded ProverAuth for prover designation (empty after block 0).
-    /// @param _bondInstructionsHash Expected cumulative hash after processing instructions.
-    /// @param _bondInstructions Bond credit instructions to process for this block.
-    /// @param _blockIndex Current block index within the proposal (0-based).
-    /// @param _anchorBlockNumber L1 block number to anchor (0 to skip anchoring).
-    /// @param _anchorBlockHash L1 block hash at _anchorBlockNumber.
-    /// @param _anchorStateRoot L1 state root at _anchorBlockNumber.
-    /// @return isLowBondProposal_ True if proposer has insufficient bonds.
-    /// @return designatedProver_ Address of the designated prover.
-    function updateState(
-        // Proposal level fields - define the overall batch
-        uint48 _proposalId,
-        address _proposer,
-        bytes calldata _proverAuth,
-        bytes32 _bondInstructionsHash,
-        BondInstruction[] calldata _bondInstructions,
-        // Block level fields - specific to this block in the proposal
-        uint16 _blockIndex,
-        uint48 _anchorBlockNumber,
-        bytes32 _anchorBlockHash,
-        bytes32 _anchorStateRoot,
-        uint48 _endOfSubmissionWindowTimestamp
+    /// @param _proposalParams Proposal-level parameters that define the overall batch.
+    /// @param _blockParams Block-level parameters specific to this block in the proposal.
+    function anchorV4(
+        ProposalParams calldata _proposalParams,
+        BlockParams calldata _blockParams
     )
-        returns (State memory previousState_, State memory newState_)
+        external
+        onlyValidSender
+        nonReentrant
     {}
 
-    /// Return type for updateState function
-    /// A helper unit for taiko reth return value checking.
-    /// This matches the actual return type of updateState: (State, State)
-    struct UpdateStateReturn {
-        State previousState;
-        State newState;
-    }
+    // event emitted by anchorV4
+    event Anchored(
+        bytes32 bondInstructionsHash,
+        address designatedProver,
+        bool isLowBondProposal,
+        uint48 anchorBlockNumber,
+        bytes32 ancestorsHash
+    );
 }
 
 // todo, use compiled abi once test passes
@@ -420,9 +410,9 @@ pub fn check_anchor_tx_pacaya(
     Ok(())
 }
 
-/// Decode anchor tx data for shasta fork, using updateState
-pub fn decode_anchor_shasta(bytes: &[u8]) -> Result<updateStateCall> {
-    updateStateCall::abi_decode(bytes, true).map_err(|e| anyhow!(e))
+/// Decode anchor tx data for shasta fork, using anchorV4
+pub fn decode_anchor_shasta(bytes: &[u8]) -> Result<anchorV4Call> {
+    anchorV4Call::abi_decode(bytes, true).map_err(|e| anyhow!(e))
 }
 
 /// Verifies the anchor tx correctness in shasta fork
@@ -457,7 +447,15 @@ pub fn check_anchor_tx_shasta(
     // Okay now let's decode the anchor tx to verify the inputs
     let anchor_call = decode_anchor_shasta(&anchor.input)?;
     ensure!(
-        anchor_call._anchorStateRoot == taiko_data.l1_header.state_root,
+        anchor_call._blockParams.anchorBlockNumber == taiko_data.l1_header.number,
+        "L1 state root mismatch"
+    );
+    ensure!(
+        anchor_call._blockParams.anchorBlockHash == taiko_data.l1_header.hash_slow(),
+        "L1 state root mismatch"
+    );
+    ensure!(
+        anchor_call._blockParams.anchorStateRoot == taiko_data.l1_header.state_root,
         "L1 state root mismatch"
     );
 

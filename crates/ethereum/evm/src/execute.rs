@@ -2,10 +2,10 @@
 
 use crate::{
     dao_fork::{DAO_HARDFORK_BENEFICIARY, DAO_HARDKFORK_ACCOUNTS},
-    taiko::{check_anchor_tx, check_anchor_tx_ontake, check_anchor_tx_pacaya, check_anchor_tx_shasta, TaikoData, UpdateStateReturn},
+    taiko::{check_anchor_tx, check_anchor_tx_ontake, check_anchor_tx_pacaya, check_anchor_tx_shasta, TaikoData, Anchored},
     EthEvmConfig,
 };
-use alloy_sol_types::SolValue;
+use alloy_sol_types::SolEvent;
 use reth_chainspec::{ChainSpec, MAINNET};
 pub use reth_consensus::Consensus;
 pub use reth_ethereum_consensus::{EthBeaconConsensus, validate_block_post_execution};
@@ -317,34 +317,24 @@ where
                     } else {
                         // if it's shasta
                         if let Some(shasta_data) = taiko_data.shasta_data {
-                            match result.output() {
-                                None => {
-                                    return Err(BlockExecutionError::msg(
-                                        "shasta anchor transaction must return extra data",
-                                    ));
-                                }
-                                Some(output) => {
-                                    // Decode the output from the updateState call using Alloy ABI decode
-                                    let decoded: UpdateStateReturn = UpdateStateReturn::abi_decode(
-                                        output, true,
-                                    )
-                                    .map_err(|e| {
-                                        BlockExecutionError::msg(format!(
-                                            "Failed to decode updateState output: {}",
-                                            e
-                                        ))
-                                    })?;
-
-                                    assert_eq!(
-                                        shasta_data.designated_prover,
-                                        decoded.newState.designatedProver
-                                    );
-                                    assert_eq!(
-                                        shasta_data.is_low_bond_proposal,
-                                        decoded.newState.isLowBondProposal
-                                    );
-                                }
+                            // Ensure the last log is the Anchored event and its contents match shasta_data
+                            let logs = result.logs();
+                            if logs.is_empty() {
+                                return Err(BlockExecutionError::msg("no logs emitted by anchor tx"));
                             }
+                            // The Anchored event should be the last log emitted
+                            let anchored_log = logs.last().expect("logs checked above");
+                            let anchored_event = Anchored::decode_log(anchored_log, true)
+                                .map_err(|e| BlockExecutionError::msg(format!("failed to decode Anchored event: {e}")))?;
+
+                            assert_eq!(
+                                anchored_event.designatedProver, shasta_data.designated_prover,
+                                "Anchored event: designatedProver mismatch"
+                            );
+                            assert_eq!(
+                                anchored_event.isLowBondProposal, shasta_data.is_low_bond_proposal,
+                                "Anchored event: isLowBondProposal mismatch"
+                            );
                         }
                     }
                 }
