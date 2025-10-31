@@ -38,7 +38,7 @@ use revm_primitives::{
 };
 use std::sync::Arc;
 use anyhow::Result;
-use tracing::{debug, warn};
+use tracing::{debug, error, warn};
 
 /// Provides executors to execute regular ethereum blocks
 #[derive(Debug, Clone)]
@@ -327,14 +327,26 @@ where
                             let anchored_event = Anchored::decode_log(anchored_log, true)
                                 .map_err(|e| BlockExecutionError::msg(format!("failed to decode Anchored event: {e}")))?;
 
-                            assert_eq!(
-                                anchored_event.designatedProver, shasta_data.designated_prover,
-                                "Anchored event: designatedProver mismatch"
-                            );
-                            assert_eq!(
-                                anchored_event.isLowBondProposal, shasta_data.is_low_bond_proposal,
-                                "Anchored event: isLowBondProposal mismatch"
-                            );
+                            if anchored_event.designatedProver != shasta_data.designated_prover {
+                                error!(
+                                    "Anchored event: designatedProver mismatch: {} != {}",
+                                    anchored_event.designatedProver, shasta_data.designated_prover
+                                );
+                                return Err(BlockExecutionError::msg(
+                                    "Anchored event: designatedProver mismatch",
+                                ));
+                            }
+                            if anchored_event.isLowBondProposal != shasta_data.is_low_bond_proposal
+                            {
+                                error!(
+                                    "Anchored event: isLowBondProposal mismatch: {} != {}",
+                                    anchored_event.isLowBondProposal,
+                                    shasta_data.is_low_bond_proposal
+                                );
+                                return Err(BlockExecutionError::msg(
+                                    "Anchored event: isLowBondProposal mismatch",
+                                ));
+                            }
                         }
                     }
                 }

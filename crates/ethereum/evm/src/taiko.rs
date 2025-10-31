@@ -3,7 +3,7 @@
 use anyhow::{anyhow, bail, ensure, Context, Result};
 use lazy_static::lazy_static;
 use reth_primitives::{Block, Header, TransactionSigned, TxKind};
-use revm_primitives::{alloy_primitives::uint, Address, U256};
+use revm_primitives::{alloy_primitives::uint, Address, B256, U256};
 use std::str::FromStr;
 
 #[derive(Clone, Debug, Default)]
@@ -448,16 +448,20 @@ pub fn check_anchor_tx_shasta(
     let anchor_call = decode_anchor_shasta(&anchor.input)?;
     ensure!(
         anchor_call._blockParams.anchorBlockNumber == taiko_data.l1_header.number,
-        "L1 state root mismatch"
+        "L1 anchor block number mismatch"
     );
-    ensure!(
-        anchor_call._blockParams.anchorBlockHash == taiko_data.l1_header.hash_slow(),
-        "L1 state root mismatch"
-    );
-    ensure!(
-        anchor_call._blockParams.anchorStateRoot == taiko_data.l1_header.state_root,
-        "L1 state root mismatch"
-    );
+    if anchor_call._blockParams.anchorBlockHash != B256::ZERO {
+        ensure!(
+            anchor_call._blockParams.anchorBlockHash == taiko_data.l1_header.hash_slow(),
+            "L1 anchor block hash mismatch"
+        );
+    }
+    if anchor_call._blockParams.anchorStateRoot != B256::ZERO {
+        ensure!(
+            anchor_call._blockParams.anchorStateRoot == taiko_data.l1_header.state_root,
+            "L1 state root mismatch"
+        );
+    }
 
     // todo: add missing fields check
     Ok(())
