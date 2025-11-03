@@ -176,7 +176,6 @@ sol! {
 
     /// @notice Block-level data specific to a single block within a proposal.
     struct BlockParams {
-        uint16 blockIndex; // Current block index within the proposal (0-based)
         uint48 anchorBlockNumber; // L1 block number to anchor (0 to skip)
         bytes32 anchorBlockHash; // L1 block hash at anchorBlockNumber
         bytes32 anchorStateRoot; // L1 state root at anchorBlockNumber
