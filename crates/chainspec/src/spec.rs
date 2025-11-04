@@ -182,9 +182,9 @@ pub static TAIKO_TOLBA: Lazy<Arc<ChainSpec>> = Lazy::new(|| {
             #[cfg(feature = "taiko")]
             (
                 Hardfork::Shasta, 
-                ForkCondition::Block(
-                    std::env::var("TOLBA_SHASTA_HEIGHT")
-                        .map_or(9999999, |h| h.parse().unwrap_or(9999999)),
+                ForkCondition::Timestamp(
+                    std::env::var("TOLBA_SHASTA_TIMESTAMP")
+                        .map_or(9762151622, |h| h.parse().unwrap_or(9762151622)),
                 ),
             ),
         ]),
@@ -235,10 +235,10 @@ pub static TAIKO_DEV: Lazy<Arc<ChainSpec>> = Lazy::new(|| {
             ),
             #[cfg(feature = "taiko")]
             (
-                Hardfork::Shasta, 
-                ForkCondition::Block(
-                    std::env::var("DEV_SHASTA_HEIGHT")
-                        .map_or(9999888, |h| h.parse().unwrap_or(9999888)),
+                Hardfork::Shasta,
+                ForkCondition::Timestamp(
+                    std::env::var("DEV_SHASTA_TIMESTAMP")
+                        .map_or(9762151622, |h| h.parse().unwrap_or(9762151622)),
                 ),
             ),
         ]),
@@ -291,10 +291,10 @@ pub static TAIKO_MAINNET: Lazy<Arc<ChainSpec>> = Lazy::new(|| {
             ),
             #[cfg(feature = "taiko")]
             (
-                Hardfork::Shasta, 
-                ForkCondition::Block(
-                    std::env::var("MAINNET_SHASTA_HEIGHT")
-                        .map_or(9999999, |h| h.parse().unwrap_or(9999999)),
+                Hardfork::Shasta,
+                ForkCondition::Timestamp(
+                    std::env::var("MAINNET_SHASTA_TIMESTAMP")
+                        .map_or(9762151622, |h| h.parse().unwrap_or(9762151622)),
                 ),
             ),
         ]),

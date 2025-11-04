@@ -186,7 +186,7 @@ where
             if is_anchor {
                 let spec_id = revm_spec(
                     &self.chain_spec,
-                    Head { number: block.number, ..Default::default() },
+                    Head { number: block.number, timestamp: block.timestamp, ..Default::default() },
                 );
                 if spec_id.is_enabled_in(SpecId::SHASTA) {
                     let taiko_data = taiko_data.clone().unwrap();
