@@ -203,6 +203,7 @@ sol! {
         bytes32 bondInstructionsHash,
         address designatedProver,
         bool isLowBondProposal,
+        uint48 prevAnchorBlockNumber,
         uint48 anchorBlockNumber,
         bytes32 ancestorsHash
     );
