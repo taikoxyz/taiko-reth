@@ -238,14 +238,8 @@ where
             // must be no greater than the block’s gasLimit.
             let block_available_gas = block.header.gas_limit - cumulative_gas_used;
             if transaction.gas_limit() > block_available_gas {
-                if optimistic {
-                    continue;
-                }
-                return Err(BlockValidationError::TransactionGasLimitMoreThanAvailableBlockGas {
-                    transaction_gas_limit: transaction.gas_limit(),
-                    block_available_gas,
-                }
-                .into())
+                // filter this tx out
+                continue;
             }
 
             EvmConfig::fill_tx_env(evm.tx_mut(), transaction, *sender);
