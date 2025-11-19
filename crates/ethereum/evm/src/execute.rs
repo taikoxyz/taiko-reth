@@ -321,6 +321,42 @@ where
                             let anchored_event = Anchored::decode_log(anchored_log, true)
                                 .map_err(|e| BlockExecutionError::msg(format!("failed to decode Anchored event: {e}")))?;
 
+                            if shasta_data.is_force_inclusion {
+                                if anchored_event.prevAnchorBlockNumber
+                                    != anchored_event.anchorBlockNumber
+                                {
+                                    error!(
+                                        "Invalid Anchor, force inclusion but prevAnchorBlockNumber != anchorBlockNumber: {} != {}",
+                                        anchored_event.prevAnchorBlockNumber, anchored_event.anchorBlockNumber
+                                    );
+                                    return Err(BlockExecutionError::msg("Invalid Anchor, force inclusion but prevAnchorBlockNumber != anchorBlockNumber"));
+                                }
+                            }
+
+                            if anchored_event.isNewProposal {
+                                // for new proposal, the last anchor block must stays, otherwise, input last_anchor_block_number is incorrect
+                                if anchored_event.prevAnchorBlockNumber != shasta_data.last_anchor_block_number {
+                                    error!(
+                                        "Anchored event: isNewProposal but prevAnchorBlockNumber != last_anchor_block_number: {} != {}",
+                                        anchored_event.prevAnchorBlockNumber, shasta_data.last_anchor_block_number
+                                    );
+                                    return Err(BlockExecutionError::msg(
+                                        "Anchored event: isNewProposal but prevAnchorBlockNumber != last_anchor_block_number",
+                                    ));
+                                }
+                            }
+
+                            if anchored_event.prevAnchorBlockNumber > anchored_event.anchorBlockNumber
+                            {
+                                error!(
+                                    "Anchored event: prevAnchorBlockNumber > anchorBlockNumber: {} > {}",
+                                    anchored_event.prevAnchorBlockNumber, anchored_event.anchorBlockNumber
+                                );
+                                return Err(BlockExecutionError::msg(
+                                    "Anchored event: prevAnchorBlockNumber > anchorBlockNumber",
+                                ));
+                            }
+
                             if anchored_event.designatedProver != shasta_data.designated_prover {
                                 error!(
                                     "Anchored event: designatedProver mismatch: {} != {}",
@@ -330,6 +366,7 @@ where
                                     "Anchored event: designatedProver mismatch",
                                 ));
                             }
+
                             if anchored_event.isLowBondProposal != shasta_data.is_low_bond_proposal
                             {
                                 error!(

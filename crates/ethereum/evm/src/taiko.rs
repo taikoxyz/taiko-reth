@@ -28,6 +28,10 @@ pub struct ShastaData {
     pub is_low_bond_proposal: bool,
     /// designatedProver_
     pub designated_prover: Address,
+    /// last anchor block number
+    pub last_anchor_block_number: u64,
+    /// is force inclusion
+    pub is_force_inclusion: bool,
 }
 
 /// Data required to validate a Taiko Block
@@ -203,6 +207,7 @@ sol! {
         bytes32 bondInstructionsHash,
         address designatedProver,
         bool isLowBondProposal,
+        bool isNewProposal,
         uint48 prevAnchorBlockNumber,
         uint48 anchorBlockNumber,
         bytes32 ancestorsHash
