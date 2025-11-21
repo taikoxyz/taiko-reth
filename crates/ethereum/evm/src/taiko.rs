@@ -56,6 +56,8 @@ pub struct TaikoData {
 pub const ANCHOR_GAS_LIMIT: u64 = 250_000;
 /// AnchorV3 tx gas limit
 pub const ANCHOR_V3_GAS_LIMIT: u64 = 1_000_000;
+/// AnchorV4 tx gas limit
+pub const ANCHOR_V4_GAS_LIMIT: u64 = 1_000_000;
 
 lazy_static! {
     /// The address calling the anchor transaction
