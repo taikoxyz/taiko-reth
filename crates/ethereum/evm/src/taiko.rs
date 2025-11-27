@@ -32,6 +32,8 @@ pub struct ShastaData {
     pub last_anchor_block_number: u64,
     /// is force inclusion
     pub is_force_inclusion: bool,
+    /// bond proposal hash
+    pub bond_proposal_hash: Option<B256>,
 }
 
 /// Data required to validate a Taiko Block
@@ -467,6 +469,17 @@ pub fn check_anchor_tx_shasta(
         ensure!(
             anchor_call._blockParams.anchorStateRoot == taiko_data.l1_header.state_root,
             "L1 state root mismatch"
+        );
+    }
+
+    if let Some(expected_hash) =
+        taiko_data.shasta_data.as_ref().and_then(|data| data.bond_proposal_hash.clone())
+    {
+        ensure!(
+            anchor_call._proposalParams.bondInstructionsHash == expected_hash,
+            "bond proposal hash mismatch, expected: {}, actual: {}",
+            expected_hash,
+            anchor_call._proposalParams.bondInstructionsHash
         );
     }
 
