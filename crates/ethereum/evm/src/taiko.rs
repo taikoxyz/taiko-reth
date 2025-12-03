@@ -24,6 +24,8 @@ pub struct ProtocolBaseFeeConfig {
 /// Shasta specific data
 #[derive(Clone, Debug, Default)]
 pub struct ShastaData {
+    /// proposal id
+    pub proposal_id: u64,
     /// isLowBondProposal_
     pub is_low_bond_proposal: bool,
     /// designatedProver_
@@ -169,9 +171,8 @@ sol! {
         uint48 proposalId;
         BondType bondType;
         address payer;
-        address receiver;
+        address payee;
     }
-
 
     /// @notice Proposal-level data that applies to the entire batch of blocks.
     struct ProposalParams {
@@ -459,18 +460,22 @@ pub fn check_anchor_tx_shasta(
         anchor_call._blockParams.anchorBlockNumber == taiko_data.l1_header.number,
         "L1 anchor block number mismatch"
     );
-    if anchor_call._blockParams.anchorBlockHash != B256::ZERO {
-        ensure!(
-            anchor_call._blockParams.anchorBlockHash == taiko_data.l1_header.hash_slow(),
-            "L1 anchor block hash mismatch"
-        );
-    }
-    if anchor_call._blockParams.anchorStateRoot != B256::ZERO {
-        ensure!(
-            anchor_call._blockParams.anchorStateRoot == taiko_data.l1_header.state_root,
-            "L1 state root mismatch"
-        );
-    }
+
+    ensure!(
+        anchor_call._proposalParams.proposalId
+            == taiko_data.shasta_data.as_ref().unwrap().proposal_id,
+        "proposal id mismatch"
+    );
+
+    ensure!(
+        anchor_call._blockParams.anchorBlockHash == taiko_data.l1_header.hash_slow(),
+        "L1 anchor block hash mismatch"
+    );
+
+    ensure!(
+        anchor_call._blockParams.anchorStateRoot == taiko_data.l1_header.state_root,
+        "L1 state root mismatch"
+    );
 
     if let Some(expected_hash) =
         taiko_data.shasta_data.as_ref().and_then(|data| data.bond_proposal_hash.clone())
