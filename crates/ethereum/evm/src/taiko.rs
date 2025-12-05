@@ -34,8 +34,6 @@ pub struct ShastaData {
     pub last_anchor_block_number: u64,
     /// is force inclusion
     pub is_force_inclusion: bool,
-    /// bond proposal hash
-    pub bond_proposal_hash: Option<B256>,
 }
 
 /// Data required to validate a Taiko Block
@@ -159,28 +157,11 @@ sol! {
         nonReentrant
     {}
 
-    /// Bond type
-    enum BondType {
-        NONE,
-        PROVABILITY,
-        LIVENESS
-    }
-
-    /// Bond instruction
-    struct BondInstruction {
-        uint48 proposalId;
-        BondType bondType;
-        address payer;
-        address payee;
-    }
-
     /// @notice Proposal-level data that applies to the entire batch of blocks.
     struct ProposalParams {
         uint48 proposalId; // Unique identifier of the proposal
         address proposer; // Address of the entity that proposed this batch
         bytes proverAuth; // Encoded ProverAuth for prover designation
-        bytes32 bondInstructionsHash; // Expected hash of bond instructions
-        BondInstruction[] bondInstructions; // Bond credit instructions to process
     }
 
     /// @notice Block-level data specific to a single block within a proposal.
@@ -209,7 +190,6 @@ sol! {
 
     // event emitted by anchorV4
     event Anchored(
-        bytes32 bondInstructionsHash,
         address designatedProver,
         bool isLowBondProposal,
         bool isNewProposal,
@@ -476,17 +456,6 @@ pub fn check_anchor_tx_shasta(
         anchor_call._blockParams.anchorStateRoot == taiko_data.l1_header.state_root,
         "L1 state root mismatch"
     );
-
-    if let Some(expected_hash) =
-        taiko_data.shasta_data.as_ref().and_then(|data| data.bond_proposal_hash.clone())
-    {
-        ensure!(
-            anchor_call._proposalParams.bondInstructionsHash == expected_hash,
-            "bond proposal hash mismatch, expected: {}, actual: {}",
-            expected_hash,
-            anchor_call._proposalParams.bondInstructionsHash
-        );
-    }
 
     // todo: add missing fields check
     Ok(())
