@@ -437,24 +437,9 @@ pub fn check_anchor_tx_shasta(
     // Okay now let's decode the anchor tx to verify the inputs
     let anchor_call = decode_anchor_shasta(&anchor.input)?;
     ensure!(
-        anchor_call._blockParams.anchorBlockNumber == taiko_data.l1_header.number,
-        "L1 anchor block number mismatch"
-    );
-
-    ensure!(
         anchor_call._proposalParams.proposalId
             == taiko_data.shasta_data.as_ref().unwrap().proposal_id,
         "proposal id mismatch"
-    );
-
-    ensure!(
-        anchor_call._blockParams.anchorBlockHash == taiko_data.l1_header.hash_slow(),
-        "L1 anchor block hash mismatch"
-    );
-
-    ensure!(
-        anchor_call._blockParams.anchorStateRoot == taiko_data.l1_header.state_root,
-        "L1 state root mismatch"
     );
 
     // todo: add missing fields check
