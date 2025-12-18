@@ -164,24 +164,25 @@ sol! {
         bytes proverAuth; // Encoded ProverAuth for prover designation
     }
 
-    /// @notice Block-level data specific to a single block within a proposal.
-    struct BlockParams {
-        uint48 anchorBlockNumber; // L1 block number to anchor (0 to skip)
-        bytes32 anchorBlockHash; // L1 block hash at anchorBlockNumber
-        bytes32 anchorStateRoot; // L1 state root at anchorBlockNumber
+    /// @notice Represents a synced checkpoint
+    struct Checkpoint {
+        /// @notice The block number associated with the checkpoint.
+        uint48 blockNumber;
+        /// @notice The block hash for the end (last) L2 block in this proposal.
+        bytes32 blockHash;
+        /// @notice The state root for the end (last) L2 block in this proposal.
+        bytes32 stateRoot;
     }
 
-    /// @notice Processes a block within a proposal, handling bond instructions and L1 data
-    /// anchoring.
+    /// @notice Processes a block within a proposal and anchors L1 data.
     /// @dev Core function that processes blocks sequentially within a proposal:
-    ///      1. Designates prover on first block (blockIndex == 0)
-    ///      2. Processes bond transfers with cumulative hash verification
-    ///      3. Anchors L1 block data for cross-chain verification
+    ///      1. Designates prover when a new proposal starts (i.e. the first block of a proposal)
+    ///      2. Anchors L1 block data for cross-chain verification
     /// @param _proposalParams Proposal-level parameters that define the overall batch.
-    /// @param _blockParams Block-level parameters specific to this block in the proposal.
+    /// @param _checkpoint Checkpoint data for the L1 block being anchored.
     function anchorV4(
         ProposalParams calldata _proposalParams,
-        BlockParams calldata _blockParams
+        Checkpoint calldata _checkpoint
     )
         external
         onlyValidSender
@@ -190,9 +191,10 @@ sol! {
 
     // event emitted by anchorV4
     event Anchored(
+        uint48 indexed proposalId,
+        bool indexed isNewProposal,
+        bool indexed isLowBondProposal,
         address designatedProver,
-        bool isLowBondProposal,
-        bool isNewProposal,
         uint48 prevAnchorBlockNumber,
         uint48 anchorBlockNumber,
         bytes32 ancestorsHash
@@ -427,7 +429,7 @@ pub fn check_anchor_tx_shasta(
     // Tx can't have any ETH attached
     ensure!(anchor.value == U256::from(0), "anchor transaction value mismatch");
     // Tx needs to have the expected gas limit
-    ensure!(anchor.gas_limit == ANCHOR_V3_GAS_LIMIT, "anchor transaction gas price mismatch");
+    ensure!(anchor.gas_limit == ANCHOR_V4_GAS_LIMIT, "anchor transaction gas price mismatch");
     // Check needs to have the base fee set to the block base fee
     ensure!(
         anchor.max_fee_per_gas == block.header.base_fee_per_gas.unwrap().into(),
