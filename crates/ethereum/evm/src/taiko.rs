@@ -3,7 +3,7 @@
 use anyhow::{anyhow, bail, ensure, Context, Result};
 use lazy_static::lazy_static;
 use reth_primitives::{Block, Header, TransactionSigned, TxKind};
-use revm_primitives::{alloy_primitives::uint, Address, B256, U256};
+use revm_primitives::{alloy_primitives::uint, Address, U256};
 use std::str::FromStr;
 
 #[derive(Clone, Debug, Default)]
@@ -24,12 +24,6 @@ pub struct ProtocolBaseFeeConfig {
 /// Shasta specific data
 #[derive(Clone, Debug, Default)]
 pub struct ShastaData {
-    /// proposal id
-    pub proposal_id: u64,
-    /// isLowBondProposal_
-    pub is_low_bond_proposal: bool,
-    /// designatedProver_
-    pub designated_prover: Address,
     /// last anchor block number
     pub last_anchor_block_number: u64,
     /// is force inclusion
@@ -164,6 +158,7 @@ sol! {
         bytes proverAuth; // Encoded ProverAuth for prover designation
     }
 
+    #[derive(Debug, Default)]
     /// @notice Represents a synced checkpoint
     struct Checkpoint {
         /// @notice The block number associated with the checkpoint.
@@ -174,31 +169,18 @@ sol! {
         bytes32 stateRoot;
     }
 
-    /// @notice Processes a block within a proposal and anchors L1 data.
-    /// @dev Core function that processes blocks sequentially within a proposal:
-    ///      1. Designates prover when a new proposal starts (i.e. the first block of a proposal)
-    ///      2. Anchors L1 block data for cross-chain verification
-    /// @param _proposalParams Proposal-level parameters that define the overall batch.
+    /// @notice Processes a block and anchors L1 data.
+    /// @dev Core function that anchors L1 block data for cross-chain verification.
     /// @param _checkpoint Checkpoint data for the L1 block being anchored.
-    function anchorV4(
-        ProposalParams calldata _proposalParams,
-        Checkpoint calldata _checkpoint
-    )
+    function anchorV4(Checkpoint calldata _checkpoint)
         external
         onlyValidSender
         nonReentrant
     {}
 
     // event emitted by anchorV4
-    event Anchored(
-        uint48 indexed proposalId,
-        bool indexed isNewProposal,
-        bool indexed isLowBondProposal,
-        address designatedProver,
-        uint48 prevAnchorBlockNumber,
-        uint48 anchorBlockNumber,
-        bytes32 ancestorsHash
-    );
+    event Anchored(uint48 prevAnchorBlockNumber, uint48 anchorBlockNumber, bytes32 ancestorsHash);
+
 }
 
 // todo, use compiled abi once test passes
@@ -436,14 +418,9 @@ pub fn check_anchor_tx_shasta(
         "anchor transaction gas mismatch"
     );
 
-    // Okay now let's decode the anchor tx to verify the inputs
-    let anchor_call = decode_anchor_shasta(&anchor.input)?;
-    ensure!(
-        anchor_call._proposalParams.proposalId
-            == taiko_data.shasta_data.as_ref().unwrap().proposal_id,
-        "proposal id mismatch"
-    );
+    // No need to decode the anchor tx here because in shasta, we check all
+    // anchors' validity & linkage in guest binary explicitly
 
-    // todo: add missing fields check
+
     Ok(())
 }
