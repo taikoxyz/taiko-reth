@@ -28,6 +28,8 @@ pub struct ShastaData {
     pub last_anchor_block_number: u64,
     /// is force inclusion
     pub is_force_inclusion: bool,
+    /// is the first block in the proposal
+    pub is_first_block_in_proposal: bool,
 }
 
 /// Data required to validate a Taiko Block

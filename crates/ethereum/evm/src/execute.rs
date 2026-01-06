@@ -343,6 +343,24 @@ where
                                     "Anchored event: prevAnchorBlockNumber > anchorBlockNumber",
                                 ));
                             }
+
+                            // Verify prevAnchorBlockNumber matches last_anchor_block_number for the first block
+                            if shasta_data.is_first_block_in_proposal {
+                                if anchored_event.prevAnchorBlockNumber
+                                    != shasta_data.last_anchor_block_number
+                                {
+                                    error!(
+                                        "Anchored event prevAnchorBlockNumber mismatch: expected {}, got {}",
+                                        shasta_data.last_anchor_block_number,
+                                        anchored_event.prevAnchorBlockNumber
+                                    );
+                                    return Err(BlockExecutionError::msg(format!(
+                                        "Anchored event prevAnchorBlockNumber mismatch: expected {}, got {}",
+                                        shasta_data.last_anchor_block_number,
+                                        anchored_event.prevAnchorBlockNumber
+                                    )));
+                                }
+                            }
                         }
                     }
                 }
