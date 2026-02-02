@@ -136,7 +136,7 @@ pub static TAIKO_A7: Lazy<Arc<ChainSpec>> = Lazy::new(|| {
             ),
             #[cfg(feature = "taiko")]
             (
-                Hardfork::Shasta, 
+                Hardfork::Shasta,
                 ForkCondition::Block(
                     std::env::var("HEKLA_SHASTA_HEIGHT")
                         .map_or(9999999, |h| h.parse().unwrap_or(9999999)),
@@ -148,7 +148,6 @@ pub static TAIKO_A7: Lazy<Arc<ChainSpec>> = Lazy::new(|| {
     }
     .into()
 });
-
 
 /// The Taiko TOLBA spec
 pub static TAIKO_TOLBA: Lazy<Arc<ChainSpec>> = Lazy::new(|| {
@@ -176,15 +175,15 @@ pub static TAIKO_TOLBA: Lazy<Arc<ChainSpec>> = Lazy::new(|| {
             #[cfg(feature = "taiko")]
             (Hardfork::Hekla, ForkCondition::Block(0)),
             #[cfg(feature = "taiko")]
-            ( Hardfork::Ontake, ForkCondition::Block(0)),
+            (Hardfork::Ontake, ForkCondition::Block(0)),
             #[cfg(feature = "taiko")]
             (Hardfork::Pacaya, ForkCondition::Block(0)),
             #[cfg(feature = "taiko")]
             (
-                Hardfork::Shasta, 
+                Hardfork::Shasta,
                 ForkCondition::Timestamp(
                     std::env::var("TOLBA_SHASTA_TIMESTAMP")
-                        .map_or(9762151622, |h| h.parse().unwrap_or(9762151622)),
+                        .map_or(1770210000, |h| h.parse().unwrap_or(1770210000)),
                 ),
             ),
         ]),
