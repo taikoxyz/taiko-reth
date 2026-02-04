@@ -183,7 +183,7 @@ pub static TAIKO_TOLBA: Lazy<Arc<ChainSpec>> = Lazy::new(|| {
                 Hardfork::Shasta,
                 ForkCondition::Timestamp(
                     std::env::var("TOLBA_SHASTA_TIMESTAMP")
-                        .map_or(1770210000, |h| h.parse().unwrap_or(1770210000)),
+                        .map_or(1_770_296_400, |h| h.parse().unwrap_or(1_770_296_400)),
                 ),
             ),
         ]),
