@@ -13,7 +13,7 @@ pub use info::ChainInfo;
 pub use spec::{
     AllGenesisFormats, BaseFeeParams, BaseFeeParamsKind, ChainSpec, ChainSpecBuilder,
     DepositContract, ForkBaseFeeParams, DEV, GOERLI, HOLESKY, MAINNET, SEPOLIA, TAIKO_A7,
-    TAIKO_TOLBA, TAIKO_DEV, TAIKO_MAINNET,
+    TAIKO_TOLBA, TAIKO_DEV, TAIKO_MAINNET, TAIKO_TRANSITION,
 };
 #[cfg(feature = "optimism")]
 pub use spec::{BASE_MAINNET, BASE_SEPOLIA, OP_MAINNET, OP_SEPOLIA};

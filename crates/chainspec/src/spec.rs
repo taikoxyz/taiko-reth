@@ -193,6 +193,63 @@ pub static TAIKO_TOLBA: Lazy<Arc<ChainSpec>> = Lazy::new(|| {
     .into()
 });
 
+/// The Taiko Transition spec, used for test purpose
+pub static TAIKO_TRANSITION: Lazy<Arc<ChainSpec>> = Lazy::new(|| {
+    ChainSpec {
+        chain: 167014.into(),
+        genesis_hash: None,
+        paris_block_and_final_difficulty: None,
+        hardforks: BTreeMap::from([
+            (Hardfork::Frontier, ForkCondition::Block(0)),
+            (Hardfork::Homestead, ForkCondition::Block(0)),
+            (Hardfork::Dao, ForkCondition::Block(0)),
+            (Hardfork::Tangerine, ForkCondition::Block(0)),
+            (Hardfork::SpuriousDragon, ForkCondition::Block(0)),
+            (Hardfork::Byzantium, ForkCondition::Block(0)),
+            (Hardfork::Constantinople, ForkCondition::Block(0)),
+            (Hardfork::Petersburg, ForkCondition::Block(0)),
+            (Hardfork::Istanbul, ForkCondition::Block(0)),
+            (Hardfork::Berlin, ForkCondition::Block(0)),
+            (Hardfork::London, ForkCondition::Block(0)),
+            (
+                Hardfork::Paris,
+                ForkCondition::TTD { fork_block: None, total_difficulty: U256::from(0) },
+            ),
+            (Hardfork::Shanghai, ForkCondition::Timestamp(0)),
+            #[cfg(feature = "taiko")]
+            (Hardfork::Hekla, ForkCondition::Block(0)),
+            #[cfg(feature = "taiko")]
+            (
+                Hardfork::Ontake,
+                ForkCondition::Block(
+                    std::env::var("TRANSITION_ONTAKE_HEIGHT")
+                        .map_or(0, |h| h.parse().unwrap_or(0)),
+                ),
+            ),
+            #[cfg(feature = "taiko")]
+            (
+                Hardfork::Pacaya,
+                ForkCondition::Block(
+                    std::env::var("TRANSITION_PACAYA_HEIGHT")
+                        .map_or(0, |h| h.parse().unwrap_or(0)),
+                ),
+            ),
+            #[cfg(feature = "taiko")]
+            (
+                Hardfork::Shasta,
+                ForkCondition::Timestamp(
+                    std::env::var("TRANSITION_SHASTA_TIMESTAMP")
+                        .map_or(1770987600, |h| h.parse().unwrap_or(1770987600)),
+                ),
+            ),
+        ]),
+        deposit_contract: None,
+        ..Default::default()
+    }
+    .into()
+});
+
+
 /// The Taiko devnet spec
 pub static TAIKO_DEV: Lazy<Arc<ChainSpec>> = Lazy::new(|| {
     ChainSpec {
