@@ -350,7 +350,7 @@ pub static TAIKO_MAINNET: Lazy<Arc<ChainSpec>> = Lazy::new(|| {
                 Hardfork::Shasta,
                 ForkCondition::Timestamp(
                     std::env::var("MAINNET_SHASTA_TIMESTAMP")
-                        .map_or(1_774_530_900, |h| h.parse().unwrap_or(1_774_530_900)),
+                        .map_or(1_775_135_700, |h| h.parse().unwrap_or(1_775_135_700)),
                 ),
             ),
         ]),
