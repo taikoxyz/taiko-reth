@@ -21,6 +21,12 @@ pub struct ProtocolBaseFeeConfig {
     pub max_gas_issuance_per_block: u32,
 }
 
+/// Taiko mainnet chain ID.
+pub const TAIKO_MAINNET_CHAIN_ID: u64 = 167_000;
+/// The maximum proposal ID (inclusive) for which anchor failure is tolerated on mainnet.
+/// The first Shasta proposals on mainnet had reverted anchor txs due to bootstrapping.
+pub const MAINNET_ANCHOR_CHECK_SKIP_PROPOSAL_OFFSET: u64 = 7;
+
 /// Shasta specific data
 #[derive(Clone, Debug, Default)]
 pub struct ShastaData {
@@ -30,6 +36,10 @@ pub struct ShastaData {
     pub is_force_inclusion: bool,
     /// is the first block in the proposal
     pub is_first_block_in_proposal: bool,
+    /// The proposal (batch) ID, used to skip anchor checks for early mainnet proposals.
+    pub proposal_id: u64,
+    /// The L2 chain ID, used together with proposal_id for mainnet-specific overrides.
+    pub chain_id: u64,
 }
 
 /// Data required to validate a Taiko Block

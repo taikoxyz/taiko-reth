@@ -307,7 +307,19 @@ where
             if is_taiko {
                 if is_anchor && !optimistic {
                     if !result.is_success() {
-                        return Err(BlockExecutionError::msg("anchor transaction must be success"));
+                        // On mainnet, the first Shasta proposals had reverted anchor txs
+                        // due to bootstrapping. Allow those specific proposals through.
+                        let skip_anchor_check = taiko_data.shasta_data.as_ref().is_some_and(|sd| {
+                            sd.chain_id == crate::taiko::TAIKO_MAINNET_CHAIN_ID
+                                && sd.proposal_id <= crate::taiko::MAINNET_ANCHOR_CHECK_SKIP_PROPOSAL_OFFSET
+                        });
+                        if !skip_anchor_check {
+                            return Err(BlockExecutionError::msg("anchor transaction must be success"));
+                        }
+                        warn!(
+                            proposal_id = taiko_data.shasta_data.as_ref().unwrap().proposal_id,
+                            "anchor transaction reverted but allowed for early mainnet proposal"
+                        );
                     } else {
                         // if it's shasta
                         if let Some(shasta_data) = taiko_data.shasta_data {
