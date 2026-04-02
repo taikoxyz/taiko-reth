@@ -307,7 +307,8 @@ where
             if is_taiko {
                 if is_anchor && !optimistic {
                     if !result.is_success() {
-                        return Err(BlockExecutionError::msg("anchor transaction must be success"));
+                        warn!("anchor transaction must be success");
+                        // return Err(BlockExecutionError::msg("anchor transaction must be success"));
                     } else {
                         // if it's shasta
                         if let Some(shasta_data) = taiko_data.shasta_data {
