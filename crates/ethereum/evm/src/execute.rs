@@ -405,7 +405,7 @@ where
             valid_transaction_indices.push(idx);
         }
 
-        let requests = if self.chain_idspec.is_prague_active_at_timestamp(block.timestamp) {
+        let requests = if self.chain_spec.is_prague_active_at_timestamp(block.timestamp) {
             // Collect all EIP-6110 deposits
             let deposit_requests =
                 crate::eip6110::parse_deposits_from_receipts(&self.chain_spec, &receipts)?;
