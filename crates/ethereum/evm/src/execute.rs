@@ -307,8 +307,16 @@ where
             if is_taiko {
                 if is_anchor && !optimistic {
                     if !result.is_success() {
-                        warn!("anchor transaction must be success");
-                        // return Err(BlockExecutionError::msg("anchor transaction must be success"));
+                        let is_taiko_mainnet = self.chain_spec.chain().id() == 167000;
+                        if let Some(shasta_data) = taiko_data.shasta_data {
+                            if is_taiko_mainnet && shasta_data.last_anchor_block_number < 24792383 {
+                                warn!("skip anchor transaction check if last_anchor_block_number < 24792383");
+                            } else {
+                                return Err(BlockExecutionError::msg("anchor transaction must be success"));
+                            }
+                        } else {
+                            return Err(BlockExecutionError::msg("anchor transaction must be success"));
+                        }
                     } else {
                         // if it's shasta
                         if let Some(shasta_data) = taiko_data.shasta_data {
@@ -397,7 +405,7 @@ where
             valid_transaction_indices.push(idx);
         }
 
-        let requests = if self.chain_spec.is_prague_active_at_timestamp(block.timestamp) {
+        let requests = if self.chain_idspec.is_prague_active_at_timestamp(block.timestamp) {
             // Collect all EIP-6110 deposits
             let deposit_requests =
                 crate::eip6110::parse_deposits_from_receipts(&self.chain_spec, &receipts)?;
