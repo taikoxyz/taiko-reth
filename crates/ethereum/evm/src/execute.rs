@@ -311,6 +311,7 @@ where
                         // due to bootstrapping. Allow those specific proposals through.
                         let skip_anchor_check = taiko_data.shasta_data.as_ref().is_some_and(|sd| {
                             sd.chain_id == crate::taiko::TAIKO_MAINNET_CHAIN_ID
+                                && sd.proposal_id >= 1
                                 && sd.proposal_id <= crate::taiko::MAINNET_ANCHOR_CHECK_SKIP_PROPOSAL_OFFSET
                         });
                         if !skip_anchor_check {
